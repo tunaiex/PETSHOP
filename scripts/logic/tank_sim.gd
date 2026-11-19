@@ -8,6 +8,7 @@ const ROOM_TEMP := 21.0
 const FILTER_EFF := [0.0, 0.35, 0.55, 0.75]
 const FILTER_COST := [0, 0, 450, 900]
 const UNLOCK_COST := 1200
+const SALT_COST := 300 ## Tankı tuzlu/tatlı suya çevirme (tuz, test kiti, yeni kum)
 
 static var _uid_counter: int = 1000
 
@@ -16,7 +17,7 @@ static func new_tank(id: int, unlocked: bool, heater: float = 25.0) -> Dictionar
 	return {
 		"id": id, "unlocked": unlocked, "heater": heater, "temp": heater,
 		"dirt": 8.0, "food": 70.0, "sick": false, "sick_level": 0.0,
-		"filter": 1, "fish": [],
+		"filter": 1, "fish": [], "salt": false,
 	}
 
 
@@ -47,6 +48,8 @@ static func species_in(tank: Dictionary) -> Array:
 
 ## Bu türü tanka koymak sorun yaratır mı? Sorun metni ya da "".
 static func check_add(tank: Dictionary, species: String) -> String:
+	if bool(tank.get("salt", false)) != FishDB.is_salt(species):
+		return "%s %s ister, bu tank %s." % [FishDB.display_name(species), "tuzlu su" if FishDB.is_salt(species) else "tatlı su", "tuzlu" if tank.get("salt", false) else "tatlı su"]
 	if tank.fish.size() >= CAPACITY:
 		return "Tank dolu (en fazla %d balık)." % CAPACITY
 	for other in species_in(tank):
@@ -104,6 +107,8 @@ static func step(tank: Dictionary, minutes: float, rng: RandomNumberGenerator) -
 		stress += dt * 0.03
 		if tank.sick:
 			stress += 0.05 * tank.sick_level
+		if bool(tank.get("salt", false)) != bool(s.salt):
+			stress += 0.4
 		for other in present:
 			if other == f.species and other != "beta":
 				continue
@@ -112,6 +117,14 @@ static func step(tank: Dictionary, minutes: float, rng: RandomNumberGenerator) -
 			var att: Dictionary = FishDB.get_species(other)
 			if (att.aggression >= 0.8 and s.long_fins and other != f.species) or (other == "beta" and f.species == "beta"):
 				stress += 0.05
+			elif att.aggression >= 0.9 and other != f.species:
+				stress += 0.05
+				if rng.randf() < 0.0005 * minutes:
+					f.alive = false
+					f.health = 0.0
+					f["eaten"] = true
+					events.append("Tank %d: %s bir %s balığını parçaladı!" % [tank.id + 1, att.name, s.name])
+					break
 			elif att.aggression >= 0.5 and s.small and other != f.species:
 				stress += 0.03
 				if rng.randf() < 0.0008 * minutes:
@@ -163,6 +176,18 @@ static func feed(tank: Dictionary) -> float:
 		tank.dirt = min(100.0, tank.dirt + extra)
 		return extra
 	return 0.0
+
+
+## Boş tankı tuzlu ya da tatlı suya çevirir. Başarılıysa "" döner.
+static func set_salt(tank: Dictionary, salt: bool) -> String:
+	if not living(tank).is_empty():
+		return "Önce tanktaki balıkları sat ya da taşı."
+	tank.salt = salt
+	tank.fish.clear()
+	tank.dirt = 5.0
+	tank.sick = false
+	tank.sick_level = 0.0
+	return ""
 
 
 static func water_change(tank: Dictionary) -> void:

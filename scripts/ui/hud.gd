@@ -524,6 +524,17 @@ func _fill_tank(body: VBoxContainer, aq: Aquarium) -> void:
 		Game.tank_changed.emit(aq.tank_id)
 		Game.notify.emit("%d ölü balık çıkarıldı." % n, "info")
 		_fill_tank(body, aq), dead > 0)
+	var salt: bool = bool(t.get("salt", false))
+	var conv_txt := "Tatlı suya çevir" if salt else "Tuzlu suya çevir"
+	_btn(acts, "%s (%d ₺)" % [conv_txt, TankSim.SALT_COST], func():
+		if not TankSim.living(t).is_empty():
+			Game.notify.emit("Önce tanktaki balıkları sat.", "bad")
+			return
+		if Game.spend(TankSim.SALT_COST):
+			TankSim.set_salt(t, not salt)
+			Game.tank_changed.emit(aq.tank_id)
+			Game.notify.emit("Tank %d artık %s." % [aq.tank_id + 1, "tatlı su" if salt else "tuzlu su (deniz) tankı"], "good")
+		_fill_tank(body, aq), TankSim.living(t).is_empty() and Game.money >= TankSim.SALT_COST)
 	var fl: int = int(t.filter)
 	if fl < 3:
 		var cost: int = TankSim.FILTER_COST[fl + 1]
@@ -613,10 +624,15 @@ func _fill_supplier(body: VBoxContainer, target_tank: int, tab: String) -> void:
 	trow.add_child(_lbl("Hedef tank:", 21))
 	for id in open_tanks:
 		var tk: Dictionary = Game.tanks[id]
-		_btn(trow, "T%d (%.0f°C, %d/%d)" % [id + 1, tk.heater, tk.fish.size(), TankSim.CAPACITY], func(): _fill_supplier(body, id, tab), id != target_tank)
+		_btn(trow, "T%d%s (%.0f°C, %d/%d)" % [id + 1, " 🌊" if tk.get("salt", false) else "", tk.heater, tk.fish.size(), TankSim.CAPACITY], func(): _fill_supplier(body, id, tab), id != target_tank)
 	var tank: Dictionary = Game.tanks[target_tank]
 	body.add_child(HSeparator.new())
-	for sp in FishDB.ids():
+	var salt: bool = bool(tank.get("salt", false))
+	var hdr := _lbl("%s türleri (Tank %d %s)" % ["Tuzlu su" if salt else "Tatlı su", target_tank + 1, "tuzlu" if salt else "tatlı su"], 20, C_ACCENT.lightened(0.4))
+	body.add_child(hdr)
+	if not salt:
+		body.add_child(_lbl("Deniz balıkları için tankı tuzlu suya çevir (tank panelinden).", 17, Color(0.75, 0.8, 0.82)))
+	for sp in FishDB.salt_ids(salt):
 		var s: Dictionary = FishDB.get_species(sp)
 		var row := _row(body)
 		var n := _lbl(s.name, 21)
@@ -802,6 +818,8 @@ func open_menu() -> void:
 func show_help() -> void:
 	var body := _open("Nasıl Oynanır?", 820)
 	var text := """Akvaryum dükkânını ayakta tut!
+
+• Tatlı su ve tuzlu su (deniz) tankları vardır. Palyaço balığı (Nemo), mavi cerrah (Dory) gibi deniz balıkları için tankı tuzlu suya çevir.
 
 • Sabah hazırlık yap: tankları kontrol et, yem ver, gerekirse suyu değiştir.
 • Hazır olunca ön kapıdan dükkânı aç. Gün 09:00-19:00 arası sürer.

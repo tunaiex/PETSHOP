@@ -125,11 +125,109 @@ const SPECIES := {
 		"pattern": 6, "fin_alpha": 0.85,
 		"desc": "Akvaryumun kralı. Çok pahalı, çok hassas. Kirli ve soğuk suda hızla ölür.",
 	},
+	# ---- Gerçek modelli yeni tatlı su türleri
+	"koi": {
+		"name": "Koi", "latin": "Cyprinus rubrofuscus",
+		"buy": 90, "value": 230, "length": 0.2,
+		"temp_min": 15.0, "temp_max": 24.0, "dirt_rate": 2.6, "hardiness": 0.9,
+		"aggression": 0.0, "long_fins": false, "small": false, "schooling": 0.4, "speed": 0.45,
+		"desc": "Havuz balığı. Çok büyür ve çok kirletir, soğuk su sever.",
+	},
+	"pirana": {
+		"name": "Pirana", "latin": "Pygocentrus nattereri",
+		"buy": 120, "value": 290, "length": 0.14,
+		"temp_min": 24.0, "temp_max": 28.0, "dirt_rate": 1.6, "hardiness": 0.8,
+		"aggression": 0.95, "long_fins": false, "small": false, "schooling": 0.7, "speed": 0.7,
+		"desc": "Sürü halinde yaşar. Tankındaki diğer balıkları yer ve yüzgeçlerini koparır.",
+	},
+	"arowana": {
+		"name": "Gümüş Arowana", "latin": "Osteoglossum bicirrhosum",
+		"buy": 450, "value": 1100, "length": 0.32,
+		"temp_min": 24.0, "temp_max": 30.0, "dirt_rate": 2.0, "hardiness": 0.6,
+		"aggression": 0.6, "long_fins": false, "small": false, "schooling": 0.0, "speed": 0.5,
+		"desc": "Dükkânın yıldızı. Küçük balıkları avlar, tek başına tutulmalı.",
+	},
+	# ---- Tuzlu su (deniz) türleri: tuzlu su tankı gerekir
+	"palyaco": {
+		"name": "Palyaço Balığı", "latin": "Amphiprion ocellaris", "salt": true,
+		"buy": 90, "value": 220, "length": 0.08,
+		"temp_min": 24.0, "temp_max": 28.0, "dirt_rate": 0.9, "hardiness": 0.7,
+		"aggression": 0.1, "long_fins": false, "small": true, "schooling": 0.4, "speed": 0.6,
+		"desc": "Herkes Nemo'yu ister! Tuzlu su gerekir.",
+	},
+	"cerrah": {
+		"name": "Mavi Cerrah", "latin": "Paracanthurus hepatus", "salt": true,
+		"buy": 160, "value": 390, "length": 0.13,
+		"temp_min": 24.0, "temp_max": 27.0, "dirt_rate": 1.2, "hardiness": 0.45,
+		"aggression": 0.2, "long_fins": false, "small": false, "schooling": 0.3, "speed": 0.8,
+		"desc": "Dory! Kirli suda hemen hastalanır.",
+	},
+	"mandarin": {
+		"name": "Mandarin Balığı", "latin": "Synchiropus splendidus", "salt": true,
+		"buy": 140, "value": 340, "length": 0.07,
+		"temp_min": 24.0, "temp_max": 27.0, "dirt_rate": 0.6, "hardiness": 0.35,
+		"aggression": 0.0, "long_fins": true, "small": true, "schooling": 0.0, "speed": 0.35,
+		"desc": "Göz alıcı renkler ama çok hassas.",
+	},
+	"aslan": {
+		"name": "Aslan Balığı", "latin": "Pterois volitans", "salt": true,
+		"buy": 220, "value": 520, "length": 0.16,
+		"temp_min": 23.0, "temp_max": 28.0, "dirt_rate": 1.4, "hardiness": 0.8,
+		"aggression": 0.7, "long_fins": true, "small": false, "schooling": 0.0, "speed": 0.3,
+		"desc": "Zehirli dikenleri var, ağzına sığan her balığı yer.",
+	},
+	"balon": {
+		"name": "Balon Balığı", "latin": "Diodon holocanthus", "salt": true,
+		"buy": 150, "value": 360, "length": 0.12,
+		"temp_min": 24.0, "temp_max": 28.0, "dirt_rate": 1.5, "hardiness": 0.65,
+		"aggression": 0.5, "long_fins": false, "small": false, "schooling": 0.0, "speed": 0.3,
+		"desc": "Sevimli ama yüzgeç ısırır, küçük balıklara dikkat.",
+	},
+	"denizati": {
+		"name": "Deniz Atı", "latin": "Hippocampus kuda", "salt": true,
+		"buy": 200, "value": 480, "length": 0.11,
+		"temp_min": 23.0, "temp_max": 26.0, "dirt_rate": 0.5, "hardiness": 0.3,
+		"aggression": 0.0, "long_fins": false, "small": true, "schooling": 0.0, "speed": 0.15,
+		"model_fwd": Vector3(0, 0, 1), "upright": true,
+		"desc": "Çok yavaş ve narin. Saldırgan balıklarla asla tutma.",
+	},
 }
+
+## Eksik alanlar için varsayılanlar (prosedürel modelde ve simülasyonda kullanılır).
+const DEFAULTS := {
+	"salt": false, "height": 0.4, "width": 0.25, "tail": "fan", "tail_size": 1.0, "dorsal": 0.6,
+	"body": Color(0.6, 0.6, 0.62), "belly": Color(0.9, 0.9, 0.88), "accent": Color(0.3, 0.3, 0.3),
+	"fin": Color(0.7, 0.7, 0.7), "pattern": 0, "fin_alpha": 0.8,
+	"model_fwd": Vector3(0, 0, 1), "upright": false,
+}
+
+## Gerçek model dosyalarının baş yönü (+Z dışında olanlar).
+const MODEL_FWD := {"melek": Vector3(1, 0, 0)}
+
+static var _merged: Dictionary = {}
 
 
 static func get_species(id: String) -> Dictionary:
-	return SPECIES.get(id, {})
+	if _merged.has(id):
+		return _merged[id]
+	if not SPECIES.has(id):
+		return {}
+	var d: Dictionary = DEFAULTS.duplicate()
+	d.merge(SPECIES[id], true)
+	if MODEL_FWD.has(id):
+		d.model_fwd = MODEL_FWD[id]
+	_merged[id] = d
+	return d
+
+
+## Bu türün gerçek 3D modeli (yoksa "").
+static func model_path(id: String) -> String:
+	var p := "res://assets/models/fish/%s.glb" % id
+	return p if ResourceLoader.exists(p) else ""
+
+
+static func is_salt(id: String) -> bool:
+	return bool(get_species(id).get("salt", false))
 
 
 static func ids() -> Array:
@@ -138,6 +236,10 @@ static func ids() -> Array:
 
 static func display_name(id: String) -> String:
 	return SPECIES.get(id, {}).get("name", id)
+
+
+static func salt_ids(salt: bool) -> Array:
+	return ids().filter(func(i): return is_salt(i) == salt)
 
 
 ## Tek bir balığın piyasa değeri. Sağlık ve büyüklükle değişir.
@@ -156,11 +258,15 @@ static func conflict_reason(a: String, b: String) -> String:
 	var sb: Dictionary = get_species(b)
 	if sa.is_empty() or sb.is_empty():
 		return ""
+	if sa.salt != sb.salt:
+		return "%s %s, %s %s balığı." % [sa.name, "tuzlu su" if sa.salt else "tatlı su", sb.name, "tuzlu su" if sb.salt else "tatlı su"]
 	if a == "beta" and b == "beta":
 		return "İki beta aynı tankta kavga eder."
 	for pair in [[a, sa, b, sb], [b, sb, a, sa]]:
 		var att: Dictionary = pair[1]
 		var vic: Dictionary = pair[3]
+		if att.aggression >= 0.9 and pair[0] != pair[2]:
+			return "%s, %s balıklarına saldırır." % [att.name, vic.name]
 		if att.aggression >= 0.8 and vic.long_fins and pair[0] != pair[2]:
 			return "%s, %s balığının yüzgeçlerini parçalar." % [att.name, vic.name]
 		if att.aggression >= 0.5 and vic.small and pair[0] != pair[2]:

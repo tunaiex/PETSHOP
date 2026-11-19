@@ -42,15 +42,17 @@ func setup(fish_data: Dictionary, aq: Node3D, swim_bounds: AABB) -> void:
 
 
 func _build_visual() -> void:
-	var glb := "res://assets/models/fish/%s.glb" % species
-	if ResourceLoader.exists(glb):
-		var scene: PackedScene = load(glb)
-		_visual = scene.instantiate()
-		add_child(_visual)
-		var aabb := _approx_aabb(_visual)
-		var longest: float = max(aabb.size.x, max(aabb.size.y, aabb.size.z))
-		if longest > 0.0:
-			_visual.scale = Vector3.ONE * (float(_data.length) / longest)
+	var model: Dictionary = _model_template(species)
+	if not model.is_empty():
+		var mi := MeshInstance3D.new()
+		mi.mesh = model.mesh
+		mi.transform = model.xf
+		_mat = model.mat.duplicate()
+		_mat.set_shader_parameter("phase", _phase)
+		mi.material_override = _mat
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(mi)
+		_visual = mi
 		return
 	var mi := MeshInstance3D.new()
 	mi.mesh = MeshKit.fish_mesh(species)
@@ -65,18 +67,76 @@ func _build_visual() -> void:
 	_visual = mi
 
 
-func _approx_aabb(n: Node) -> AABB:
-	var box := AABB()
-	var first := true
-	for c in n.find_children("*", "MeshInstance3D", true, false):
-		var m: MeshInstance3D = c
-		var b: AABB = m.get_aabb()
-		if first:
-			box = b
-			first = false
-		else:
-			box = box.merge(b)
-	return box
+static var _templates: Dictionary = {}
+
+## Gerçek modeli bir kez yükler: mesh, yönlendirme/ölçek dönüşümü ve yüzme materyali.
+## Model, burnu -Z'ye bakacak ve boyu tür uzunluğuna eşit olacak şekilde yerleştirilir.
+static func _model_template(sp: String) -> Dictionary:
+	if _templates.has(sp):
+		return _templates[sp]
+	var path: String = FishDB.model_path(sp)
+	if path == "":
+		_templates[sp] = {}
+		return {}
+	var data: Dictionary = FishDB.get_species(sp)
+	var root: Node3D = (load(path) as PackedScene).instantiate()
+	var src: MeshInstance3D = null
+	for c in root.find_children("*", "MeshInstance3D", true, false):
+		src = c
+		break
+	if src == null:
+		root.free()
+		_templates[sp] = {}
+		return {}
+	# Mesh'in sahne köküne göre dönüşümü
+	var rel := Transform3D.IDENTITY
+	var cur: Node = src
+	while cur != root and cur != null:
+		if cur is Node3D:
+			rel = (cur as Node3D).transform * rel
+		cur = cur.get_parent()
+	var mesh: Mesh = src.mesh
+	var src_mat: Material = src.get_active_material(0)
+	root.free()
+	var fwd: Vector3 = data.model_fwd
+	# Modelin baş yönünü -Z'ye çeviren dönüş
+	var orient := Basis.IDENTITY
+	if fwd.is_equal_approx(Vector3(0, 0, 1)):
+		orient = Basis(Vector3.UP, PI)
+	elif fwd.is_equal_approx(Vector3(1, 0, 0)):
+		orient = Basis(Vector3.UP, PI * 0.5)
+	elif fwd.is_equal_approx(Vector3(-1, 0, 0)):
+		orient = Basis(Vector3.UP, -PI * 0.5)
+	var aabb: AABB = rel * mesh.get_aabb()
+	var along: float = abs(aabb.size.dot(fwd.abs()))
+	var k: float = float(data.length) / max(along, 0.0001)
+	var xf := Transform3D(orient.scaled(Vector3.ONE * k), Vector3.ZERO) * Transform3D(Basis.IDENTITY, -aabb.get_center()) * rel
+	# Shader için eksenler mesh uzayında
+	var inv: Basis = rel.basis.inverse()
+	var tail_mesh: Vector3 = (inv * -fwd).normalized()
+	var side_model: Vector3 = Vector3.UP.cross(fwd).normalized()
+	var side_mesh: Vector3 = (inv * side_model).normalized()
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://shaders/fish_tex.gdshader")
+	var tex: Texture2D = null
+	var col := Color.WHITE
+	var rough := 0.45
+	if src_mat is BaseMaterial3D:
+		tex = (src_mat as BaseMaterial3D).albedo_texture
+		col = (src_mat as BaseMaterial3D).albedo_color
+		rough = clamp((src_mat as BaseMaterial3D).roughness, 0.25, 0.8)
+	mat.set_shader_parameter("albedo_tex", tex)
+	mat.set_shader_parameter("has_tex", tex != null)
+	mat.set_shader_parameter("albedo_color", col)
+	mat.set_shader_parameter("roughness", rough)
+	mat.set_shader_parameter("tail_axis", tail_mesh)
+	mat.set_shader_parameter("side_axis", side_mesh)
+	mat.set_shader_parameter("center", mesh.get_aabb().get_center())
+	mat.set_shader_parameter("half_len", along * 0.5 / max(rel.basis.get_scale().x, 0.0001))
+	mat.set_shader_parameter("upright", 1.0 if data.upright else 0.0)
+	var t := {"mesh": mesh, "xf": xf, "mat": mat}
+	_templates[sp] = t
+	return t
 
 
 func apply_state(fish_data: Dictionary) -> void:
@@ -94,9 +154,23 @@ func set_sick(level: float) -> void:
 		_mat.set_shader_parameter("sick", level)
 
 
+func _margin() -> Vector3:
+	var half: float = float(_data.length) * scale.x * 0.5
+	var m := Vector3(half, half * 0.5, half) + Vector3.ONE * 0.04
+	return m.min(bounds.size * 0.45)
+
+
+func _lo() -> Vector3:
+	return bounds.position + _margin()
+
+
+func _hi() -> Vector3:
+	return bounds.end - _margin()
+
+
 func _random_point() -> Vector3:
-	var p := bounds.position
-	var s := bounds.size
+	var p := _lo()
+	var s := _hi() - _lo()
 	var y_bias: float = _rng.randf()
 	# Sürü balıkları ortada, diğerleri her yerde
 	if float(_data.schooling) > 0.7:
@@ -146,10 +220,9 @@ func _process(delta: float) -> void:
 			center /= n
 			desired += ((center - position) * 0.6 + align / n * 0.8) * school
 			desired += sep * 0.002
-	# Duvarlardan uzak dur
-	var margin := 0.05
-	var lo: Vector3 = bounds.position + Vector3.ONE * margin
-	var hi: Vector3 = bounds.end - Vector3.ONE * margin
+	# Duvarlardan uzak dur (büyük balıklar için daha geniş pay)
+	var lo: Vector3 = _lo()
+	var hi: Vector3 = _hi()
 	for axis in 3:
 		if position[axis] < lo[axis]:
 			desired[axis] += spd * 2.0
@@ -160,7 +233,7 @@ func _process(delta: float) -> void:
 		desired = desired.normalized() * spd * 1.5
 	velocity = velocity.lerp(desired, clamp(delta * 2.0, 0.0, 1.0))
 	position += velocity * delta
-	position = position.clamp(bounds.position, bounds.end)
+	position = position.clamp(_lo() - Vector3.ONE * 0.03, _hi() + Vector3.ONE * 0.03)
 
 	if velocity.length() > 0.002:
 		var flat := velocity

@@ -6,7 +6,8 @@ müşteriler pazarlık eder ve kira her gün artar.
 
 ![Dükkân](docs/dukkan.png)
 ![Akvaryum](docs/akvaryum.png)
-![Balık türleri](docs/baliklar.png)
+![Melek ve pirana](docs/egzotik.png)
+![Japon ve koi](docs/japon_koi.png)
 
 ## Açmak
 
@@ -42,6 +43,18 @@ müşteriler pazarlık eder ve kira her gün artar.
   - Diskus çok kazandırır ama çok hassastır
 - **Gün sonu:** Kira (her gün artar) ve elektrik ödenir. **3 gün üst üste borçta kalırsan dükkân kapanır.**
 - Lepistesler bakımlı tankta yavrular. Kiralık tankları açarak büyüyebilirsin.
+- **Tuzlu su (deniz) tankları:** Boş bir tankı tuzlu suya çevirip palyaço balığı (Nemo), mavi cerrah (Dory),
+  mandarin, aslan balığı, balon balığı ve deniz atı satabilirsin.
+
+## Balık türleri (17)
+
+| Tatlı su | Tuzlu su |
+|---|---|
+| Lepistes, Neon Tetra, Zebra Danio, Siyah Moli, Diskus | Palyaço Balığı, Mavi Cerrah, Mandarin |
+| Japon Balığı\*, Beta\*, Melek Balığı\*, Koi\* | Aslan Balığı\*, Balon Balığı\*, Deniz Atı\* |
+| Pirana\*, Gümüş Arowana\* | |
+
+\* Gerçek 3D modelli türler (Palyaço, Cerrah, Mandarin dahil 12 tür). Diğerleri koddan üretilen modellerle gösterilir.
 
 ## Proje yapısı
 
@@ -63,17 +76,21 @@ tools/screenshot.gd       Geliştirici aracı: ekran görüntüsü alır
 `scripts/data/fish_db.gd` içindeki `SPECIES` sözlüğüne bir kayıt ekle.
 Gövde şekli, yüzgeçler, renkler ve desen bu alanlardan otomatik üretilir.
 
-## Kendi 3D modellerini kullanmak
+## 3D modeller
 
-Oyun şu an tüm modelleri koddan üretiyor. Daha gerçekçi modeller kullanmak için
-`.glb` dosyalarını aşağıdaki yerlere koyman yeterli, kod bunları otomatik kullanır:
+Projede CC0 lisanslı hazır modeller var: 12 balık, ceviz akvaryum dolabı, kasa tezgâhı, duvar rafları,
+saksı bitkileri ve akvaryum dekorları (kaya, amfora, resif, deniz yıldızı...). Kaynaklar için `assets/LISANSLAR.md`.
+Hazır balık modelleri animasyonsuz geldiği için yüzme hareketi `shaders/fish_tex.gdshader` ile ekleniyor.
+
+Yeni model eklemek için `.glb` dosyalarını aşağıdaki yerlere koyman yeterli, kod bunları otomatik kullanır:
 
 | Dosya | Yerine geçtiği |
 |---|---|
 | `assets/models/fish/<tür>.glb` (ör. `neon.glb`, `japon.glb`) | O türün balığı |
 | `assets/models/characters/customer.glb` | Müşteri. İçinde `walk` / `idle` animasyonu varsa oynatılır. |
 
-Balık modelinin burnu **-Z** yönüne bakmalı. Boyutu otomatik ölçeklenir.
+Balık modelinin burnu **+Z** yönüne bakmalı (bu paketteki gibi). Farklıysa `fish_db.gd` içindeki `MODEL_FWD` ile ayarla.
+Boyutu tür uzunluğuna göre otomatik ölçeklenir.
 
 Ücretsiz model kaynakları:
 

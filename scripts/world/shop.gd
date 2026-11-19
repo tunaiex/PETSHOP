@@ -9,8 +9,10 @@ const H := 3.2
 const WALL := 0.2
 
 var aquariums: Array = []
-var register_point := Vector3(4.3, 0, 2.05)   ## Kasada bekleyen müşterinin yeri
-var queue_points: Array = [Vector3(3.2, 0, 1.4), Vector3(2.2, 0, 1.4), Vector3(1.2, 0, 1.4), Vector3(0.2, 0, 1.4)]
+var register_point := Vector3(5.2, 0, 2.15)   ## Kasada bekleyen müşterinin yeri
+var queue_points: Array = [Vector3(4.1, 0, 1.5), Vector3(3.0, 0, 1.5), Vector3(1.9, 0, 1.5), Vector3(0.8, 0, 1.5)]
+
+const PROPS := "res://assets/models/props/%s.glb"
 var entrance := Vector3(0, 0, 3.6)
 var outside := Vector3(0, 0, 8.5)
 var shelf_point := Vector3(5.4, 0, -2.0)
@@ -260,48 +262,53 @@ func _place_aquariums() -> void:
 		aq.position = spots[i][0]
 		aq.rotation_degrees.y = spots[i][1]
 		add_child(aq)
-		aq.setup(i)
+		aq.setup(i, i <= 2) # arka duvar: ceviz dolap, sol duvar: beyaz dolap
 		aquariums.append(aq)
 
 
+func _prop(id: String) -> Node3D:
+	var path := PROPS % id
+	if not ResourceLoader.exists(path):
+		return null
+	return (load(path) as PackedScene).instantiate()
+
+
 func _counter() -> void:
-	var base_mat := MeshKit.mat(Color(0.93, 0.92, 0.9), 0.5)
-	var wood := MeshKit.shader_mat("res://shaders/wood_floor.gdshader", {"wood_a": Color(0.7, 0.52, 0.34), "wood_b": Color(0.55, 0.38, 0.24), "plank": Vector2(3.0, 0.6)})
-	MeshKit.box(self, Vector3(3.0, 0.98, 0.6), Vector3(4.7, 0.49, 3.0), base_mat, true)
-	MeshKit.box(self, Vector3(3.1, 0.05, 0.7), Vector3(4.7, 1.0, 3.0), wood)
-	# Ön panelde şerit ve yazı
-	MeshKit.box(self, Vector3(3.0, 0.12, 0.01), Vector3(4.7, 0.75, 2.695), MeshKit.mat(Color(0.06, 0.45, 0.52), 0.4))
-	var lbl := Label3D.new()
-	lbl.text = "KASA"
-	lbl.font_size = 64
-	lbl.pixel_size = 0.0025
-	lbl.modulate = Color(1, 1, 1)
-	lbl.outline_size = 0
-	lbl.position = Vector3(4.3, 0.75, 2.685)
-	add_child(lbl)
-	# Yazar kasa
 	var dark := MeshKit.mat(Color(0.12, 0.12, 0.13), 0.35)
-	MeshKit.box(self, Vector3(0.4, 0.1, 0.35), Vector3(4.3, 1.075, 3.05), dark)
-	var screen_mat := StandardMaterial3D.new()
-	screen_mat.albedo_color = Color(0.05, 0.1, 0.15)
-	screen_mat.emission_enabled = true
-	screen_mat.emission = Color(0.3, 0.75, 0.9)
-	screen_mat.emission_energy_multiplier = 0.8
-	var scr := MeshKit.box(self, Vector3(0.3, 0.2, 0.02), Vector3(4.3, 1.25, 3.12), screen_mat)
-	scr.rotation_degrees.x = -15
-	MeshKit.box(self, Vector3(0.04, 0.15, 0.04), Vector3(4.3, 1.15, 3.15), dark)
-	Interactable.create(self, Vector3(0.6, 0.5, 0.6), Vector3(4.3, 1.2, 3.05), _register_prompt, func(p): p.hud.open_register())
+	var counter := _prop("kasa_tezgahi")
+	var top_y := 1.0
+	if counter:
+		# 2.62 m tezgâh; müşteri yüzü modelde +Z, burada -Z'ye (salona) bakmalı.
+		counter.rotation_degrees.y = 180
+		counter.position = Vector3(6.0, 0, 2.72)
+		add_child(counter)
+		top_y = 1.05
+		var body := StaticBody3D.new()
+		var cs := CollisionShape3D.new()
+		var shape := BoxShape3D.new()
+		shape.size = Vector3(2.62, 1.05, 0.7)
+		cs.shape = shape
+		body.add_child(cs)
+		body.position = Vector3(4.69, 0.525, 3.05)
+		add_child(body)
+	else:
+		var base_mat := MeshKit.mat(Color(0.93, 0.92, 0.9), 0.5)
+		var wood := MeshKit.shader_mat("res://shaders/wood_floor.gdshader", {"wood_a": Color(0.7, 0.52, 0.34), "wood_b": Color(0.55, 0.38, 0.24), "plank": Vector2(3.0, 0.6)})
+		MeshKit.box(self, Vector3(3.0, 0.98, 0.6), Vector3(4.7, 0.49, 3.0), base_mat, true)
+		MeshKit.box(self, Vector3(3.1, 0.05, 0.7), Vector3(4.7, 1.0, 3.0), wood)
+		MeshKit.box(self, Vector3(0.4, 0.1, 0.35), Vector3(5.2, 1.075, 3.05), dark)
+	Interactable.create(self, Vector3(0.9, 0.6, 0.7), Vector3(5.2, top_y + 0.2, 3.05), _register_prompt, func(p): p.hud.open_register())
 	# Tedarik tableti
-	var tab := MeshKit.box(self, Vector3(0.32, 0.015, 0.22), Vector3(5.5, 1.04, 3.0), dark)
+	var tab := MeshKit.box(self, Vector3(0.32, 0.015, 0.22), Vector3(4.0, top_y + 0.04, 3.1), dark)
 	tab.rotation_degrees.x = 12
 	var tscr := StandardMaterial3D.new()
 	tscr.albedo_color = Color(0.1, 0.2, 0.3)
 	tscr.emission_enabled = true
 	tscr.emission = Color(0.4, 0.8, 1.0)
 	tscr.emission_energy_multiplier = 0.7
-	var ts := MeshKit.box(self, Vector3(0.28, 0.004, 0.18), Vector3(5.5, 1.05, 3.0), tscr)
+	var ts := MeshKit.box(self, Vector3(0.28, 0.004, 0.18), Vector3(4.0, top_y + 0.05, 3.1), tscr)
 	ts.rotation_degrees.x = 12
-	Interactable.create(self, Vector3(0.5, 0.3, 0.4), Vector3(5.5, 1.1, 3.0), func(): return "Tedarik tableti: Sipariş ver", func(p): p.hud.open_supplier())
+	Interactable.create(self, Vector3(0.6, 0.35, 0.5), Vector3(4.0, top_y + 0.1, 3.1), func(): return "Tedarik tableti: Sipariş ver", func(p): p.hud.open_supplier())
 	# Duvar saati
 	_clock = Label3D.new()
 	_clock.font_size = 96
@@ -408,8 +415,27 @@ func _product_mesh(parent: Node3D, p: Dictionary, pos: Vector3) -> void:
 
 
 func _decor() -> void:
+	# Ekipman rafları (sağ duvar)
+	for z in [-4.35, 0.35]:
+		var bay := _prop("duvar_rafi")
+		if bay:
+			bay.rotation_degrees.y = -90
+			bay.position = Vector3(W * 0.5 - 0.22, 0, z)
+			add_child(bay)
+			var body := StaticBody3D.new()
+			var cs := CollisionShape3D.new()
+			var shape := BoxShape3D.new()
+			shape.size = Vector3(0.45, 2.15, 1.0)
+			cs.shape = shape
+			cs.position = Vector3(0, 1.07, 0)
+			body.add_child(cs)
+			body.position = Vector3(W * 0.5 - 0.22, 0, z)
+			add_child(body)
 	# Saksı bitkileri
-	for pos in [Vector3(-6.3, 0, 4.3), Vector3(6.4, 0, -4.4), Vector3(-6.4, 0, -4.4)]:
+	var plants := [["agave", 0.75], ["egrelti", 0.85], ["calilik", 0.7]]
+	var spots := [Vector3(-6.3, 0, 4.3), Vector3(-6.4, 0, -4.4), Vector3(2.0, 0, 4.4)]
+	for i in spots.size():
+		var pos: Vector3 = spots[i]
 		var pot := MeshInstance3D.new()
 		var cm := CylinderMesh.new()
 		cm.top_radius = 0.22
@@ -419,12 +445,25 @@ func _decor() -> void:
 		pot.position = pos + Vector3(0, 0.225, 0)
 		pot.material_override = MeshKit.mat(Color(0.85, 0.83, 0.8), 0.6)
 		add_child(pot)
-		var plant := MeshInstance3D.new()
-		plant.mesh = MeshKit.sword_plant(int(pos.x * 10 + pos.z), 14, 0.3)
-		plant.scale = Vector3.ONE * 2.6
-		plant.position = pos + Vector3(0, 0.42, 0)
-		plant.material_override = MeshKit.shader_mat("res://shaders/plant.gdshader", {"base_color": Color(0.08, 0.28, 0.08), "tip_color": Color(0.35, 0.65, 0.2), "sway": 0.0})
-		add_child(plant)
+		var model := _prop(plants[i][0])
+		if model:
+			var box := AABB()
+			var first := true
+			for c in model.find_children("*", "MeshInstance3D", true, false):
+				var b: AABB = (c as MeshInstance3D).transform * (c as MeshInstance3D).get_aabb()
+				box = b if first else box.merge(b)
+				first = false
+			var k: float = float(plants[i][1]) / max(box.size.x, box.size.z)
+			model.scale = Vector3.ONE * k
+			model.position = pos + Vector3(-box.get_center().x * k, 0.43 - box.position.y * k, -box.get_center().z * k)
+			add_child(model)
+		else:
+			var plant := MeshInstance3D.new()
+			plant.mesh = MeshKit.sword_plant(int(pos.x * 10 + pos.z), 14, 0.3)
+			plant.scale = Vector3.ONE * 2.6
+			plant.position = pos + Vector3(0, 0.42, 0)
+			plant.material_override = MeshKit.shader_mat("res://shaders/plant.gdshader", {"base_color": Color(0.08, 0.28, 0.08), "tip_color": Color(0.35, 0.65, 0.2), "sway": 0.0})
+			add_child(plant)
 		var body := StaticBody3D.new()
 		var cs := CollisionShape3D.new()
 		var sh := CylinderShape3D.new()

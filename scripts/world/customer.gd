@@ -308,7 +308,11 @@ func _evaluate_tank(aq: Aquarium) -> void:
 	if _rng.randf() < 0.75:
 		for i in want:
 			basket.append({"type": "fish", "tank": aq.tank_id, "uid": int(same[i].uid), "species": sp})
-		say("%d tane %s alayım." % [want, s.name] if want > 1 else "Şu %s çok güzel!" % s.name)
+		var special := {"palyaco": "Aaa Nemo! Bunu alıyorum!", "cerrah": "Dory'yi buldum!", "arowana": "Vay be, ejderha balığı!", "pirana": "Pirana mı bu? Harika!", "denizati": "Deniz atı! Çok narin..."}
+		if special.has(sp) and _rng.randf() < 0.7:
+			say(special[sp])
+		else:
+			say("%d tane %s alayım." % [want, s.name] if want > 1 else "Şu %s çok güzel!" % s.name)
 	else:
 		say(["Güzelmiş.", "Hmm...", "Çok tatlılar!"][_rng.randi_range(0, 2)], 2.5)
 

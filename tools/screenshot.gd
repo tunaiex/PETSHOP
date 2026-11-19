@@ -8,7 +8,9 @@ var _shots := [
 	["genel", Vector3(5.0, 0.05, 4.2), 45.0, -8.0],
 	["tank_yakin", Vector3(-3.6, 0.05, -3.55), 0.0, -18.0],
 	["tank_orta", Vector3(0.0, 0.05, -3.3), 0.0, -14.0],
-	["tank_japon", Vector3(3.4, 0.05, -3.6), 0.0, -18.0],
+	["tank_japon", Vector3(0.0, 0.05, -3.6), 0.0, -18.0],
+	["tank_deniz", Vector3(3.6, 0.05, -3.6), 0.0, -18.0],
+	["tank_egzotik", Vector3(-5.2, 0.05, -1.6), 90.0, -18.0],
 	["salon", Vector3(3.0, 0.05, 2.0), 60.0, -6.0],
 	["kasa", Vector3(2.8, 0.05, 0.6), -60.0, -8.0],
 	["raf", Vector3(4.0, 0.05, -2.0), -90.0, -8.0],
@@ -31,9 +33,10 @@ func _process(_d: float) -> bool:
 		_main = load("res://scenes/main.tscn").instantiate()
 		root.add_child(_main)
 	if _frame == 10:
+		_showcase(root.get_node("Game"))
 		_main.hud.close_panel()
 		root.get_node("Game").open_shop()
-		root.get_node("Game").time_scale = 6.0
+		root.get_node("Game").time_scale = 1.0
 	if _frame > 10 and _frame % 90 == 0:
 		if _idx > 0 and _idx <= _shots.size():
 			var img := root.get_viewport().get_texture().get_image()
@@ -96,3 +99,19 @@ func _gallery() -> void:
 	g.add_child(cam)
 	cam.current = true
 	_main.hud.visible = false
+
+
+## Görüntü için vitrin: tuzlu tank ve egzotik tank doldurulur.
+func _showcase(game: Node) -> void:
+	var sea: Dictionary = game.tanks[2]
+	TankSim.set_salt(sea, true)
+	for sp in ["palyaco", "palyaco", "palyaco", "cerrah", "cerrah", "mandarin", "denizati"]:
+		sea.fish.append(TankSim.new_fish(sp, 0.9))
+	var ex: Dictionary = game.tanks[3]
+	ex.unlocked = true
+	for sp in ["melek", "melek", "melek", "arowana", "pirana", "pirana"]:
+		ex.fish.append(TankSim.new_fish(sp, 0.9))
+	for i in 3:
+		game.tanks[1].fish.append(TankSim.new_fish("koi", 0.8))
+	for t in game.tanks:
+		game.tank_changed.emit(t.id)

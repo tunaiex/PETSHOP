@@ -1,1 +1,0 @@
-Modelleri buraya koy (.glb / .gltf / .fbx).

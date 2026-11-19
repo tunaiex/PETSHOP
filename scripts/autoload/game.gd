@@ -240,6 +240,7 @@ func from_dict(d: Dictionary) -> bool:
 		var tank: Dictionary = t
 		tank.id = int(tank.id)
 		tank.filter = int(tank.filter)
+		tank["salt"] = bool(tank.get("salt", false))
 		for f in tank.fish:
 			f.uid = int(f.uid)
 			max_uid = max(max_uid, f.uid)

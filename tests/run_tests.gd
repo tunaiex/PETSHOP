@@ -113,6 +113,11 @@ func _test_fishdb() -> void:
 	for id in FishDB.ids():
 		var s: Dictionary = FishDB.get_species(id)
 		check(s.value > s.buy, "%s kârlı satılabilir" % s.name)
+	check(FishDB.conflict_reason("palyaco", "neon") != "", "Tuzlu ve tatlı su balığı birlikte olmaz")
+	check(FishDB.conflict_reason("palyaco", "cerrah") == "", "Palyaço + mavi cerrah uyumlu")
+	check(FishDB.conflict_reason("pirana", "japon") != "", "Pirana diğer balıklara saldırır")
+	check(FishDB.conflict_reason("aslan", "palyaco") != "", "Aslan balığı palyaçoyu yer")
+	check(FishDB.get_species("koi").has("tail"), "Yeni türler varsayılan alanları alır")
 
 
 func _test_haggle() -> void:
@@ -189,6 +194,19 @@ func _test_tank_sim() -> void:
 	# Ölü balık kaldırma
 	full.fish[0].alive = false
 	check(TankSim.remove_dead(full) == 1, "Ölü balık çıkarılır")
+	# Tuzlu su
+	var sea := TankSim.new_tank(3, true, 26.0)
+	check(TankSim.check_add(sea, "palyaco") != "", "Tatlı su tankına deniz balığı konmaz")
+	check(TankSim.set_salt(sea, true) == "", "Boş tank tuzlu suya çevrilir")
+	check(TankSim.check_add(sea, "palyaco") == "", "Tuzlu tanka palyaço konur")
+	check(TankSim.check_add(sea, "neon") != "", "Tuzlu tanka neon konmaz")
+	sea.fish.append(TankSim.new_fish("palyaco", 0.8))
+	check(TankSim.set_salt(sea, false) != "", "Dolu tankın suyu değiştirilemez")
+	var wrong := TankSim.new_tank(4, true, 26.0)
+	wrong.fish.append(TankSim.new_fish("cerrah", 0.8))
+	for m in 120:
+		TankSim.step(wrong, 1.0, rng)
+	check(TankSim.living(wrong).is_empty(), "Deniz balığı tatlı suda yaşayamaz")
 
 
 func _test_meshes() -> void:
@@ -196,6 +214,15 @@ func _test_meshes() -> void:
 		var m: ArrayMesh = MeshKit.fish_mesh(id)
 		check(m != null and m.get_surface_count() == 1 and m.get_aabb().size.z > 0.0, "%s modeli üretildi" % id)
 	check(MeshKit.rock(1, Vector3(0.2, 0.1, 0.15)).get_surface_count() == 1, "Kaya modeli üretildi")
+	for id in ["beta", "japon", "melek", "koi", "pirana", "arowana", "palyaco", "cerrah", "mandarin", "aslan", "balon", "denizati"]:
+		var t: Dictionary = Fish._model_template(id)
+		var ok: bool = not t.is_empty() and t.mesh != null
+		if ok:
+			var size: Vector3 = (t.xf * t.mesh.get_aabb()).size
+			ok = abs(size.z - float(FishDB.get_species(id).length)) < 0.02 or id == "denizati"
+		check(ok, "%s gerçek modeli yüklendi ve boyu doğru" % id)
+	for prop in ["props/akvaryum_dolabi", "props/kasa_tezgahi", "props/duvar_rafi", "props/agave", "decor/resif_kayasi", "decor/amfora"]:
+		check(ResourceLoader.exists("res://assets/models/%s.glb" % prop), "%s modeli var" % prop)
 	check(MeshKit.grass_clump(1, 6, 0.3).get_surface_count() == 1, "Bitki modeli üretildi")
 
 

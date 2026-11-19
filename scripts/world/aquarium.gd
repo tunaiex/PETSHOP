@@ -8,8 +8,11 @@ const TH := 0.55
 const TD := 0.5
 const STAND_H := 0.82
 const GRAVEL := 0.07
+const CABINET_MODEL := "res://assets/models/props/akvaryum_dolabi.glb"
 
 var tank_id: int = 0
+var wood_stand: bool = false ## true: hazır ceviz dolap modeli, false: beyaz modern dolap
+var _built_salt: bool = false
 var _fish: Dictionary = {}  ## uid -> Fish
 var _water_mat: ShaderMaterial
 var _surface_mat: ShaderMaterial
@@ -28,8 +31,9 @@ var _y0: float = STAND_H + 0.025
 var _water_h: float = TH - 0.06
 
 
-func setup(id: int) -> void:
+func setup(id: int, wood: bool = false) -> void:
 	tank_id = id
+	wood_stand = wood and ResourceLoader.exists(CABINET_MODEL)
 	_build_static()
 	_rebuild_content()
 	Game.tank_changed.connect(_on_tank_changed)
@@ -47,19 +51,25 @@ func _on_tank_changed(id: int) -> void:
 # ------------------------------------------------------------------ İnşa
 
 func _build_static() -> void:
-	var cabinet := MeshKit.mat(Color(0.87, 0.87, 0.85), 0.45)
 	var dark := MeshKit.mat(Color(0.05, 0.05, 0.055), 0.35)
-	var seam := MeshKit.mat(Color(0.55, 0.55, 0.53), 0.6)
-	MeshKit.box(self, Vector3(TW + 0.04, STAND_H - 0.06, TD + 0.04), Vector3(0, STAND_H * 0.5 + 0.03, 0), cabinet)
-	MeshKit.box(self, Vector3(TW, 0.06, TD), Vector3(0, 0.03, -0.01), dark)
-	# Dolap kapakları
-	for i in 2:
-		var x: float = -TW / 6.0 + i * TW / 3.0
-		MeshKit.box(self, Vector3(0.004, STAND_H - 0.1, 0.004), Vector3(x, STAND_H * 0.5 + 0.03, TD * 0.5 + 0.021), seam)
-	for i in 3:
-		var x: float = -TW / 3.0 + i * TW / 3.0
-		MeshKit.box(self, Vector3(0.012, 0.12, 0.012), Vector3(x + 0.12, STAND_H * 0.62, TD * 0.5 + 0.028), MeshKit.mat(Color(0.7, 0.7, 0.72), 0.25, 0.9))
-	MeshKit.box(self, Vector3(TW + 0.05, 0.025, TD + 0.05), Vector3(0, STAND_H + 0.0125, 0), dark)
+	if wood_stand:
+		# Hazır model: 1.304 x 0.894 x 0.62 (üst tabla). Tank ölçüsüne uydur.
+		var cab: Node3D = (load(CABINET_MODEL) as PackedScene).instantiate()
+		cab.scale = Vector3((TW + 0.04) / 1.304, (STAND_H + 0.025) / 0.894, (TD + 0.04) / 0.62)
+		add_child(cab)
+	else:
+		var cabinet := MeshKit.mat(Color(0.87, 0.87, 0.85), 0.45)
+		var seam := MeshKit.mat(Color(0.55, 0.55, 0.53), 0.6)
+		MeshKit.box(self, Vector3(TW + 0.04, STAND_H - 0.06, TD + 0.04), Vector3(0, STAND_H * 0.5 + 0.03, 0), cabinet)
+		MeshKit.box(self, Vector3(TW, 0.06, TD), Vector3(0, 0.03, -0.01), dark)
+		# Dolap kapakları
+		for i in 2:
+			var x: float = -TW / 6.0 + i * TW / 3.0
+			MeshKit.box(self, Vector3(0.004, STAND_H - 0.1, 0.004), Vector3(x, STAND_H * 0.5 + 0.03, TD * 0.5 + 0.021), seam)
+		for i in 3:
+			var x: float = -TW / 3.0 + i * TW / 3.0
+			MeshKit.box(self, Vector3(0.012, 0.12, 0.012), Vector3(x + 0.12, STAND_H * 0.62, TD * 0.5 + 0.028), MeshKit.mat(Color(0.7, 0.7, 0.72), 0.25, 0.9))
+		MeshKit.box(self, Vector3(TW + 0.05, 0.025, TD + 0.05), Vector3(0, STAND_H + 0.0125, 0), dark)
 
 	# Cam kenar çerçeveleri (siyah silikon görünümü)
 	var y0 := _y0
@@ -106,7 +116,9 @@ func _build_static() -> void:
 	_label.pixel_size = 0.0011
 	_label.outline_size = 0
 	_label.modulate = Color(0.15, 0.15, 0.17)
-	_label.position = Vector3(0, STAND_H - 0.1, TD * 0.5 + 0.022)
+	_label.position = Vector3(0, STAND_H - 0.1, TD * 0.5 + (0.045 if wood_stand else 0.022))
+	if wood_stand:
+		_label.modulate = Color(0.95, 0.9, 0.8)
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	_label.double_sided = false
@@ -132,6 +144,7 @@ func _rebuild_content() -> void:
 	add_child(_content)
 	var d: Dictionary = data()
 	_built_unlocked = d.unlocked
+	_built_salt = bool(d.get("salt", false))
 	var y0 := _y0
 	if not d.unlocked:
 		_sign = Label3D.new()
@@ -153,15 +166,23 @@ func _rebuild_content() -> void:
 
 	# Çakıl
 	_gravel_mat = MeshKit.shader_mat("res://shaders/gravel.gdshader")
-	if rng.randf() < 0.5:
+	if _built_salt:
+		_gravel_mat.set_shader_parameter("color_a", Color(0.95, 0.92, 0.85))
+		_gravel_mat.set_shader_parameter("color_b", Color(0.84, 0.81, 0.74))
+		_gravel_mat.set_shader_parameter("scale", 95.0)
+	elif rng.randf() < 0.5:
 		_gravel_mat.set_shader_parameter("color_a", Color(0.78, 0.7, 0.55))
 		_gravel_mat.set_shader_parameter("color_b", Color(0.45, 0.38, 0.28))
 	MeshKit.box(_content, Vector3(TW - 0.016, GRAVEL, TD - 0.016), Vector3(0, y0 + GRAVEL * 0.5, 0), _gravel_mat)
 
 	# Su
 	_water_mat = MeshKit.shader_mat("res://shaders/water.gdshader")
+	if _built_salt:
+		_water_mat.set_shader_parameter("clean_color", Color(0.35, 0.7, 0.95))
 	MeshKit.box(_content, Vector3(TW - 0.016, _water_h - GRAVEL, TD - 0.016), Vector3(0, y0 + GRAVEL + (_water_h - GRAVEL) * 0.5, 0), _water_mat)
 	_surface_mat = MeshKit.shader_mat("res://shaders/water.gdshader", {"is_surface": true})
+	if _built_salt:
+		_surface_mat.set_shader_parameter("clean_color", Color(0.35, 0.7, 0.95))
 	var surf := MeshInstance3D.new()
 	var pm := PlaneMesh.new()
 	pm.size = Vector2(TW - 0.016, TD - 0.016)
@@ -188,20 +209,58 @@ func _rebuild_content() -> void:
 	sync()
 
 
+const DECOR := "res://assets/models/decor/%s.glb"
+
+
+## Hazır dekor modelini en uzun kenarı `size` olacak şekilde zemine koyar. Model yoksa false.
+func _place_decor(name_id: String, size: float, pos: Vector3, rot: float) -> bool:
+	var path := DECOR % name_id
+	if not ResourceLoader.exists(path):
+		return false
+	var n: Node3D = (load(path) as PackedScene).instantiate()
+	var box := AABB()
+	var first := true
+	for c in n.find_children("*", "MeshInstance3D", true, false):
+		var mi: MeshInstance3D = c
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var b: AABB = mi.transform * mi.get_aabb()
+		box = b if first else box.merge(b)
+		first = false
+	var k: float = size / max(box.size.x, max(box.size.y, box.size.z))
+	n.scale = Vector3.ONE * k
+	n.rotation.y = rot
+	n.position = pos - Vector3(0, box.position.y * k + 0.005, 0)
+	_content.add_child(n)
+	return true
+
+
 func _build_decor(rng: RandomNumberGenerator) -> void:
 	var y0 := _y0 + GRAVEL
-	var rock_mat := MeshKit.mat(Color(0.5, 0.5, 0.48), 0.85)
-	if rng.randf() < 0.5:
-		rock_mat.albedo_color = Color(0.42, 0.36, 0.3)
-	# Kayalar
+	if _built_salt:
+		# Deniz tankı: resif kayaları, deniz yıldızı, kabuk, deniz kestanesi
+		_place_decor("resif_kayasi", rng.randf_range(0.34, 0.42), Vector3(rng.randf_range(-0.4, -0.15), y0, -0.08), rng.randf() * TAU)
+		_place_decor("resif_kayasi", rng.randf_range(0.24, 0.3), Vector3(rng.randf_range(0.2, 0.42), y0, -0.1), rng.randf() * TAU)
+		_place_decor("deniz_yildizi", 0.1, Vector3(rng.randf_range(-0.1, 0.15), y0, 0.1), rng.randf() * TAU)
+		_place_decor("deniz_kabugu", 0.08, Vector3(rng.randf_range(0.2, 0.45), y0, 0.12), rng.randf() * TAU)
+		_place_decor("deniz_kestanesi", 0.08, Vector3(rng.randf_range(-0.45, -0.25), y0, 0.13), rng.randf() * TAU)
+		return
+	var used_models := false
+	var rocks := ["dere_kayasi", "kirik_kaya"]
 	for i in rng.randi_range(2, 3):
-		var mi := MeshInstance3D.new()
-		var sz := Vector3(rng.randf_range(0.12, 0.22), rng.randf_range(0.08, 0.16), rng.randf_range(0.1, 0.16))
-		mi.mesh = MeshKit.rock(rng.randi(), sz)
-		mi.material_override = rock_mat
-		mi.position = Vector3(rng.randf_range(-TW * 0.38, TW * 0.38), y0 + sz.y * 0.1, rng.randf_range(-TD * 0.3, 0.0))
-		mi.rotation.y = rng.randf() * TAU
-		_content.add_child(mi)
+		var ok := _place_decor(rocks[rng.randi_range(0, 1)], rng.randf_range(0.16, 0.26), Vector3(rng.randf_range(-TW * 0.38, TW * 0.38), y0, rng.randf_range(-TD * 0.3, 0.0)), rng.randf() * TAU)
+		used_models = used_models or ok
+	if rng.randf() < 0.6:
+		_place_decor("amfora", 0.24, Vector3(rng.randf_range(-0.3, 0.3), y0, 0.05), rng.randf() * TAU)
+	if not used_models:
+		var rock_mat := MeshKit.mat(Color(0.5, 0.5, 0.48), 0.85)
+		for i in rng.randi_range(2, 3):
+			var mi := MeshInstance3D.new()
+			var sz := Vector3(rng.randf_range(0.12, 0.22), rng.randf_range(0.08, 0.16), rng.randf_range(0.1, 0.16))
+			mi.mesh = MeshKit.rock(rng.randi(), sz)
+			mi.material_override = rock_mat
+			mi.position = Vector3(rng.randf_range(-TW * 0.38, TW * 0.38), y0 + sz.y * 0.1, rng.randf_range(-TD * 0.3, 0.0))
+			mi.rotation.y = rng.randf() * TAU
+			_content.add_child(mi)
 	# Kök
 	var pts: Array = []
 	var radii: Array = []
@@ -300,7 +359,7 @@ func swim_bounds() -> AABB:
 
 func sync() -> void:
 	var d: Dictionary = data()
-	if d.unlocked != _built_unlocked:
+	if d.unlocked != _built_unlocked or bool(d.get("salt", false)) != _built_salt:
 		_rebuild_content()
 		return
 	if not d.unlocked:
@@ -334,7 +393,7 @@ func _update_label() -> void:
 	var counts := {}
 	for f in TankSim.living(d):
 		counts[f.species] = counts.get(f.species, 0) + 1
-	var lines: Array = ["TANK %d   %.1f°C" % [tank_id + 1, d.temp]]
+	var lines: Array = ["TANK %d %s  %.1f°C" % [tank_id + 1, "(TUZLU)" if d.get("salt", false) else "", d.temp]]
 	for sp in counts:
 		lines.append("%s ×%d" % [FishDB.display_name(sp), counts[sp]])
 	if counts.is_empty():
