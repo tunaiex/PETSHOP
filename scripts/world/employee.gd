@@ -39,6 +39,7 @@ func setup(r: String, m: Node, s: Shop) -> void:
 			for a in [_walk, _idle]:
 				if a != "":
 					_anim.get_animation(a).loop_mode = Animation.LOOP_LINEAR
+	Shop.add_blob_shadow(self, Vector2(0.8, 0.8), 0.4)
 	# Personel önlüğü (müşterilerden ayırt etmek için)
 	var apron := MeshKit.box(self, Vector3(0.36, 0.55, 0.03), Vector3(0, 1.05, -0.16), MeshKit.mat(Color(0.12, 0.5, 0.55), 0.7))
 	apron.name = "Apron"

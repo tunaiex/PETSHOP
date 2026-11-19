@@ -229,6 +229,7 @@ func _go(target: Vector3) -> void:
 
 
 func _build_body() -> void:
+	Shop.add_blob_shadow(self, Vector2(0.8, 0.8), 0.4)
 	var avail: Array = CHARACTERS.filter(func(p): return ResourceLoader.exists(p))
 	if not avail.is_empty():
 		var inst: Node3D = (load(avail[_rng.randi_range(0, avail.size() - 1)]) as PackedScene).instantiate()

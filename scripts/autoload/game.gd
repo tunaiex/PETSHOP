@@ -35,11 +35,13 @@ const WALL_COLORS := [
 	["Kum beji", Color(0.9, 0.83, 0.7), Color(0.45, 0.3, 0.2)],
 	["Antrasit", Color(0.32, 0.34, 0.37), Color(0.18, 0.18, 0.2)],
 ]
+## Zemin seçenekleri: tex = dokulu PBR malzeme, yoksa prosedürel ahşap (a/b renkleri)
 const FLOOR_TYPES := [
-	["Meşe parke", Color(0.62, 0.45, 0.30), Color(0.48, 0.33, 0.21)],
-	["Koyu ceviz", Color(0.36, 0.24, 0.16), Color(0.26, 0.17, 0.11)],
-	["Açık akçaağaç", Color(0.82, 0.7, 0.52), Color(0.7, 0.58, 0.42)],
-	["Gri beton", Color(0.55, 0.55, 0.55), Color(0.48, 0.48, 0.5)],
+	["Terrazzo karo", Color(1, 1, 1), Color(1, 1, 1), "terrazzo"],
+	["Beyaz mermer", Color(1, 1, 1), Color(1, 1, 1), "marble"],
+	["Meşe parke", Color(0.62, 0.45, 0.30), Color(0.48, 0.33, 0.21), ""],
+	["Koyu ceviz", Color(0.36, 0.24, 0.16), Color(0.26, 0.17, 0.11), ""],
+	["Endüstriyel beton", Color(1, 1, 1), Color(1, 1, 1), "concrete"],
 ]
 const REGULAR_NAMES := ["Hüseyin Amca", "Ayşe Hanım", "Mert", "Zeynep", "Kemal Usta", "Elif Teyze"]
 

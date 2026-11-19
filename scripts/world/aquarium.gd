@@ -218,6 +218,17 @@ func _rebuild_content() -> void:
 		_light.shadow_enabled = false
 		_light.visible = not Game.power_out
 		_content.add_child(_light)
+		# Suya süzülen ışık hüzmeleri
+		for k in 3:
+			var shaft := MeshInstance3D.new()
+			var qm := QuadMesh.new()
+			qm.size = Vector2(0.38, _water_h - _gravel_h())
+			shaft.mesh = qm
+			shaft.material_override = MeshKit.shader_mat("res://shaders/lightshaft.gdshader", {"seed": float(tank_id * 7 + k * 3), "strength": 0.16 if not _built_salt else 0.2})
+			shaft.position = Vector3(-0.38 + k * 0.38, y0 + _gravel_h() + (_water_h - _gravel_h()) * 0.5, -0.05 + k * 0.05)
+			shaft.rotation_degrees = Vector3(0, 12.0 * (k - 1), 8.0 * (k - 1))
+			shaft.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			_content.add_child(shaft)
 	_gravel_mat.set_shader_parameter("caustic_strength", 0.35 if d.get("light", false) else 0.0)
 
 	# Görünür ekipman: ısıtıcı (sol arka), filtre (sağ arka)

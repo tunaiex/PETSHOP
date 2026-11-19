@@ -8,6 +8,7 @@ var _game: Node
 ## ad, oyuncu konumu, bakış (yaw), eğim (pitch), kurulmuş dükkân mı
 var _shots := [
 	["bos_disari", Vector3(0, 0.05, 8.0), 0.0, -2.0, false],
+	["cadde", Vector3(-2.0, 0.05, 15.5), -8.0, 10.0, false],
 	["genel", Vector3(5.6, 0.05, 4.5), 42.0, -10.0, true],
 	["tank_tatli", Vector3(-3.5, 0.05, -3.25), 0.0, -16.0, true],
 	["tank_deniz", Vector3(0.0, 0.05, -3.25), 0.0, -16.0, true],
