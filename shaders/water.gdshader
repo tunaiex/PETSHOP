@@ -19,7 +19,7 @@ void fragment() {
 	float fres = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 2.0);
 	ALBEDO = col;
 	if (is_surface) {
-		ALPHA = 0.35 + 0.4 * fres;
+		ALPHA = 0.18 + 0.32 * fres;
 		ROUGHNESS = 0.02;
 		SPECULAR = 1.0;
 		NORMAL_MAP = vec3(0.5 + 0.08 * sin(UV.x * 40.0 + TIME * 2.0), 0.5 + 0.08 * cos(UV.y * 35.0 + TIME * 1.7), 1.0);

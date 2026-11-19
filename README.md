@@ -4,6 +4,7 @@ Godot 4 ile yapılmış, birinci şahıs, Türkçe bir **akvaryum dükkânı yö
 Rahatlatıcı görünür ama seni uğraştırır: su kirlenir, balıklar hastalanır, yanlış türler birbirini yer,
 müşteriler pazarlık eder ve kira her gün artar.
 
+![Cadde](docs/cadde.png)
 ![Boş dükkân](docs/bos_dukkan.png)
 ![Kurulmuş dükkân](docs/dukkan.png)
 ![Yerleştirme modu](docs/yerlestirme.png)

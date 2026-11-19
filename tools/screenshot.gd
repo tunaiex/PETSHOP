@@ -30,6 +30,9 @@ func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
 	if args.size() > 0:
 		_out = args[0]
+	if args.size() > 1:
+		var only: Array = Array(args[1].split(","))
+		_shots = _shots.filter(func(s): return only.has(s[0]))
 	DirAccess.make_dir_recursive_absolute(_out)
 
 

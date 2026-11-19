@@ -353,8 +353,29 @@ func _city(id: String, pos: Vector3, rot_deg: float = 0.0, parent: Node3D = null
 	var n: Node3D = (load(path) as PackedScene).instantiate()
 	n.position = pos
 	n.rotation_degrees.y = rot_deg
+	_fix_city_materials(n)
 	(parent if parent else self).add_child(n)
 	return n
+
+
+## Kitin köşe aşınma maskesi köşe renklerinde (vertex color) saklı; özel shader olmadan
+## kırmızı leke gibi göründüğü için kapatılır.
+static var _fixed_mats: Dictionary = {}
+
+
+func _fix_city_materials(n: Node) -> void:
+	for c in n.find_children("*", "MeshInstance3D", true, false):
+		var mi: MeshInstance3D = c
+		if mi.mesh == null:
+			continue
+		for si in mi.mesh.get_surface_count():
+			var m: Material = mi.get_active_material(si)
+			if m is BaseMaterial3D:
+				if not _fixed_mats.has(m):
+					var d: BaseMaterial3D = m.duplicate()
+					d.vertex_color_use_as_albedo = false
+					_fixed_mats[m] = d
+				mi.set_surface_override_material(si, _fixed_mats[m])
 
 
 func _outside() -> void:
@@ -475,7 +496,7 @@ func _street_lamp(pos: Vector3) -> void:
 
 func _lights() -> void:
 	_sun = DirectionalLight3D.new()
-	_sun.rotation_degrees = Vector3(-40, 160, 0)
+	_sun.rotation_degrees = Vector3(-62, -28, 0)  # güneş cepheye ve vitrinden içeri vursun
 	_sun.light_energy = 1.1
 	_sun.light_color = Color(1.0, 0.95, 0.85)
 	_sun.shadow_enabled = true
