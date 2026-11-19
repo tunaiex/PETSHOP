@@ -44,6 +44,7 @@ func _ready() -> void:
 	Game.phase_changed.connect(_on_phase)
 	if Game.day == 1 and Game.phase == "prep":
 		hud.show_help.call_deferred()
+	_morning_news.call_deferred()
 
 
 func _on_phase(p: String) -> void:
@@ -53,6 +54,7 @@ func _on_phase(p: String) -> void:
 	elif p == "prep":
 		_report_shown = false
 		_inspector_spawned = false
+		_morning_news()
 
 
 func _process(delta: float) -> void:
@@ -91,6 +93,20 @@ func _next_spawn_delay() -> float:
 	var dusk: float = smoothstep(17.5 * 60.0, 19.0 * 60.0, Game.minute)
 	minutes *= 1.0 + dusk * 0.5
 	return minutes * Game.SECONDS_PER_MINUTE
+
+
+## Sabah haberleri: hava, yarışma, fiyatlar
+func _morning_news() -> void:
+	var w: String = {"gunesli": "Güneşli bir gün, müşteri bol olabilir.", "bulutlu": "Hava bulutlu.", "yagmurlu": "Yağmur yağıyor, bugün az müşteri gelir."}.get(Game.weather, "")
+	Game.notify.emit("Gün %d: %s" % [Game.day, w], "info")
+	if Game.events_today.get("contest", false):
+		Game.notify.emit("BUGÜN AKVARYUM YARIŞMASI! Kapanışta en güzel tankın puanlanacak.", "warn")
+	var cheap: Array = []
+	for id in FishDB.ids():
+		if float(Game.price_mult.get(id, 1.0)) <= 0.8:
+			cheap.append(FishDB.display_name(id))
+	if not cheap.is_empty():
+		Game.notify.emit("Toptancıda indirim: " + ", ".join(cheap.slice(0, 3)), "good")
 
 
 ## Çalışanları işe alım durumuna göre sahneye koyar ya da çıkarır.

@@ -398,6 +398,23 @@ func _test_shop_systems(game: Node) -> void:
 		tk.fish.append(TankSim.new_fish(sp, 0.9))
 	var res: Dictionary = game.run_contest()
 	check(res.score > 50 and res.place >= 1 and res.place <= 4, "Yarışma puanlanır (%d puan, %d.)" % [res.score, res.place])
+	# Kredi ve şube
+	var m0: int = game.money
+	game.loan = {"days_left": 2, "daily": 600}
+	game.branches = 1
+	game.reputation = 70.0
+	var exp_total: int = game.daily_expenses().total
+	check(exp_total >= 600, "Kredi taksiti giderlere eklenir")
+	game.end_day()
+	check(int(game.loan.days_left) == 1, "Her akşam bir taksit ödenir")
+	game.next_day()
+	game.end_day()
+	check(game.loan.is_empty(), "Taksitler bitince kredi kapanır")
+	game.loan = {}
+	game.branches = 0
+	# Kampanya müşteri bekleme süresini kısaltır (daha çok müşteri)
+	game.campaign = {}
+	game.followers = 0
 	# Kayıt
 	game.settings.name = "NEMO PETSHOP"
 	game.save_game()

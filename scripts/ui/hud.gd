@@ -750,6 +750,7 @@ func _fill_tank(body: VBoxContainer, aq: Aquarium) -> void:
 	_section(body, "Tank")
 	var mv := _flow(body)
 	_btn(mv, "Tuzlu suya çevir" if not salt else "Tatlı suya çevir", _toggle_salt.bind(body, aq), alive.is_empty() and Game.money >= TankSim.SALT_COST).tooltip_text = "%d ₺ (tuz, test kiti). Sadece boş tankta." % TankSim.SALT_COST
+	_btn(mv, "Fotoğraf çek ve paylaş", _photo.bind(body, aq), not Game.photos_today.has(aq.tank_id))
 	_btn(mv, "Karantina: %s" % ("AÇIK" if t.get("quarantine", false) else "KAPALI"), _toggle_quarantine.bind(body, aq))
 	_btn(mv, "Taşı", _move_furniture.bind(aq.furniture_uid))
 	_btn(mv, "Sat (%d ₺)" % (int(FurnitureDB.item(Game.furniture_by_uid(aq.furniture_uid).get("type", "akvaryum_beyaz")).price) / 2), _sell_furniture.bind(aq.furniture_uid), t.fish.is_empty())
@@ -884,7 +885,10 @@ func _fill_phone(body: VBoxContainer, tab: String, target_tank: int) -> void:
 	_btn(tabs, "Dükkân", _fill_phone.bind(body, "shop", target_tank), tab != "shop")
 	_btn(tabs, "Personel", _fill_phone.bind(body, "staff", target_tank), tab != "staff")
 	_btn(tabs, "Müşteriler", _fill_phone.bind(body, "customers", target_tank), tab != "customers")
+	_btn(tabs, "Finans", _fill_phone.bind(body, "finance", target_tank), tab != "finance")
 	match tab:
+		"finance":
+			_fill_finance(body)
 		"customers":
 			_fill_customers(body)
 		"furniture":
@@ -1273,6 +1277,89 @@ func _answer(c: Customer, idx: int, q: Dictionary) -> void:
 	close_panel()
 	toast(("Doğru! " if ok else "Yanlış. ") + str(q.get("explain", "")), "good" if ok else "bad")
 	Sfx.play("good" if ok else "bad")
+
+
+func _set_campaign(body: VBoxContainer, target: String, pct: int) -> void:
+	Game.campaign = {"target": target, "pct": pct}
+	toast("Kampanya başladı: %s %%%d indirimli! Bugün daha çok müşteri gelir." % ["Balıklar" if target == "fish" else "Ürünler", pct], "good")
+	_fill_phone(body, "finance", -1)
+
+
+func _take_loan(body: VBoxContainer, i: int) -> void:
+	var l: Array = Game.LOANS[i]
+	Game.loan = {"days_left": l[1], "daily": l[2]}
+	Game.add_money(l[0])
+	toast("%s ₺ kredi hesabına geçti. %d gün boyunca günde %d ₺ ödenecek." % [Aquarium._fmt(l[0]), l[1], l[2]], "good")
+	_fill_phone(body, "finance", -1)
+
+
+func _payoff_loan(body: VBoxContainer) -> void:
+	var total: int = int(Game.loan.days_left) * int(Game.loan.daily)
+	var payoff: int = int(total * 0.9)
+	if Game.spend(payoff):
+		Game.loan = {}
+		toast("Kredi erken kapatıldı (%%10 indirimle %d ₺)." % payoff, "good")
+	_fill_phone(body, "finance", -1)
+
+
+func _open_branch(body: VBoxContainer) -> void:
+	if Game.spend(Game.BRANCH_COST):
+		Game.branches += 1
+		toast("Yeni şube açıldı! Her akşam şubeden gelir gelecek.", "good")
+		Sfx.play("good")
+	_fill_phone(body, "finance", -1)
+
+
+func _fill_finance(body: VBoxContainer) -> void:
+	_section(body, "Kampanya (bugün için)")
+	if Game.campaign.is_empty():
+		body.add_child(_lbl("İndirim yaparsan bugün daha çok müşteri gelir ama kâr marjın düşer.", 18, Color(0.8, 0.85, 0.87)))
+		var f := _flow(body)
+		for target in ["fish", "products"]:
+			for pct in [10, 20, 30]:
+				_btn(f, "%s %%%d" % ["Balıklar" if target == "fish" else "Ürünler", pct], _set_campaign.bind(body, target, pct))
+	else:
+		body.add_child(_lbl("Aktif: %s %%%d indirim" % ["Balıklar" if Game.campaign.target == "fish" else "Ürünler", Game.campaign.pct], 20, C_GOOD))
+	_section(body, "Sosyal medya")
+	body.add_child(_lbl("Takipçi: %s. Tanklara bakıp fotoğraf paylaş; güzel tanklar çok takipçi getirir, takipçiler müşteri getirir." % Aquarium._fmt(Game.followers), 19))
+	_section(body, "Banka")
+	if Game.loan.is_empty():
+		for i in Game.LOANS.size():
+			var l: Array = Game.LOANS[i]
+			_btn(body, "%s ₺ kredi çek (%d gün × %d ₺ = %s ₺ geri öde)" % [Aquarium._fmt(l[0]), l[1], l[2], Aquarium._fmt(l[1] * l[2])], _take_loan.bind(body, i))
+	else:
+		body.add_child(_lbl("Kredi: %d gün kaldı, günlük %d ₺ taksit." % [Game.loan.days_left, Game.loan.daily], 20, C_WARN))
+		var payoff: int = int(int(Game.loan.days_left) * int(Game.loan.daily) * 0.9)
+		_btn(body, "Erken kapat (%s ₺)" % Aquarium._fmt(payoff), _payoff_loan.bind(body), Game.money >= payoff)
+	_section(body, "Şubeler (%d/2)" % Game.branches)
+	body.add_child(_lbl("Şube her akşam itibarına göre gelir getirir (müdür maaşı düşülür). İtibar en az 60 olmalı.", 18, Color(0.8, 0.85, 0.87)))
+	if Game.branches < 2:
+		_btn(body, "Yeni şube aç (%s ₺)" % Aquarium._fmt(Game.BRANCH_COST), _open_branch.bind(body), Game.money >= Game.BRANCH_COST and Game.reputation >= 60.0)
+	if Game.events_today.get("contest", false):
+		_section(body, "Yarışma")
+		body.add_child(_lbl("Bugün akvaryum yarışması var! Kapanışta en güzel tankın puanlanacak: çekicilik, tür çeşitliliği, sağlık ve nadir balıklar.", 19, C_WARN))
+
+
+func _photo(body: VBoxContainer, aq: Aquarium) -> void:
+	var t: Dictionary = Game.tanks[aq.tank_id]
+	if Game.photos_today.has(aq.tank_id):
+		toast("Bu tankın bugünkü fotoğrafını zaten paylaştın.", "bad")
+		return
+	Game.photos_today.append(aq.tank_id)
+	var appeal: float = TankSim.appeal(t)
+	var gain: int = int(appeal * Game.rng.randf_range(0.6, 1.4) * (1.0 + TankSim.species_in(t).size() * 0.15))
+	for f in TankSim.living(t):
+		if f.get("rare", false):
+			gain += 40
+	if TankSim.living(t).is_empty():
+		gain = int(gain * 0.2)
+	Game.followers += gain
+	Game.change_reputation(appeal / 80.0)
+	Sfx.play("shutter")
+	if player:
+		player.hands.hold_phone()
+	toast("Fotoğraf paylaşıldı: +%d takipçi (toplam %s)" % [gain, Aquarium._fmt(Game.followers)], "good" if gain > 30 else "info")
+	_fill_tank(body, aq)
 
 
 func _fill_customers(body: VBoxContainer) -> void:
