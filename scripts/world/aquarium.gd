@@ -450,6 +450,11 @@ func _process(delta: float) -> void:
 		_food_timer -= delta
 
 
+func scare() -> void:
+	for f in _fish.values():
+		f.scare()
+
+
 func fish_nodes() -> Array:
 	return _fish.values()
 

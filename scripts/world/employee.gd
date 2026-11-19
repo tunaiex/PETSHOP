@@ -88,6 +88,10 @@ func _cashier(dt: float, moving: bool) -> void:
 	_wait += dt
 	if _wait > 6.0:
 		_wait = 0.0
+		if c.kind == "complainer":
+			main.resolve_complaint(c, true)
+			Game.notify.emit("Kasiyer şikâyetçi müşteriye para iadesi yaptı.", "info")
+			return
 		c.validate_basket()
 		if c.basket.is_empty():
 			c.walk_out_angry()

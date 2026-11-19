@@ -73,6 +73,7 @@ func _process(_delta: float) -> bool:
 			check(p.size() >= 2 and p[-1].distance_to(_main.shop.counter.register_point()) < 0.5, "Dışarıdan kasaya yol bulunur (%d nokta)" % p.size())
 			_start_money = game.money
 			game.day_ended.connect(func(r): _report = r)
+			_test_customer_kinds(game)
 			_start_money = game.money
 			game.open_shop()
 			check(game.phase == "open", "Dükkân açıldı")
@@ -483,3 +484,59 @@ func _test_fish_systems(game: Node) -> void:
 				break
 	check(result[0] == true, "Doğru balıkları yakalayınca kepçe oyunu kazanılır")
 	cg.queue_free()
+
+
+func _test_customer_kinds(game: Node) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	# Sorular doğru cevaplanabilir
+	var ok_all := true
+	for i in 30:
+		var q: Dictionary = Quiz.make(rng, ["neon", "japon"])
+		if q.answer < 0 or q.answer >= q.options.size():
+			ok_all = false
+	check(ok_all, "Bilgi sorularının doğru cevabı seçenekler içinde")
+	var c = _main.spawn_customer()
+	c.question = {"text": "x", "options": ["a", "b"], "answer": 1, "explain": ""}
+	var m0: int = game.money
+	check(c.answer_question(1) and game.money > m0, "Doğru cevap bahşiş kazandırır")
+	# Hırsız: kamera yokken ürün kaybolur
+	var sh = _main.shop.shelves[0]
+	var before: int = game.shelf_total(sh.entry())
+	var th = _main.spawn_customer()
+	th.make_thief()
+	th._evaluate_shelf(sh)
+	check(game.shelf_total(sh.entry()) < before and game.stats.stolen > 0, "Kamerasız dükkânda hırsız ürün çalar")
+	# Şikâyet: iade para düşürür
+	var cm = _main.spawn_customer()
+	cm.make_complainer({"name": "Mert", "amount": 50, "species": "neon"})
+	var m1: int = game.money
+	_main.resolve_complaint(cm, true)
+	check(game.money == m1 - 50, "Şikâyette iade parası ödenir")
+	# Müdavim ziyaret sayısı artar
+	var reg: Dictionary = game.regulars[0]
+	var v0: int = int(reg.visits)
+	var rc = _main.spawn_customer()
+	rc.make_regular(reg)
+	check(int(reg.visits) == v0 + 1 and rc.profile.title == reg.name, "Müdavim tanınır")
+	# Çocuk tanka vurunca balıklar strese girer
+	var kid = _main.spawn_customer()
+	kid.make_child()
+	var aq = _main.shop.aquariums[0]
+	var t: Dictionary = game.tanks[aq.tank_id]
+	var h0: float = TankSim.average_health(t)
+	kid._evaluate_tank(aq)
+	kid.state = 2  # LOOK
+	for i in 30:
+		kid._process(0.1)
+	check(TankSim.average_health(t) < h0, "Çocuk cama vurunca balıklar strese girer")
+	kid.interact(_main.player)
+	check(kid._tapping <= 0.0, "Çocuk uyarılınca durur")
+	for cc in [c, th, cm, rc, kid]:
+		if is_instance_valid(cc):
+			_main.customers.erase(cc)
+			_main.queue.erase(cc)
+			cc.queue_free()
+	for tk in game.tanks:
+		for f in tk.fish:
+			f.health = 100.0

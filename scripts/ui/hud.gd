@@ -877,13 +877,16 @@ func open_phone(tab: String = "furniture") -> void:
 
 func _fill_phone(body: VBoxContainer, tab: String, target_tank: int) -> void:
 	_clear(body)
-	var tabs := _row(body)
+	var tabs := _flow(body)
 	_btn(tabs, "Mobilya", _fill_phone.bind(body, "furniture", target_tank), tab != "furniture")
 	_btn(tabs, "Balık", _fill_phone.bind(body, "fish", target_tank), tab != "fish")
 	_btn(tabs, "Ürün / Depo", _fill_phone.bind(body, "products", target_tank), tab != "products")
 	_btn(tabs, "Dükkân", _fill_phone.bind(body, "shop", target_tank), tab != "shop")
 	_btn(tabs, "Personel", _fill_phone.bind(body, "staff", target_tank), tab != "staff")
+	_btn(tabs, "Müşteriler", _fill_phone.bind(body, "customers", target_tank), tab != "customers")
 	match tab:
+		"customers":
+			_fill_customers(body)
 		"furniture":
 			_fill_catalog(body)
 		"shop":
@@ -1119,6 +1122,9 @@ func open_register() -> void:
 	if c == null:
 		toast("Kasada bekleyen müşteri yok.", "info")
 		return
+	if c.kind == "complainer":
+		_open_complaint(c)
+		return
 	var h: Haggle = c.haggle if c.haggle else c.start_haggle()
 	if h == null:
 		c.say("Aldıklarım kalmamış...")
@@ -1236,6 +1242,59 @@ func _open_catch(c: Customer, price: int, line: String, tank_id: int, want: Dict
 			Game.change_reputation(-1.0)
 			_finish_sale(c, reduced, "Ne kadar bekledim ama...")
 			toast("Balıkları zor yakaladın, müşteri bekledi: %d ₺ yerine %d ₺" % [price, reduced], "warn"))
+
+
+func _open_complaint(c: Customer) -> void:
+	var body := _open("Şikâyet: %s" % c.profile.title, 720)
+	var amt: int = int(c.complaint.get("amount", 0))
+	var l := _lbl("“Dün sizden aldığım %s eve varmadan öldü! Paramı geri istiyorum: %d ₺”" % [FishDB.display_name(c.complaint.get("species", "")), amt], 22, Color(0.95, 0.9, 0.7))
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size.x = 660
+	body.add_child(l)
+	body.add_child(_lbl("İade edersen para gider ama itibarın korunur. Reddedersen itibarın ciddi düşer.", 18, Color(0.8, 0.85, 0.87)))
+	var row := _row(body)
+	_btn(row, "Parasını iade et (-%d ₺)" % amt, func(): main.resolve_complaint(c, true); close_panel())
+	_btn(row, "Reddet", func(): main.resolve_complaint(c, false); close_panel())
+
+
+func open_question(c: Customer) -> void:
+	var q: Dictionary = c.question
+	var body := _open("%s soruyor" % c.profile.title, 720)
+	var l := _lbl("“%s”" % q.text, 23, Color(0.95, 0.9, 0.7))
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size.x = 660
+	body.add_child(l)
+	for i in q.options.size():
+		_btn(body, q.options[i], _answer.bind(c, i, q))
+
+
+func _answer(c: Customer, idx: int, q: Dictionary) -> void:
+	var ok: bool = c.answer_question(idx)
+	close_panel()
+	toast(("Doğru! " if ok else "Yanlış. ") + str(q.get("explain", "")), "good" if ok else "bad")
+	Sfx.play("good" if ok else "bad")
+
+
+func _fill_customers(body: VBoxContainer) -> void:
+	_section(body, "Müdavimler")
+	for r in Game.regulars:
+		var row := _row(body)
+		var n := _lbl(r.name, 21)
+		n.custom_minimum_size.x = 200
+		row.add_child(n)
+		var lv: float = float(r.loyalty)
+		var tag: String = "Sadık" if lv > 70 else ("Memnun" if lv > 40 else ("Kararsız" if lv > 15 else "Küskün"))
+		row.add_child(_lbl("Sadakat %d (%s) • %d ziyaret" % [int(lv), tag, int(r.get("visits", 0))], 19, C_GOOD if lv > 40 else (C_WARN if lv > 15 else C_BAD)))
+	body.add_child(_lbl("Sadık müdavimler daha çok alır ama indirim bekler. Bekletirsen ya da şikâyetini reddedersen küser.", 17, Color(0.78, 0.82, 0.84)))
+	_section(body, "Özel siparişler")
+	if Game.special_orders.is_empty():
+		body.add_child(_lbl("Bekleyen sipariş yok. Aradığını bulamayan müşteriler bazen sipariş verir.", 19))
+	for o in Game.special_orders:
+		var have := 0
+		for t in Game.tanks:
+			if t.unlocked and not t.get("quarantine", false):
+				have += TankSim.living(t).filter(func(f): return f.species == o.species).size()
+		body.add_child(_lbl("%s: %d %s — Gün %d'e kadar (dükkânda %d var) • %%50 fazla öder" % [o.name, o.qty, FishDB.display_name(o.species), o.due, have], 19, C_GOOD if have >= int(o.qty) else C_WARN))
 
 
 # ------------------------------------------------------------------ Gün sonu / menü

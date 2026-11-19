@@ -66,7 +66,7 @@ func _process(delta: float) -> void:
 		if _spawn_timer <= 0.0:
 			_spawn_timer = _next_spawn_delay()
 			if customers.size() < MAX_CUSTOMERS:
-				spawn_customer()
+				_spawn_varied()
 	elif Game.phase == "closing" and not customers.is_empty() and Game.minute >= Game.CLOSE_MINUTE + 45:
 		# Kapanıştan 45 dk sonra kalan herkes çıkar.
 		for c in customers.duplicate():
@@ -107,6 +107,32 @@ func sync_employees() -> void:
 		elif not want and have:
 			employees[role].queue_free()
 			employees.erase(role)
+
+
+var _special_spawned := {}
+
+## Bugün gelmesi gereken şikâyetçi/özel siparişçi varsa önce onlar, yoksa rastgele bir tür.
+func _spawn_varied() -> void:
+	if not Game.complaints.is_empty():
+		var comp: Dictionary = Game.complaints.pop_front()
+		spawn_customer().make_complainer(comp)
+		return
+	for o in Game.special_orders:
+		if Game.day >= int(o.get("ready", 0)) and not _special_spawned.has(str(o.id) + "_" + str(Game.day)):
+			_special_spawned[str(o.id) + "_" + str(Game.day)] = true
+			spawn_customer().make_special(o)
+			return
+	var c := spawn_customer()
+	var r: float = Game.rng.randf()
+	if r < 0.06 and not shop.shelves.is_empty():
+		c.make_thief()
+	elif r < 0.16:
+		c.make_child()
+	elif r < 0.45:
+		var reg: Dictionary = Game.regulars[Game.rng.randi_range(0, Game.regulars.size() - 1)]
+		# Sadakati çok düşük müdavim gelmez
+		if float(reg.loyalty) > 10.0:
+			c.make_regular(reg)
 
 
 func spawn_customer() -> Customer:
@@ -182,6 +208,8 @@ func complete_sale(c: Customer, price: int) -> void:
 			var f: Dictionary = find_fish(int(item.tank), int(item.uid))
 			if not f.is_empty() and f.health < 60.0:
 				sick_sold = true
+				if Game.rng.randf() < 0.7:
+					Game.complaints.append({"name": c.profile.title, "amount": c.item_value(item), "species": item.species})
 			t.fish = t.fish.filter(func(x): return int(x.uid) != int(item.uid))
 			touched[int(item.tank)] = true
 		# Ürünler müşteri raftan alırken zaten raftan düşüldü.
@@ -194,6 +222,22 @@ func complete_sale(c: Customer, price: int) -> void:
 		Game.change_reputation(-3.0)
 		Game.notify.emit("Halsiz balık sattın. Müşteri memnun kalmayabilir, itibar düştü.", "warn")
 	c.finish_sale()
+
+
+## Şikâyet: iade edersen para gider ama itibar korunur; reddedersen itibar düşer.
+func resolve_complaint(c: Customer, refund: bool) -> void:
+	var amt: int = int(c.complaint.get("amount", 0))
+	if refund:
+		Game.add_money(-amt)
+		Game.stats.refunds += amt
+		Game.change_reputation(1.0)
+		c.say("Teşekkürler, anlayışlısınız.", 3.0)
+	else:
+		Game.change_reputation(-4.0)
+		Game.change_loyalty(c.complaint.get("name", ""), -20.0)
+		c.say("Bir daha buradan alışveriş yapmam! Herkese anlatacağım!", 4.0)
+	c.complaint = {}
+	c.walk_out_calm()
 
 
 func someone_near_door() -> bool:

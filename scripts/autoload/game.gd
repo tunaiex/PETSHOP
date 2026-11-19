@@ -247,6 +247,11 @@ func roll_day() -> void:
 	campaign = {}
 	photos_today = []
 	power_out = false
+	for o in special_orders.duplicate():
+		if int(o.due) < day:
+			special_orders.erase(o)
+			change_reputation(-2.0)
+			notify.emit("%s'in özel siparişini zamanında getiremedin. İtibar düştü." % o.name, "bad")
 
 
 func buy_price(id: String) -> int:

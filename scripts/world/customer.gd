@@ -43,6 +43,15 @@ var _rng := RandomNumberGenerator.new()
 var _anim: AnimationPlayer
 var _queue_index: int = -1
 var inspector: bool = false
+var kind: String = "normal"     ## normal | regular | complainer | thief | child | special
+var regular_name: String = ""
+var complaint: Dictionary = {}
+var special_order: Dictionary = {}
+var question: Dictionary = {}
+var _question_timer: float = 0.0
+var _tapping: float = 0.0
+var _tap_aq: Aquarium
+var _happy_bonus: float = 0.0
 var _issues: Array = []
 
 
@@ -77,6 +86,95 @@ func setup(m: Node, s: Shop, seed_value: int) -> void:
 	_to_visit = targets.slice(0, _rng.randi_range(1, max(1, min(3, targets.size()))))
 	_path = [shop.entrance + Vector3(_rng.randf_range(-0.4, 0.4), 0, 0)]
 	state = State.ENTER
+
+
+# ------------------------------------------------------------------ Özel müşteri türleri
+
+func make_regular(r: Dictionary) -> void:
+	kind = "regular"
+	regular_name = r.name
+	profile = profile.duplicate()
+	profile.title = r.name
+	profile.patience = float(profile.patience) * 1.3
+	# Sadık müşteri indirim bekler
+	if float(r.loyalty) > 60.0:
+		profile.stingy = min(1.0, float(profile.stingy) + 0.1)
+	r.visits = int(r.get("visits", 0)) + 1
+	_bubble.modulate = Color(0.75, 1.0, 0.8)
+	say("Merhaba, yine ben! (%s)" % r.name, 3.5)
+
+
+func make_complainer(c: Dictionary) -> void:
+	kind = "complainer"
+	complaint = c
+	profile = {"title": c.name, "patience": 2.0, "stingy": 0.5, "picky": 0.5}
+	_to_visit = []
+	_bubble.modulate = Color(1.0, 0.6, 0.5)
+	say("Dün aldığım %s öldü!" % FishDB.display_name(c.species), 4.0)
+
+
+func make_thief() -> void:
+	kind = "thief"
+	_to_visit = shop.shelves.filter(func(sh): return Game.shelf_total(sh.entry()) > 0)
+	_to_visit = _to_visit.slice(0, 1)
+
+
+func make_child() -> void:
+	kind = "child"
+	profile = {"title": "Çocuk", "patience": 1.0, "stingy": 1.0, "picky": 0.0}
+	scale = Vector3.ONE * 0.62
+	_to_visit = shop.aquariums.filter(func(a): return not TankSim.living(Game.tanks[a.tank_id]).is_empty())
+	_to_visit.shuffle()
+	_to_visit = _to_visit.slice(0, 2)
+	_speed *= 1.3
+	say("Balıklaaar!", 2.5)
+
+
+func make_special(o: Dictionary) -> void:
+	kind = "special"
+	special_order = o
+	profile = {"title": o.name, "patience": 2.0, "stingy": 0.2, "picky": 0.4}
+	_to_visit = []
+	_bubble.modulate = Color(0.8, 0.9, 1.0)
+	say("Siparişim hazır mı? %d %s." % [o.qty, FishDB.display_name(o.species)], 4.0)
+
+
+## Oyuncu müşteriye bakıp ETKİLEŞ dediğinde
+func get_prompt() -> String:
+	if not question.is_empty():
+		return "%s: Soruyu cevapla" % profile.title
+	if kind == "child" and _tapping > 0.0:
+		return "Çocuğu uyar"
+	return ""
+
+
+func interact(player: Node) -> void:
+	if not question.is_empty():
+		player.hud.open_question(self)
+	elif kind == "child" and _tapping > 0.0:
+		_tapping = 0.0
+		say("Peki abi, vurmam...", 2.5)
+		_to_visit.clear()
+		_look_timer = 0.5
+
+
+func answer_question(idx: int) -> bool:
+	var ok: bool = idx == int(question.answer)
+	if ok:
+		var tip: int = _rng.randi_range(15, 50)
+		Game.add_money(tip)
+		Game.stats.tips += tip
+		Game.change_reputation(1.5)
+		_happy_bonus = 0.3
+		say("Çok teşekkürler, ne kadar bilgilisiniz! (+%d ₺ bahşiş)" % tip, 3.5)
+		if regular_name != "":
+			Game.change_loyalty(regular_name, 5.0)
+	else:
+		Game.change_reputation(-1.0)
+		say("Hmm, emin değilim bundan...", 3.0)
+	question = {}
+	_look_timer = min(_look_timer, 1.0)
+	return ok
 
 
 ## Bu müşteriyi belediye müfettişine çevirir: bütün tankları gezer, sorun bulursa ceza keser.
@@ -254,6 +352,7 @@ func _add_collider() -> void:
 	cs.shape = cap
 	cs.position = Vector3(0, 0.875, 0)
 	ab.add_child(cs)
+	ab.set_meta("interact", self)
 	add_child(ab)
 
 
@@ -301,7 +400,26 @@ func _process(delta: float) -> void:
 						_evaluate_shelf(_current)
 		State.LOOK:
 			_look_timer -= delta * Game.time_scale
-			if _look_timer <= 0.0:
+			if _tapping > 0.0 and is_instance_valid(_tap_aq):
+				_tapping -= delta * Game.time_scale
+				_tap_aq.scare()
+				for f in TankSim.living(Game.tanks[_tap_aq.tank_id]):
+					f.health = max(1.0, f.health - 0.6 * delta * Game.time_scale)
+				if _bubble_timer <= 0.0:
+					say("Tık tık tık!", 1.0)
+				if _tapping <= 0.0:
+					_look_timer = 0.5
+			if not question.is_empty():
+				_question_timer -= delta * Game.time_scale
+				if _bubble_timer <= 0.0:
+					say("Bir sorum var! (bana bak)", 1.5)
+				if _question_timer <= 0.0:
+					question = {}
+					say("Neyse, kimse ilgilenmiyor...", 2.5)
+					Game.change_reputation(-0.5)
+				else:
+					return
+			if _look_timer <= 0.0 and _tapping <= 0.0:
 				_next_browse()
 		State.QUEUE:
 			if not moving and shop.counter:
@@ -348,6 +466,16 @@ func _next_browse() -> void:
 func _evaluate_tank(aq: Aquarium) -> void:
 	var t: Dictionary = Game.tanks[aq.tank_id]
 	var alive: Array = TankSim.living(t)
+	if kind == "child":
+		_tapping = _rng.randf_range(6.0, 10.0)
+		_tap_aq = aq
+		_look_timer = _tapping + 1.0
+		return
+	if (kind == "normal" or kind == "regular") and not alive.is_empty() and _rng.randf() < 0.2:
+		question = Quiz.make(_rng, TankSim.species_in(t))
+		_question_timer = 25.0
+		_look_timer = 25.0
+		say("Bir sorum var! (bana bak)", 3.0)
 	if alive.is_empty():
 		say("Bu tank boş...")
 		return
@@ -400,7 +528,9 @@ func _evaluate_tank(aq: Aquarium) -> void:
 	if avg_h < 55.0 + picky * 20.0:
 		say("Bunlar biraz halsiz görünüyor.")
 		return
-	if _rng.randf() < clamp(0.3 + appeal * 0.0065, 0.2, 0.95):
+	if regular_name != "" and float(Game.regular(regular_name).get("loyalty", 0)) > 70.0:
+		want = min(want + 1, same.size())
+	if _rng.randf() < clamp(0.3 + appeal * 0.0065 + _happy_bonus, 0.2, 0.97):
 		for i in want:
 			basket.append({"type": "fish", "tank": aq.tank_id, "uid": int(same[i].uid), "species": sp})
 		var special := {"palyaco": "Aaa Nemo! Bunu alıyorum!", "cerrah": "Dory'yi buldum!", "arowana": "Vay be, ejderha balığı!", "pirana": "Pirana mı bu? Harika!", "denizati": "Deniz atı! Çok narin..."}
@@ -410,6 +540,22 @@ func _evaluate_tank(aq: Aquarium) -> void:
 			say("%d tane %s alayım." % [want, s.name] if want > 1 else "Şu %s çok güzel!" % s.name)
 	else:
 		say(["Güzelmiş.", "Hmm...", "Çok tatlılar!"][_rng.randi_range(0, 2)], 2.5)
+		_maybe_special_order(t)
+
+
+## Aradığını bulamayan müşteri bazen özel sipariş verir.
+func _maybe_special_order(t: Dictionary) -> void:
+	if kind != "normal" and kind != "regular":
+		return
+	if _rng.randf() > 0.12 or Game.special_orders.size() >= 4:
+		return
+	var pool: Array = FishDB.salt_ids(bool(t.get("salt", false)))
+	var sp: String = pool[_rng.randi_range(0, pool.size() - 1)]
+	var qty: int = _rng.randi_range(2, 4) if TankSim.space_of(sp) <= 2 else 1
+	var o := {"id": Game.rng.randi(), "name": profile.title, "species": sp, "qty": qty, "ready": Game.day + 1, "due": Game.day + 3}
+	Game.special_orders.append(o)
+	say("Bana %d %s bulabilir misiniz? İki üç güne uğrarım." % [qty, FishDB.display_name(sp)], 4.5)
+	Game.notify.emit("Özel sipariş: %s, %d %s istiyor (en geç Gün %d). Getirirsen %%50 fazla öder." % [o.name, qty, FishDB.display_name(sp), o.due], "info")
 
 
 func _evaluate_shelf(sh: Shelf) -> void:
@@ -422,7 +568,7 @@ func _evaluate_shelf(sh: Shelf) -> void:
 		say("Raf bomboş!")
 		Game.change_reputation(-0.5)
 		return
-	if _rng.randf() < 0.3:
+	if kind != "thief" and _rng.randf() < 0.3:
 		say(["Fiyatlara bakıyorum sadece.", "Hmm, şimdilik almayayım."][_rng.randi_range(0, 1)], 2.5)
 		return
 	ids.shuffle()
@@ -433,10 +579,49 @@ func _evaluate_shelf(sh: Shelf) -> void:
 			e.shelf.erase(pid)
 		basket.append({"type": "product", "id": pid, "shelf": sh.furniture_uid})
 	Game.stock_changed.emit()
+	if kind == "thief":
+		_steal()
+		return
 	say("Bunu da alayım.", 2.0)
 
 
+func _steal() -> void:
+	_to_visit.clear()
+	var n: int = basket.size()
+	if Game.has_furniture("kamera"):
+		Sfx.play("alarm")
+		say("Eyvah, kamera!", 2.5)
+		Game.notify.emit("HIRSIZ! Güvenlik kamerası yakaladı, %d ürün geri alındı." % n, "good")
+		Game.change_reputation(0.5)
+		_leave()  # ürünler rafa geri konur
+	else:
+		Game.stats.stolen += n
+		basket.clear()
+		state = State.LEAVE
+		_speed *= 1.6
+		_path = shop.path(position, shop.entrance)
+		_path.append(shop.outside + Vector3(_rng.randf_range(-6, 6), 0, 0))
+
+
 func _go_queue() -> void:
+	if kind == "complainer":
+		_join_counter()
+		return
+	if kind == "special":
+		_fill_special_basket()
+		if basket.is_empty():
+			if Game.day >= int(special_order.due):
+				say("Sözünüzü tutmadınız! Bir daha gelmem.", 4.0)
+				Game.special_orders.erase(special_order)
+				Game.change_reputation(-3.0)
+			else:
+				say("Henüz gelmemiş. Yarın tekrar uğrarım.", 3.5)
+			_leave()
+			return
+		say("Harika, buldunuz!", 2.5)
+	if kind == "child":
+		_leave()
+		return
 	if inspector:
 		_inspection_result()
 		state = State.LEAVE
@@ -453,10 +638,32 @@ func _go_queue() -> void:
 		Game.record_lost_customer(false)
 		_leave()
 		return
+	_join_counter()
+
+
+func _join_counter() -> void:
+	if shop.counter == null:
+		_leave()
+		return
 	wait_max = 60.0 * float(profile.patience)
 	wait_time = wait_max
 	state = State.QUEUE
 	main.join_queue(self)
+
+
+func _fill_special_basket() -> void:
+	var need: int = int(special_order.qty)
+	var reserved: Array = main.reserved_uids()
+	var found: Array = []
+	for aq in shop.aquariums:
+		var t: Dictionary = Game.tanks[aq.tank_id]
+		if t.get("quarantine", false):
+			continue
+		for f in TankSim.living(t):
+			if f.species == special_order.species and f.health > 50.0 and not reserved.has(int(f.uid)) and found.size() < need:
+				found.append({"type": "fish", "tank": aq.tank_id, "uid": int(f.uid), "species": f.species, "mult": 1.5})
+	if found.size() >= need:
+		basket = found
 
 
 ## main sıra düzenini değiştirdiğinde çağırır.
@@ -485,11 +692,17 @@ func basket_value() -> int:
 
 func item_value(item: Dictionary) -> int:
 	if item.type == "product":
-		return int(ProductDB.get_product(item.id).price)
+		var pv: int = int(ProductDB.get_product(item.id).price)
+		if Game.campaign.get("target", "") == "products":
+			pv = int(pv * (1.0 - float(Game.campaign.pct) / 100.0))
+		return pv
 	var f: Dictionary = main.find_fish(int(item.tank), int(item.uid))
 	if f.is_empty() or not f.alive:
 		return 0
-	return FishDB.fish_value(f)
+	var v: float = FishDB.fish_value(f) * float(item.get("mult", 1.0))
+	if Game.campaign.get("target", "") == "fish":
+		v *= 1.0 - float(Game.campaign.pct) / 100.0
+	return int(v)
 
 
 ## Satış öncesi: ölen/satılamayan kalemleri sepetten çıkar.
@@ -514,6 +727,11 @@ func start_haggle() -> Haggle:
 
 
 func finish_sale() -> void:
+	if regular_name != "":
+		Game.change_loyalty(regular_name, 5.0)
+	if kind == "special":
+		Game.special_orders.erase(special_order)
+		Game.notify.emit("Özel sipariş teslim edildi!", "good")
 	haggle = null
 	say(["Teşekkürler, iyi günler!", "Kolay gelsin!", "Yine gelirim."][_rng.randi_range(0, 2)])
 	basket.clear()
@@ -521,9 +739,16 @@ func finish_sale() -> void:
 
 
 func _give_up() -> void:
+	if regular_name != "":
+		Game.change_loyalty(regular_name, -10.0)
 	angry = true
 	say("Bu ne yavaşlık! Gidiyorum.")
 	Game.record_lost_customer(true)
+	_leave()
+
+
+func walk_out_calm() -> void:
+	haggle = null
 	_leave()
 
 

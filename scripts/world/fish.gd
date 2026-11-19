@@ -150,6 +150,15 @@ func apply_state(fish_data: Dictionary) -> void:
 		scale = Vector3.ONE * sc
 
 
+## Cama vurulunca ürküp arkaya kaçar
+func scare() -> void:
+	if _burst > 0.2 or not alive:
+		return
+	_burst = 0.8
+	_target = Vector3(_lo().x + _rng.randf() * (_hi().x - _lo().x), _lo().y + _rng.randf() * (_hi().y - _lo().y) * 0.5, _lo().z)
+	_retarget = 2.0
+
+
 func set_sick(level: float) -> void:
 	sick = level
 	if _mat:
