@@ -84,7 +84,8 @@ func refresh() -> void:
 	if not is_instance_valid(_items):
 		return
 	for c in _items.get_children():
-		c.free()
+		c.get_parent().remove_child(c)
+		c.queue_free()
 	var e: Dictionary = entry()
 	if e.is_empty():
 		return

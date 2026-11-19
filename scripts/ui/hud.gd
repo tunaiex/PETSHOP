@@ -381,8 +381,10 @@ func toast(text: String, kind: String = "info") -> void:
 	pc.add_child(l)
 	_toasts.add_child(pc)
 	while _toasts.get_child_count() > 5:
-		_toasts.get_child(0).free()
-	var tw := create_tween()
+		var old: Node = _toasts.get_child(0)
+		_toasts.remove_child(old)
+		old.queue_free()
+	var tw := pc.create_tween()
 	tw.tween_interval(4.5)
 	tw.tween_property(pc, "modulate:a", 0.0, 0.6)
 	tw.tween_callback(pc.queue_free)
@@ -408,7 +410,8 @@ func close_panel() -> void:
 
 func _open(title: String, width: float = 760) -> VBoxContainer:
 	if is_blocking():
-		_panel.free()
+		_root.remove_child(_panel)
+		_panel.queue_free()
 	_panel_refresh = Callable()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_joy_vec = Vector2.ZERO
@@ -454,9 +457,12 @@ func _center_panel() -> void:
 	_panel.size = s
 
 
+## Paneli temizler. Tıklanan butonun kendi sinyali sürerken silinmemesi için
+## önce ağaçtan çıkarılır, sonra kare sonunda silinir (queue_free).
 func _clear(body: VBoxContainer) -> void:
 	for c in body.get_children():
-		c.free()
+		c.get_parent().remove_child(c)
+		c.queue_free()
 
 
 func _row(parent: Control) -> HBoxContainer:

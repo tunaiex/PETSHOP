@@ -438,7 +438,8 @@ func _index() -> void:
 ## Kapıya gelen kolileri, girişin sağına yığar.
 func sync_boxes() -> void:
 	for c in _boxes_root.get_children():
-		c.free()
+		c.get_parent().remove_child(c)
+		c.queue_free()
 	for i in Game.boxes.size():
 		var b: Dictionary = Game.boxes[i]
 		var box := DeliveryBox.new()

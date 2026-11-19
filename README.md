@@ -142,6 +142,13 @@ godot --headless --path . --import
 godot --headless --path . --fixed-fps 60 -s res://tests/run_tests.gd
 ```
 
+Ek duman testleri (bütün panellerdeki her butona basar, dünya etkileşimlerini dener):
+
+```
+godot --headless --path . -s res://tests/smoke_ui.gd
+godot --headless --path . -s res://tests/smoke_world.gd
+```
+
 Testler şunları kontrol eder:
 
 - Tür uyumu, balık değeri, pazarlık ve su simülasyonu
