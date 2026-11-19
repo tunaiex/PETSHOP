@@ -1,7 +1,9 @@
 class_name Customer
 extends Node3D
 ## Müşteri: içeri girer, tanklara bakar, balık/ürün seçer, sıraya girer, pazarlık eder, çıkar.
-## assets/models/characters/customer.glb varsa prosedürel insan yerine o kullanılır.
+## Görünüm: assets/models/characters/*.glb (yürüme/bekleme animasyonlu) yoksa prosedürel insan.
+
+const CHARACTERS := ["res://assets/models/characters/adam.glb", "res://assets/models/characters/kiz.glb"]
 
 enum State { ENTER, BROWSE, LOOK, SHELF, QUEUE, REGISTER, LEAVE, GONE }
 
@@ -29,7 +31,9 @@ var _path: Array = []
 var _speed: float = 1.25
 var _to_visit: Array = []
 var _look_timer: float = 0.0
-var _current_aq: Aquarium
+var _current: Node3D           ## Baktığı akvaryum ya da raf
+var _walk_anim: String = ""
+var _idle_anim: String = ""
 var _bubble: Label3D
 var _bubble_timer: float = 0.0
 var _walk_phase: float = 0.0
@@ -58,22 +62,46 @@ func setup(m: Node, s: Shop, seed_value: int) -> void:
 	_bubble.no_depth_test = false
 	add_child(_bubble)
 	position = shop.outside + Vector3(_rng.randf_range(-3, 3), 0, 0)
-	# Bakacağı tanklar
-	var open_tanks: Array = shop.aquariums.filter(func(a): return Game.tanks[a.tank_id].unlocked)
-	open_tanks.shuffle()
-	_to_visit = open_tanks.slice(0, _rng.randi_range(1, min(3, open_tanks.size())))
+	# Bakacağı yerler: balıklı tanklar ve dolu raflar
+	var targets: Array = []
+	for aq in shop.aquariums:
+		if not TankSim.living(Game.tanks[aq.tank_id]).is_empty():
+			targets.append(aq)
+	for sh in shop.shelves:
+		if Game.shelf_total(sh.entry()) > 0:
+			targets.append(sh)
+	targets.shuffle()
+	_to_visit = targets.slice(0, _rng.randi_range(1, max(1, min(3, targets.size()))))
 	_path = [shop.entrance + Vector3(_rng.randf_range(-0.4, 0.4), 0, 0)]
 	state = State.ENTER
 
 
+func _go(target: Vector3) -> void:
+	_path = shop.path(position, target)
+
+
 func _build_body() -> void:
-	var glb := "res://assets/models/characters/customer.glb"
-	if ResourceLoader.exists(glb):
-		var inst: Node3D = (load(glb) as PackedScene).instantiate()
+	var avail: Array = CHARACTERS.filter(func(p): return ResourceLoader.exists(p))
+	if not avail.is_empty():
+		var inst: Node3D = (load(avail[_rng.randi_range(0, avail.size() - 1)]) as PackedScene).instantiate()
+		inst.rotation.y = PI  # modeller +Z'ye bakıyor, müşteri -Z yönünde yürür
+		inst.scale = Vector3.ONE * _rng.randf_range(0.95, 1.05)
 		add_child(inst)
+		_add_collider()
 		var players := inst.find_children("*", "AnimationPlayer", true, false)
 		if not players.is_empty():
 			_anim = players[0]
+			for a in _anim.get_animation_list():
+				var low: String = a.to_lower()
+				if low == "walk" or low.ends_with("|walk"):
+					_walk_anim = a
+				elif low == "idle" or low.ends_with("|idle"):
+					_idle_anim = a
+			for a in [_walk_anim, _idle_anim]:
+				if a != "":
+					_anim.get_animation(a).loop_mode = Animation.LOOP_LINEAR
+			if _idle_anim != "":
+				_anim.play(_idle_anim)
 		return
 	var skins := [Color(0.96, 0.8, 0.68), Color(0.87, 0.67, 0.5), Color(0.72, 0.52, 0.38), Color(0.5, 0.35, 0.25)]
 	var hairs := [Color(0.08, 0.06, 0.05), Color(0.3, 0.2, 0.12), Color(0.55, 0.4, 0.22), Color(0.75, 0.75, 0.75)]
@@ -162,6 +190,10 @@ func _build_body() -> void:
 		eye.material_override = MeshKit.mat(Color(0.05, 0.05, 0.05), 0.2)
 		eye.position = Vector3(side * 0.04, 1.745, -0.1)
 		body.add_child(eye)
+	_add_collider()
+
+
+func _add_collider() -> void:
 	# Oyuncunun içinden geçmemesi için çarpışma
 	var ab := AnimatableBody3D.new()
 	ab.sync_to_physics = false
@@ -209,33 +241,33 @@ func _process(delta: float) -> void:
 			if not moving:
 				state = State.LOOK
 				_look_timer = _rng.randf_range(3.0, 6.0)
-				_face(_current_aq.look_target())
-				_evaluate_tank(_current_aq)
+				if is_instance_valid(_current):
+					_face(_current.look_target())
+					if _current is Aquarium:
+						_evaluate_tank(_current)
+					elif _current is Shelf:
+						_evaluate_shelf(_current)
 		State.LOOK:
 			_look_timer -= delta * Game.time_scale
 			if _look_timer <= 0.0:
 				_next_browse()
-		State.SHELF:
-			if not moving:
-				_face(shop.shelf_look)
-				_pick_products()
-				_go_queue()
 		State.QUEUE:
-			if not moving:
-				_face(shop.register_point)
+			if not moving and shop.counter:
+				_face(shop.counter.to_global(Vector3(-0.5, 0, 0)))
 				wait_time -= delta * Game.time_scale * 0.5
 				if wait_time <= 0.0:
 					_give_up()
 		State.REGISTER:
 			if not moving:
-				_face(position + Vector3(0, 0, 1))
+				if shop.counter:
+					_face(shop.counter.to_global(Vector3(-0.5, 0, 0)))
 				if haggle == null:
 					wait_time -= delta * Game.time_scale
 					var frac: float = wait_time / wait_max
 					if frac < 0.3:
-						_bubble.text = "Hadi ama! ⏳"
+						_bubble.text = "Hadi ama!"
 					elif frac < 0.6:
-						_bubble.text = "Bakar mısınız? ⏳"
+						_bubble.text = "Bakar mısınız?"
 					else:
 						_bubble.text = "Hesap lütfen ✓"
 					if wait_time <= 0.0:
@@ -248,18 +280,15 @@ func _process(delta: float) -> void:
 
 
 func _next_browse() -> void:
-	if not _to_visit.is_empty():
-		_current_aq = _to_visit.pop_front()
-		var vp: Vector3 = _current_aq.view_point()
+	while not _to_visit.is_empty():
+		_current = _to_visit.pop_front()
+		if not is_instance_valid(_current):
+			continue
+		var vp: Vector3 = _current.view_point()
 		vp.y = 0
-		var off := _current_aq.global_transform.basis.x * _rng.randf_range(-0.4, 0.4)
-		_path = [vp + off]
+		var off: Vector3 = _current.global_transform.basis.x * _rng.randf_range(-0.4, 0.4)
+		_go(vp + off)
 		state = State.BROWSE
-		return
-	# Bakma bitti: karar ver
-	if _rng.randf() < 0.45:
-		_path = [shop.shelf_point + Vector3(0, 0, _rng.randf_range(-0.5, 0.5))]
-		state = State.SHELF
 		return
 	_go_queue()
 
@@ -284,6 +313,12 @@ func _evaluate_tank(aq: Aquarium) -> void:
 		say("Iyy, ölü balık var!")
 		Game.change_reputation(-1.5)
 		return
+	var appeal: float = TankSim.appeal(t)
+	if not t.get("light", false) and _rng.randf() < 0.6:
+		say("Bu tank çok karanlık, hiçbir şey görünmüyor.")
+		return
+	if t.get("decor", []).is_empty() and str(t.get("gravel", "")) == "" and _rng.randf() < 0.4:
+		say("Bomboş cam kutu... Hiç özenilmemiş.")
 	# Balık seç
 	var reserved: Array = main.reserved_uids()
 	var choices: Array = alive.filter(func(f): return not reserved.has(int(f.uid)) and f.growth > 0.3)
@@ -305,7 +340,7 @@ func _evaluate_tank(aq: Aquarium) -> void:
 	if avg_h < 55.0 + picky * 20.0:
 		say("Bunlar biraz halsiz görünüyor.")
 		return
-	if _rng.randf() < 0.75:
+	if _rng.randf() < clamp(0.3 + appeal * 0.0065, 0.2, 0.95):
 		for i in want:
 			basket.append({"type": "fish", "tank": aq.tank_id, "uid": int(same[i].uid), "species": sp})
 		var special := {"palyaco": "Aaa Nemo! Bunu alıyorum!", "cerrah": "Dory'yi buldum!", "arowana": "Vay be, ejderha balığı!", "pirana": "Pirana mı bu? Harika!", "denizati": "Deniz atı! Çok narin..."}
@@ -317,20 +352,36 @@ func _evaluate_tank(aq: Aquarium) -> void:
 		say(["Güzelmiş.", "Hmm...", "Çok tatlılar!"][_rng.randi_range(0, 2)], 2.5)
 
 
-func _pick_products() -> void:
-	var ids: Array = ProductDB.ids().filter(func(p): return Game.stock.get(p, 0) > 0)
+func _evaluate_shelf(sh: Shelf) -> void:
+	var e: Dictionary = sh.entry()
+	var ids: Array = []
+	for pid in e.get("shelf", {}):
+		if int(e.shelf[pid]) > 0:
+			ids.append(pid)
 	if ids.is_empty():
-		say("Raflar bomboş!")
+		say("Raf bomboş!")
 		Game.change_reputation(-0.5)
 		return
-	var n := _rng.randi_range(1, 2)
+	if _rng.randf() < 0.3:
+		say(["Fiyatlara bakıyorum sadece.", "Hmm, şimdilik almayayım."][_rng.randi_range(0, 1)], 2.5)
+		return
 	ids.shuffle()
-	for i in min(n, ids.size()):
-		basket.append({"type": "product", "id": ids[i]})
+	for i in min(_rng.randi_range(1, 2), ids.size()):
+		var pid: String = ids[i]
+		e.shelf[pid] = int(e.shelf[pid]) - 1
+		if e.shelf[pid] <= 0:
+			e.shelf.erase(pid)
+		basket.append({"type": "product", "id": pid, "shelf": sh.furniture_uid})
+	Game.stock_changed.emit()
 	say("Bunu da alayım.", 2.0)
 
 
 func _go_queue() -> void:
+	if not basket.is_empty() and shop.counter == null:
+		say("Kasa bile yok, nereye ödeyeceğim?")
+		Game.record_lost_customer(true)
+		_leave()
+		return
 	if basket.is_empty():
 		say(["Bugünlük bakmaya geldim.", "Sonra uğrarım.", "Aradığımı bulamadım."][_rng.randi_range(0, 2)])
 		Game.record_lost_customer(false)
@@ -347,14 +398,16 @@ func set_queue_slot(index: int) -> void:
 	_queue_index = index
 	if state != State.QUEUE and state != State.REGISTER:
 		return
+	if shop.counter == null:
+		return
 	if index == 0:
 		state = State.REGISTER
-		_path = [shop.register_point]
+		_go(shop.counter.register_point())
 		if wait_time < wait_max * 0.6:
 			wait_time = wait_max * 0.6
 	else:
 		state = State.QUEUE
-		_path = [shop.queue_points[min(index - 1, shop.queue_points.size() - 1)]]
+		_go(shop.counter.queue_point(index - 1))
 
 
 func basket_value() -> int:
@@ -378,8 +431,7 @@ func validate_basket() -> void:
 	var keep: Array = []
 	for item in basket:
 		if item.type == "product":
-			if Game.stock.get(item.id, 0) > 0:
-				keep.append(item)
+			keep.append(item)  # raftan alındı, elinde
 		else:
 			var f: Dictionary = main.find_fish(int(item.tank), int(item.uid))
 			if not f.is_empty() and f.alive:
@@ -398,6 +450,7 @@ func start_haggle() -> Haggle:
 func finish_sale() -> void:
 	haggle = null
 	say(["Teşekkürler, iyi günler!", "Kolay gelsin!", "Yine gelirim."][_rng.randi_range(0, 2)])
+	basket.clear()
 	_leave()
 
 
@@ -419,9 +472,20 @@ func _leave() -> void:
 	if state == State.LEAVE or state == State.GONE:
 		return
 	main.leave_queue(self)
+	# Ödenmemiş ürünleri rafa (raf yoksa depoya) geri koy
+	for item in basket:
+		if item.type == "product":
+			var e: Dictionary = Game.furniture_by_uid(int(item.get("shelf", -1)))
+			if not e.is_empty() and e.has("shelf"):
+				e.shelf[item.id] = int(e.shelf.get(item.id, 0)) + 1
+			else:
+				Game.stock[item.id] = int(Game.stock.get(item.id, 0)) + 1
+	if not basket.is_empty():
+		Game.stock_changed.emit()
 	basket.clear()
 	state = State.LEAVE
-	_path = [shop.entrance, shop.outside + Vector3(_rng.randf_range(-6, 6), 0, 0)]
+	_path = shop.path(position, shop.entrance)
+	_path.append(shop.outside + Vector3(_rng.randf_range(-6, 6), 0, 0))
 
 
 func is_waiting_at_register() -> bool:
@@ -457,11 +521,10 @@ func _face(p: Vector3) -> void:
 
 func _animate(delta: float, moving: bool) -> void:
 	if _anim:
-		var want_anim := "walk" if moving else "idle"
-		for anim_name in _anim.get_animation_list():
-			if anim_name.to_lower().contains(want_anim) and _anim.current_animation != anim_name:
-				_anim.play(anim_name)
-				break
+		var want_anim: String = _walk_anim if moving else _idle_anim
+		if want_anim != "" and _anim.current_animation != want_anim:
+			_anim.play(want_anim, 0.25)
+		_anim.speed_scale = Game.time_scale if moving else 1.0
 		return
 	if moving:
 		_walk_phase += delta * _speed * 5.5 * Game.time_scale

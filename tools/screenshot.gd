@@ -1,22 +1,26 @@
 extends SceneTree
-## Geliştirici aracı: farklı açılardan ekran görüntüsü alır.
+## Geliştirici aracı: örnek bir dükkân kurup farklı açılardan ekran görüntüsü alır.
 ##   godot --path . --rendering-method gl_compatibility -s res://tools/screenshot.gd -- <çıktı_klasörü>
 
 var _frame := 0
 var _main: Node
+var _game: Node
+## ad, oyuncu konumu, bakış (yaw), eğim (pitch), kurulmuş dükkân mı
 var _shots := [
-	["genel", Vector3(5.0, 0.05, 4.2), 45.0, -8.0],
-	["tank_yakin", Vector3(-3.6, 0.05, -3.55), 0.0, -18.0],
-	["tank_orta", Vector3(0.0, 0.05, -3.3), 0.0, -14.0],
-	["tank_japon", Vector3(0.0, 0.05, -3.6), 0.0, -18.0],
-	["tank_deniz", Vector3(3.6, 0.05, -3.6), 0.0, -18.0],
-	["tank_egzotik", Vector3(-5.2, 0.05, -1.6), 90.0, -18.0],
-	["salon", Vector3(3.0, 0.05, 2.0), 60.0, -6.0],
-	["kasa", Vector3(2.8, 0.05, 0.6), -60.0, -8.0],
-	["raf", Vector3(4.0, 0.05, -2.0), -90.0, -8.0],
+	["bos_disari", Vector3(0, 0.05, 8.0), 0.0, -2.0, false],
+	["bos_ic", Vector3(0, 0.05, 3.6), 0.0, -4.0, false],
+	["disari", Vector3(0, 0.05, 8.0), 0.0, -2.0, true],
+	["genel", Vector3(5.6, 0.05, 4.5), 42.0, -10.0, true],
+	["tank_tatli", Vector3(-3.5, 0.05, -3.25), 0.0, -16.0, true],
+	["tank_deniz", Vector3(0.0, 0.05, -3.25), 0.0, -16.0, true],
+	["tank_soguk", Vector3(3.5, 0.05, -3.25), 0.0, -16.0, true],
+	["raflar", Vector3(4.3, 0.05, -0.2), -90.0, -12.0, true],
+	["kasa", Vector3(2.2, 0.05, 4.4), -55.0, -10.0, true],
+	["yerlestirme", Vector3(-1.5, 0.05, 1.2), 90.0, -28.0, true],
 ]
 var _idx := 0
 var _out := "user://shots"
+var _built := false
 
 
 func _initialize() -> void:
@@ -29,29 +33,24 @@ func _initialize() -> void:
 func _process(_d: float) -> bool:
 	_frame += 1
 	if _frame == 2:
-		root.get_node("Game").new_game()
+		_game = root.get_node("Game")
+		_game.new_game()
 		_main = load("res://scenes/main.tscn").instantiate()
 		root.add_child(_main)
 	if _frame == 10:
-		_showcase(root.get_node("Game"))
 		_main.hud.close_panel()
-		root.get_node("Game").open_shop()
-		root.get_node("Game").time_scale = 1.0
 	if _frame > 10 and _frame % 90 == 0:
 		if _idx > 0 and _idx <= _shots.size():
-			var img := root.get_viewport().get_texture().get_image()
-			img.save_png("%s/%s.png" % [_out, _shots[_idx - 1][0]])
-			print(_shots[_idx - 1][0], " pos=", _main.player.global_position, " focus=", _main.player.focus.get_prompt() if _main.player.focus else "-")
+			root.get_viewport().get_texture().get_image().save_png("%s/%s.png" % [_out, _shots[_idx - 1][0]])
 		if _idx >= _shots.size():
-			if _idx == _shots.size():
-				_gallery()
-				_idx += 1
-				return false
-			root.get_viewport().get_texture().get_image().save_png("%s/galeri.png" % _out)
 			quit()
 			return true
 		var s: Array = _shots[_idx]
-		var p: Player = _main.player
+		if s[4] and not _built:
+			_build()
+		if s[0] == "yerlestirme":
+			_main.builder.start_new("akvaryum_beyaz")
+		var p = _main.player
 		p.position = s[1]
 		p._yaw = deg_to_rad(s[2])
 		p._pitch = deg_to_rad(s[3])
@@ -59,59 +58,49 @@ func _process(_d: float) -> bool:
 	return false
 
 
-## Tüm balık türlerini yan yana, yakından gösterir.
-func _gallery() -> void:
-	var g := Node3D.new()
-	g.position = Vector3(0, 20, 0)
-	root.add_child(g)
-	var bg := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = Vector3(4, 3, 0.05)
-	bg.mesh = bm
-	bg.material_override = MeshKit.mat(Color(0.03, 0.08, 0.1))
-	bg.position = Vector3(0, 0, -0.6)
-	g.add_child(bg)
-	var light := DirectionalLight3D.new()
-	light.rotation_degrees = Vector3(-35, 20, 0)
-	g.add_child(light)
-	var ids: Array = FishDB.ids()
-	for i in ids.size():
-		var s: Dictionary = FishDB.get_species(ids[i])
-		var mi := MeshInstance3D.new()
-		mi.mesh = MeshKit.fish_mesh(ids[i])
-		mi.material_override = MeshKit.shader_mat("res://shaders/fish.gdshader", {
-			"body_color": s.body, "belly_color": s.belly, "accent_color": s.accent, "fin_color": s.fin,
-			"fin_alpha": s.fin_alpha, "pattern": s.pattern, "fish_len": s.length, "phase": float(i)})
-		var k: float = 0.28 / float(s.length)
-		mi.scale = Vector3.ONE * k
-		mi.rotation_degrees.y = 90
-		mi.position = Vector3(-0.6 + (i % 4) * 0.4, 0.2 - (i / 4) * 0.35, 0)
-		g.add_child(mi)
-		var l := Label3D.new()
-		l.text = s.name
-		l.font_size = 24
-		l.pixel_size = 0.0012
-		l.position = mi.position + Vector3(0, -0.14, 0)
-		g.add_child(l)
-	var cam := Camera3D.new()
-	cam.position = Vector3(0, 0.02, 1.15)
-	cam.fov = 50
-	g.add_child(cam)
-	cam.current = true
-	_main.hud.visible = false
-
-
-## Görüntü için vitrin: tuzlu tank ve egzotik tank doldurulur.
-func _showcase(game: Node) -> void:
-	var sea: Dictionary = game.tanks[2]
-	TankSim.set_salt(sea, true)
-	for sp in ["palyaco", "palyaco", "palyaco", "cerrah", "cerrah", "mandarin", "denizati"]:
-		sea.fish.append(TankSim.new_fish(sp, 0.9))
-	var ex: Dictionary = game.tanks[3]
-	ex.unlocked = true
-	for sp in ["melek", "melek", "melek", "arowana", "pirana", "pirana"]:
-		ex.fish.append(TankSim.new_fish(sp, 0.9))
-	for i in 3:
-		game.tanks[1].fish.append(TankSim.new_fish("koi", 0.8))
-	for t in game.tanks:
-		game.tank_changed.emit(t.id)
+## Örnek dükkân: 4 akvaryum (tatlı, deniz, soğuk su, melek), 2 raf, kasa, bitkiler.
+func _build() -> void:
+	_built = true
+	var g := _game
+	g.money = 20000
+	g.add_furniture("kasa", 4.5, 2.6, 0.0)
+	var a: Dictionary = g.add_furniture("akvaryum_ceviz", -3.5, -4.6, 0.0)
+	var b: Dictionary = g.add_furniture("akvaryum_ceviz", 0.0, -4.6, 0.0)
+	var c: Dictionary = g.add_furniture("akvaryum_ceviz", 3.5, -4.6, 0.0)
+	var d: Dictionary = g.add_furniture("akvaryum_beyaz", -6.45, -1.4, 90.0)
+	var r1: Dictionary = g.add_furniture("kavisli_raf", 6.72, -1.6, -90.0)
+	var r2: Dictionary = g.add_furniture("duvar_rafi", 6.75, 1.0, -90.0)
+	g.add_furniture("saksi_agave", -6.3, 4.3, 0.0)
+	g.add_furniture("saksi_egrelti", -6.2, 2.0, 0.0)
+	g.add_furniture("saksi_calilik", 2.4, 4.4, 0.0)
+	g.add_furniture("paspas", 0.0, 3.9, 0.0)
+	var setups := [
+		[a, false, 25.0, true, ["kaya", "bitki", "bitki", "kok", "kilic_bitki", "bitki"], {"neon": 6, "lepistes": 4}],
+		[b, true, 26.0, true, ["resif", "resif", "deniz_yildizi", "kabuk", "kestane"], {"palyaco": 3, "cerrah": 2, "mandarin": 1, "denizati": 1}],
+		[c, false, 21.0, false, ["kaya", "amfora", "bitki", "kirik_kaya"], {"japon": 3, "koi": 1}],
+		[d, false, 27.0, true, ["kok", "bitki", "bitki", "kilic_bitki", "kaya"], {"melek": 4}],
+	]
+	for st in setups:
+		var t: Dictionary = g.tanks[int(st[0].tank)]
+		t.salt = st[1]
+		t.heater = st[2]
+		t.temp = st[2]
+		t.heater_on = st[3]
+		t.gravel = "white" if st[1] else "natural"
+		t.light = true
+		t.air = true
+		t.filter = 2
+		t.cycle = 100.0
+		t.dirt = 5.0
+		t.decor = st[4]
+		for sp in st[5]:
+			for i in st[5][sp]:
+				t.fish.append(TankSim.new_fish(sp, 0.85))
+	for pid in ProductDB.ids():
+		g.add_stock(pid, 20)
+	for pid in ["yem", "su_duzenleyici", "ilac", "kum", "dekor", "filtre"]:
+		g.stock_shelf(int(r1.uid), pid, 4)
+		g.stock_shelf(int(r2.uid), pid, 3)
+	for t in g.tanks:
+		g.tank_changed.emit(t.id)
+	g.open_shop()

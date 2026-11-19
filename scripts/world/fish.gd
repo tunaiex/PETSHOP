@@ -154,6 +154,11 @@ func set_sick(level: float) -> void:
 		_mat.set_shader_parameter("sick", level)
 
 
+## Balığın "kişisel alan" yarıçapı (boyuna göre)
+func radius() -> float:
+	return float(_data.length) * scale.x * 0.45
+
+
 func _margin() -> Vector3:
 	var half: float = float(_data.length) * scale.x * 0.5
 	var m := Vector3(half, half * 0.5, half) + Vector3.ONE * 0.04
@@ -199,27 +204,34 @@ func _process(delta: float) -> void:
 		spd *= 2.5
 
 	var desired: Vector3 = (_target - position).normalized() * spd
-	# Sürü davranışı
+	# Sürü davranışı + kişisel alan: hiçbir balık diğerinin içine girmez
 	var school: float = float(_data.schooling)
-	if school > 0.0 and aquarium and feed_point == Vector3.INF:
-		var center := Vector3.ZERO
-		var align := Vector3.ZERO
-		var sep := Vector3.ZERO
-		var n := 0
+	var my_r: float = radius()
+	var center := Vector3.ZERO
+	var align := Vector3.ZERO
+	var sep := Vector3.ZERO
+	var n := 0
+	if aquarium:
 		for other in aquarium.fish_nodes():
-			if other == self or other.species != species or not other.alive:
+			if other == self or not is_instance_valid(other) or not other.alive:
 				continue
-			var d: float = position.distance_to(other.position)
-			if d < 0.3:
+			var off: Vector3 = position - other.position
+			var d: float = off.length()
+			var min_d: float = (my_r + other.radius()) * 1.15
+			if d < min_d:
+				var push: float = (1.0 - d / min_d)
+				sep += (off / max(d, 0.001) if d > 0.001 else Vector3(_rng.randf_range(-1, 1), 0, _rng.randf_range(-1, 1)).normalized()) * push
+			if school > 0.0 and other.species == species and d < 0.3:
 				center += other.position
 				align += other.velocity
 				n += 1
-				if d < 0.04:
-					sep += (position - other.position) / max(d, 0.005)
-		if n > 0:
-			center /= n
-			desired += ((center - position) * 0.6 + align / n * 0.8) * school
-			desired += sep * 0.002
+	if n > 0 and feed_point == Vector3.INF:
+		center /= n
+		desired += ((center - position) * 0.35 + align / n * 0.8) * school
+	if sep != Vector3.ZERO:
+		desired += sep * spd * 4.0
+		# İç içe geçmiş balıkları anında biraz ayır
+		position += sep * min(my_r, 0.03) * delta * 6.0
 	# Duvarlardan uzak dur (büyük balıklar için daha geniş pay)
 	var lo: Vector3 = _lo()
 	var hi: Vector3 = _hi()

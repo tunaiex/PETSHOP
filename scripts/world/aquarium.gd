@@ -90,12 +90,6 @@ func _build_static() -> void:
 	# Kapak / lamba
 	var hood := MeshKit.box(self, Vector3(TW + 0.03, 0.07, TD + 0.03), Vector3(0, y0 + TH + 0.035, 0), dark)
 	hood.name = "Hood"
-	var led := StandardMaterial3D.new()
-	led.albedo_color = Color(0.9, 0.95, 1.0)
-	led.emission_enabled = true
-	led.emission = Color(0.85, 0.95, 1.0)
-	led.emission_energy_multiplier = 3.0
-	MeshKit.box(self, Vector3(TW - 0.12, 0.004, 0.05), Vector3(0, y0 + TH - 0.002, 0), led)
 	# Küçük dijital gösterge
 	var lcd := StandardMaterial3D.new()
 	lcd.albedo_color = Color(0.1, 0.2, 0.35)
@@ -136,6 +130,20 @@ func _build_static() -> void:
 	add_child(body)
 
 
+var furniture_uid: int = 0
+var _equip_sig: String = ""
+
+
+## Ekipman/dekor değişince görünümün yeniden kurulması gerekir.
+func _signature() -> String:
+	var d: Dictionary = data()
+	return "%s|%s|%s|%s|%s|%s|%s" % [d.get("salt", false), d.get("gravel", ""), d.get("light", false), d.get("air", false), d.get("heater_on", false), d.filter, ",".join(PackedStringArray(d.get("decor", [])))]
+
+
+func _gravel_h() -> float:
+	return GRAVEL if str(data().get("gravel", "")) != "" else 0.008
+
+
 func _rebuild_content() -> void:
 	if _content:
 		_content.queue_free()
@@ -145,44 +153,34 @@ func _rebuild_content() -> void:
 	var d: Dictionary = data()
 	_built_unlocked = d.unlocked
 	_built_salt = bool(d.get("salt", false))
+	_equip_sig = _signature()
 	var y0 := _y0
-	if not d.unlocked:
-		_sign = Label3D.new()
-		_sign.text = "KİRALIK TANK\n%s ₺" % _fmt(TankSim.UNLOCK_COST)
-		_sign.font_size = 64
-		_sign.pixel_size = 0.0012
-		_sign.modulate = Color(0.9, 0.2, 0.15)
-		_sign.outline_size = 8
-		_sign.outline_modulate = Color(1, 1, 1)
-		_sign.position = Vector3(0, y0 + TH * 0.5, TD * 0.5 + 0.01)
-		_content.add_child(_sign)
-		var bed := MeshKit.mat(Color(0.2, 0.2, 0.2), 0.9)
-		MeshKit.box(_content, Vector3(TW - 0.02, 0.01, TD - 0.02), Vector3(0, y0 + 0.005, 0), bed)
-		_label.text = "TANK %d" % (tank_id + 1)
-		return
-
+	var gh := _gravel_h()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 4242 + tank_id * 131
 
-	# Çakıl
+	# Taban: çakıl / kum ya da çıplak cam
 	_gravel_mat = MeshKit.shader_mat("res://shaders/gravel.gdshader")
-	if _built_salt:
-		_gravel_mat.set_shader_parameter("color_a", Color(0.95, 0.92, 0.85))
-		_gravel_mat.set_shader_parameter("color_b", Color(0.84, 0.81, 0.74))
-		_gravel_mat.set_shader_parameter("scale", 95.0)
-	elif rng.randf() < 0.5:
-		_gravel_mat.set_shader_parameter("color_a", Color(0.78, 0.7, 0.55))
-		_gravel_mat.set_shader_parameter("color_b", Color(0.45, 0.38, 0.28))
-	MeshKit.box(_content, Vector3(TW - 0.016, GRAVEL, TD - 0.016), Vector3(0, y0 + GRAVEL * 0.5, 0), _gravel_mat)
+	match str(d.get("gravel", "")):
+		"white":
+			_gravel_mat.set_shader_parameter("color_a", Color(0.95, 0.92, 0.85))
+			_gravel_mat.set_shader_parameter("color_b", Color(0.84, 0.81, 0.74))
+			_gravel_mat.set_shader_parameter("scale", 95.0)
+		"natural":
+			pass
+		_:
+			_gravel_mat.set_shader_parameter("color_a", Color(0.12, 0.14, 0.15))
+			_gravel_mat.set_shader_parameter("color_b", Color(0.08, 0.09, 0.1))
+			_gravel_mat.set_shader_parameter("scale", 2.0)
+	MeshKit.box(_content, Vector3(TW - 0.016, gh, TD - 0.016), Vector3(0, y0 + gh * 0.5, 0), _gravel_mat)
 
 	# Su
 	_water_mat = MeshKit.shader_mat("res://shaders/water.gdshader")
-	if _built_salt:
-		_water_mat.set_shader_parameter("clean_color", Color(0.35, 0.7, 0.95))
-	MeshKit.box(_content, Vector3(TW - 0.016, _water_h - GRAVEL, TD - 0.016), Vector3(0, y0 + GRAVEL + (_water_h - GRAVEL) * 0.5, 0), _water_mat)
 	_surface_mat = MeshKit.shader_mat("res://shaders/water.gdshader", {"is_surface": true})
 	if _built_salt:
+		_water_mat.set_shader_parameter("clean_color", Color(0.35, 0.7, 0.95))
 		_surface_mat.set_shader_parameter("clean_color", Color(0.35, 0.7, 0.95))
+	MeshKit.box(_content, Vector3(TW - 0.016, _water_h - gh, TD - 0.016), Vector3(0, y0 + gh + (_water_h - gh) * 0.5, 0), _water_mat)
 	var surf := MeshInstance3D.new()
 	var pm := PlaneMesh.new()
 	pm.size = Vector2(TW - 0.016, TD - 0.016)
@@ -193,28 +191,52 @@ func _rebuild_content() -> void:
 	surf.position = Vector3(0, y0 + _water_h, 0)
 	_content.add_child(surf)
 
-	# Işık
-	_light = SpotLight3D.new()
-	_light.position = Vector3(0, y0 + TH - 0.02, 0)
-	_light.rotation_degrees = Vector3(-90, 0, 0)
-	_light.spot_range = 1.2
-	_light.spot_angle = 65.0
-	_light.light_energy = 2.2
-	_light.light_color = Color(0.85, 0.95, 1.0)
-	_light.shadow_enabled = false
-	_content.add_child(_light)
+	# Lamba
+	if d.get("light", false):
+		var led := StandardMaterial3D.new()
+		led.albedo_color = Color(0.9, 0.95, 1.0)
+		led.emission_enabled = true
+		led.emission = Color(0.85, 0.95, 1.0)
+		led.emission_energy_multiplier = 3.0
+		MeshKit.box(_content, Vector3(TW - 0.12, 0.004, 0.05), Vector3(0, y0 + TH - 0.002, 0), led)
+		_light = SpotLight3D.new()
+		_light.position = Vector3(0, y0 + TH - 0.02, 0)
+		_light.rotation_degrees = Vector3(-90, 0, 0)
+		_light.spot_range = 1.2
+		_light.spot_angle = 65.0
+		_light.light_energy = 2.2
+		_light.light_color = Color(0.85, 0.95, 1.0)
+		_light.shadow_enabled = false
+		_content.add_child(_light)
+	_gravel_mat.set_shader_parameter("caustic_strength", 0.35 if d.get("light", false) else 0.0)
+
+	# Görünür ekipman: ısıtıcı (sol arka), filtre (sağ arka)
+	var black := MeshKit.mat(Color(0.06, 0.06, 0.07), 0.3)
+	if d.get("heater_on", false):
+		var h := MeshKit.cylinder(_content, 0.012, 0.3, Vector3(-TW * 0.5 + 0.04, y0 + gh + 0.18, -TD * 0.5 + 0.03), MeshKit.mat(Color(0.75, 0.85, 0.9, 1.0), 0.1), 12)
+		h.rotation_degrees.z = 8
+		MeshKit.box(_content, Vector3(0.03, 0.03, 0.02), Vector3(-TW * 0.5 + 0.04, y0 + _water_h + 0.01, -TD * 0.5 + 0.03), black)
+	var fl: int = int(d.filter)
+	if fl > 0:
+		var fh: float = 0.12 + fl * 0.05
+		MeshKit.box(_content, Vector3(0.07, fh, 0.05), Vector3(TW * 0.5 - 0.06, y0 + _water_h - fh * 0.5 - 0.02, -TD * 0.5 + 0.04), black)
 
 	_build_decor(rng)
-	_build_particles()
+	if d.get("air", false):
+		_build_particles()
+	else:
+		_build_food_particles()
 	sync()
 
 
-const DECOR := "res://assets/models/decor/%s.glb"
+const DECOR_MODEL := "res://assets/models/decor/%s.glb"
+## Dekor yuvaları (tank yerel x,z). Bitkiler arka sıraya dizilir.
+const SLOTS := [Vector2(-0.38, -0.08), Vector2(0.36, -0.06), Vector2(-0.02, -0.1), Vector2(0.16, 0.08), Vector2(-0.22, 0.1), Vector2(0.48, 0.12), Vector2(-0.5, 0.06), Vector2(0.04, 0.13)]
 
 
 ## Hazır dekor modelini en uzun kenarı `size` olacak şekilde zemine koyar. Model yoksa false.
 func _place_decor(name_id: String, size: float, pos: Vector3, rot: float) -> bool:
-	var path := DECOR % name_id
+	var path := DECOR_MODEL % name_id
 	if not ResourceLoader.exists(path):
 		return false
 	var n: Node3D = (load(path) as PackedScene).instantiate()
@@ -229,71 +251,84 @@ func _place_decor(name_id: String, size: float, pos: Vector3, rot: float) -> boo
 	var k: float = size / max(box.size.x, max(box.size.y, box.size.z))
 	n.scale = Vector3.ONE * k
 	n.rotation.y = rot
-	n.position = pos - Vector3(0, box.position.y * k + 0.005, 0)
+	var c := Vector3(box.get_center().x, 0, box.get_center().z) * k
+	n.position = pos - c.rotated(Vector3.UP, rot) - Vector3(0, box.position.y * k + 0.005, 0)
 	_content.add_child(n)
 	return true
 
 
 func _build_decor(rng: RandomNumberGenerator) -> void:
-	var y0 := _y0 + GRAVEL
-	if _built_salt:
-		# Deniz tankı: resif kayaları, deniz yıldızı, kabuk, deniz kestanesi
-		_place_decor("resif_kayasi", rng.randf_range(0.34, 0.42), Vector3(rng.randf_range(-0.4, -0.15), y0, -0.08), rng.randf() * TAU)
-		_place_decor("resif_kayasi", rng.randf_range(0.24, 0.3), Vector3(rng.randf_range(0.2, 0.42), y0, -0.1), rng.randf() * TAU)
-		_place_decor("deniz_yildizi", 0.1, Vector3(rng.randf_range(-0.1, 0.15), y0, 0.1), rng.randf() * TAU)
-		_place_decor("deniz_kabugu", 0.08, Vector3(rng.randf_range(0.2, 0.45), y0, 0.12), rng.randf() * TAU)
-		_place_decor("deniz_kestanesi", 0.08, Vector3(rng.randf_range(-0.45, -0.25), y0, 0.13), rng.randf() * TAU)
-		return
-	var used_models := false
-	var rocks := ["dere_kayasi", "kirik_kaya"]
-	for i in rng.randi_range(2, 3):
-		var ok := _place_decor(rocks[rng.randi_range(0, 1)], rng.randf_range(0.16, 0.26), Vector3(rng.randf_range(-TW * 0.38, TW * 0.38), y0, rng.randf_range(-TD * 0.3, 0.0)), rng.randf() * TAU)
-		used_models = used_models or ok
-	if rng.randf() < 0.6:
-		_place_decor("amfora", 0.24, Vector3(rng.randf_range(-0.3, 0.3), y0, 0.05), rng.randf() * TAU)
-	if not used_models:
-		var rock_mat := MeshKit.mat(Color(0.5, 0.5, 0.48), 0.85)
-		for i in rng.randi_range(2, 3):
-			var mi := MeshInstance3D.new()
-			var sz := Vector3(rng.randf_range(0.12, 0.22), rng.randf_range(0.08, 0.16), rng.randf_range(0.1, 0.16))
-			mi.mesh = MeshKit.rock(rng.randi(), sz)
-			mi.material_override = rock_mat
-			mi.position = Vector3(rng.randf_range(-TW * 0.38, TW * 0.38), y0 + sz.y * 0.1, rng.randf_range(-TD * 0.3, 0.0))
-			mi.rotation.y = rng.randf() * TAU
-			_content.add_child(mi)
-	# Kök
-	var pts: Array = []
-	var radii: Array = []
-	var sx: float = rng.randf_range(-0.35, -0.1)
-	var dir: float = 1.0 if rng.randf() < 0.5 else -1.0
-	for i in 8:
-		var t: float = i / 7.0
-		pts.append(Vector3(sx * dir + t * 0.45 * dir, y0 + sin(t * PI) * 0.22 + t * 0.08, -0.08 + sin(t * 5.0) * 0.04))
-		radii.append(lerp(0.03, 0.008, t))
-	var wood := MeshInstance3D.new()
-	wood.mesh = MeshKit.tube(pts, radii)
-	wood.material_override = MeshKit.mat(Color(0.28, 0.2, 0.13), 0.9)
-	_content.add_child(wood)
-	# Bitkiler
+	var y0 := _y0 + _gravel_h()
+	var decor: Array = data().get("decor", [])
+	var plant_i := 0
 	var greens := [
 		[Color(0.06, 0.25, 0.06), Color(0.35, 0.75, 0.2)],
 		[Color(0.08, 0.3, 0.1), Color(0.55, 0.85, 0.3)],
 		[Color(0.2, 0.08, 0.05), Color(0.75, 0.3, 0.2)],
 	]
-	for i in rng.randi_range(5, 7):
-		var pal: Array = greens[rng.randi_range(0, 1)]
-		var mi := MeshInstance3D.new()
-		mi.mesh = MeshKit.grass_clump(rng.randi() % 1000, rng.randi_range(6, 10), rng.randf_range(0.25, _water_h - GRAVEL - 0.05))
-		mi.material_override = MeshKit.shader_mat("res://shaders/plant.gdshader", {"base_color": pal[0], "tip_color": pal[1]})
-		mi.position = Vector3(rng.randf_range(-TW * 0.45, TW * 0.45), y0 - 0.01, rng.randf_range(-TD * 0.42, -TD * 0.2))
-		_content.add_child(mi)
-	for i in rng.randi_range(1, 2):
-		var pal: Array = greens[2] if rng.randf() < 0.3 else greens[1]
-		var mi := MeshInstance3D.new()
-		mi.mesh = MeshKit.sword_plant(rng.randi() % 1000, rng.randi_range(7, 11), rng.randf_range(0.14, 0.22))
-		mi.material_override = MeshKit.shader_mat("res://shaders/plant.gdshader", {"base_color": pal[0], "tip_color": pal[1], "sway": 0.4})
-		mi.position = Vector3(rng.randf_range(-TW * 0.35, TW * 0.35), y0 - 0.005, rng.randf_range(-TD * 0.15, TD * 0.1))
-		_content.add_child(mi)
+	for i in decor.size():
+		var id: String = decor[i]
+		var info: Dictionary = FurnitureDB.DECOR.get(id, {})
+		if info.is_empty():
+			continue
+		var slot: Vector2 = SLOTS[i % SLOTS.size()]
+		var rot: float = rng.randf() * TAU
+		match id:
+			"bitki", "kilic_bitki":
+				var x: float = -TW * 0.42 + fmod(plant_i * 0.37 + 0.1, TW * 0.84)
+				plant_i += 1
+				var pal: Array = greens[2] if (id == "kilic_bitki" and rng.randf() < 0.4) else greens[rng.randi_range(0, 1)]
+				var mi := MeshInstance3D.new()
+				if id == "bitki":
+					mi.mesh = MeshKit.grass_clump(rng.randi() % 1000, rng.randi_range(7, 11), rng.randf_range(0.28, _water_h - 0.12))
+					mi.material_override = MeshKit.shader_mat("res://shaders/plant.gdshader", {"base_color": pal[0], "tip_color": pal[1]})
+					mi.position = Vector3(x, y0 - 0.01, -TD * 0.3 + rng.randf_range(-0.04, 0.04))
+				else:
+					mi.mesh = MeshKit.sword_plant(rng.randi() % 1000, rng.randi_range(8, 11), rng.randf_range(0.16, 0.22))
+					mi.material_override = MeshKit.shader_mat("res://shaders/plant.gdshader", {"base_color": pal[0], "tip_color": pal[1], "sway": 0.4})
+					mi.position = Vector3(x, y0 - 0.005, -TD * 0.12)
+				_content.add_child(mi)
+			"kok":
+				var pts: Array = []
+				var radii: Array = []
+				var dir: float = 1.0 if rng.randf() < 0.5 else -1.0
+				for k in 8:
+					var t: float = k / 7.0
+					pts.append(Vector3(slot.x - 0.2 * dir + t * 0.42 * dir, y0 + sin(t * PI) * 0.2 + t * 0.07, -0.08 + sin(t * 5.0) * 0.04))
+					radii.append(lerp(0.028, 0.008, t))
+				var wood := MeshInstance3D.new()
+				wood.mesh = MeshKit.tube(pts, radii)
+				wood.material_override = MeshKit.mat(Color(0.28, 0.2, 0.13), 0.9)
+				_content.add_child(wood)
+			_:
+				var size: float = float(info.size) * rng.randf_range(0.85, 1.15)
+				if not _place_decor(info.model, size, Vector3(slot.x, y0, slot.y), rot):
+					var mi := MeshInstance3D.new()
+					mi.mesh = MeshKit.rock(rng.randi(), Vector3(size, size * 0.6, size * 0.7))
+					mi.material_override = MeshKit.mat(Color(0.5, 0.5, 0.48), 0.85)
+					mi.position = Vector3(slot.x, y0, slot.y)
+					_content.add_child(mi)
+
+
+func _build_food_particles() -> void:
+	var flake := QuadMesh.new()
+	flake.size = Vector2(0.008, 0.008)
+	var flake_mat := StandardMaterial3D.new()
+	flake_mat.albedo_color = Color(0.85, 0.45, 0.2)
+	flake_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	flake.material = flake_mat
+	_food_particles = CPUParticles3D.new()
+	_food_particles.mesh = flake
+	_food_particles.amount = 60
+	_food_particles.lifetime = 6.0
+	_food_particles.one_shot = true
+	_food_particles.emitting = false
+	_food_particles.explosiveness = 0.85
+	_food_particles.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	_food_particles.emission_box_extents = Vector3(0.08, 0.002, 0.06)
+	_food_particles.gravity = Vector3(0, -0.012, 0)
+	_food_particles.initial_velocity_max = 0.01
+	_content.add_child(_food_particles)
 
 
 func _build_particles() -> void:
@@ -312,7 +347,7 @@ func _build_particles() -> void:
 	bubbles.mesh = bm
 	bubbles.amount = 40
 	bubbles.lifetime = 2.6
-	bubbles.position = Vector3(TW * 0.42, _y0 + GRAVEL + 0.01, -TD * 0.35)
+	bubbles.position = Vector3(TW * 0.3, _y0 + _gravel_h() + 0.01, -TD * 0.35)
 	bubbles.direction = Vector3.UP
 	bubbles.spread = 6.0
 	bubbles.gravity = Vector3(0, 0.05, 0)
@@ -352,17 +387,17 @@ func _build_particles() -> void:
 # ------------------------------------------------------------------ Eşitleme
 
 func swim_bounds() -> AABB:
-	var lo := Vector3(-TW * 0.5 + 0.07, _y0 + GRAVEL + 0.06, -TD * 0.5 + 0.07)
+	var lo := Vector3(-TW * 0.5 + 0.07, _y0 + _gravel_h() + 0.06, -TD * 0.5 + 0.07)
 	var hi := Vector3(TW * 0.5 - 0.07, _y0 + _water_h - 0.04, TD * 0.5 - 0.07)
 	return AABB(lo, hi - lo)
 
 
 func sync() -> void:
 	var d: Dictionary = data()
-	if d.unlocked != _built_unlocked or bool(d.get("salt", false)) != _built_salt:
-		_rebuild_content()
-		return
 	if not d.unlocked:
+		return
+	if _signature() != _equip_sig:
+		_rebuild_content()
 		return
 	var seen := {}
 	for f in d.fish:
@@ -445,8 +480,9 @@ func look_target() -> Vector3:
 
 
 func get_prompt() -> String:
-	if not data().unlocked:
-		return "Tank %d: Kirala (%s ₺)" % [tank_id + 1, _fmt(TankSim.UNLOCK_COST)]
+	var d := data()
+	if TankSim.living(d).is_empty() and str(d.get("gravel", "")) == "":
+		return "Tank %d: Kur (kum, filtre, ısıtıcı, lamba...)" % (tank_id + 1)
 	return "Tank %d: İncele" % (tank_id + 1)
 
 

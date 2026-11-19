@@ -6,6 +6,7 @@ const MAX_CUSTOMERS := 6
 var shop: Shop
 var player: Player
 var hud: HUD
+var builder: Builder
 var customers: Array = []
 var queue: Array = []
 var _spawn_timer: float = 4.0
@@ -15,18 +16,27 @@ var _report_shown := false
 
 func _ready() -> void:
 	shop = Shop.new()
+	shop.main = self
 	add_child(shop)
 	shop.build()
 	hud = HUD.new()
 	hud.main = self
 	add_child(hud)
 	shop.hud = hud
+	# Oyuna dışarıda, kaldırımda, dükkâna bakarak başlanır.
 	player = Player.new()
-	player.position = Vector3(5.0, 0.05, 4.2)
-	player.rotation.y = deg_to_rad(45)
+	player.position = Vector3(0, 0.05, Shop.D * 0.5 + 3.0)
+	player.rotation.y = 0.0
 	player.hud = hud
 	add_child(player)
 	hud.player = player
+	builder = Builder.new()
+	builder.player = player
+	builder.shop = shop
+	add_child(builder)
+	hud.builder = builder
+	builder.state_changed.connect(hud.on_build_state)
+	Game.furniture_changed.connect(func(): _update_queue.call_deferred())
 	Game.phase_changed.connect(_on_phase)
 	if Game.day == 1 and Game.phase == "prep":
 		hud.show_help.call_deferred()
@@ -138,8 +148,7 @@ func complete_sale(c: Customer, price: int) -> void:
 				sick_sold = true
 			t.fish = t.fish.filter(func(x): return int(x.uid) != int(item.uid))
 			touched[int(item.tank)] = true
-		else:
-			Game.stock[item.id] = max(0, Game.stock.get(item.id, 0) - 1)
+		# Ürünler müşteri raftan alırken zaten raftan düşüldü.
 	Game.stock_changed.emit()
 	for id in touched:
 		Game.tank_changed.emit(id)
@@ -152,7 +161,7 @@ func complete_sale(c: Customer, price: int) -> void:
 
 func someone_near_door() -> bool:
 	var door := Vector3(0, 0, Shop.D * 0.5)
-	if player and player.global_position.distance_to(door) < 2.2:
+	if player and player.global_position.distance_to(door) < 2.6:
 		return true
 	for c in customers:
 		if c.global_position.distance_to(door) < 2.6:

@@ -25,6 +25,7 @@ func check(cond: bool, name: String) -> void:
 func _initialize() -> void:
 	print("== Mantık testleri ==")
 	_test_fishdb()
+	_test_furniture()
 	_test_haggle()
 	_test_tank_sim()
 	_test_meshes()
@@ -48,14 +49,27 @@ func _process(_delta: float) -> bool:
 		"boot":
 			if _frame < 6:
 				return false
-			check(_main.shop.aquariums.size() == 5, "5 akvaryum kuruldu")
+			check(_main.shop.aquariums.is_empty() and _main.shop.counter == null, "Oyun boş dükkânla başlar")
+			check(_main.player.global_position.z > 5.0, "Oyuncu dışarıda başlar")
+			_main.hud.close_panel()
+			_build_shop(game)
+			_stage = "built"
+		"built":
+			if _frame < 12:
+				return false
+			check(_main.shop.aquariums.size() == 2, "2 akvaryum yerleştirildi")
+			check(_main.shop.counter != null, "Kasa yerleştirildi")
+			check(_main.shop.shelves.size() == 1, "Raf yerleştirildi")
 			var fish_nodes: int = 0
 			for aq in _main.shop.aquariums:
 				fish_nodes += aq.fish_nodes().size()
-			check(fish_nodes == 13, "Başlangıç balıkları sahnede (%d)" % fish_nodes)
-			_main.hud.close_panel()
+			check(fish_nodes == 13, "Balıklar sahnede (%d)" % fish_nodes)
+			var p: Array = _main.shop.path(Vector3(0, 0, 8), _main.shop.counter.register_point())
+			print("  yol: ", p)
+			check(p.size() >= 2 and p[-1].distance_to(_main.shop.counter.register_point()) < 0.5, "Dışarıdan kasaya yol bulunur (%d nokta)" % p.size())
 			_start_money = game.money
 			game.day_ended.connect(func(r): _report = r)
+			_start_money = game.money
 			game.open_shop()
 			check(game.phase == "open", "Dükkân açıldı")
 			game.time_scale = 12.0
@@ -118,6 +132,17 @@ func _test_fishdb() -> void:
 	check(FishDB.conflict_reason("pirana", "japon") != "", "Pirana diğer balıklara saldırır")
 	check(FishDB.conflict_reason("aslan", "palyaco") != "", "Aslan balığı palyaçoyu yer")
 	check(FishDB.get_species("koi").has("tail"), "Yeni türler varsayılan alanları alır")
+
+
+func _test_furniture() -> void:
+	var a := FurnitureDB.corners("kasa", Vector2.ZERO, 0.0)
+	var b := FurnitureDB.corners("kasa", Vector2(0, 0.5), 0.0)
+	var c := FurnitureDB.corners("kasa", Vector2(0, 3.0), 0.0)
+	var d := FurnitureDB.corners("kasa", Vector2(1.5, 0.0), 90.0)
+	check(FurnitureDB.polys_overlap(a, b), "Çakışan eşyalar algılanır")
+	check(not FurnitureDB.polys_overlap(a, c), "Uzak eşyalar çakışmaz")
+	check(FurnitureDB.polys_overlap(a, d), "Döndürülmüş eşya çakışması algılanır")
+	check(TankSim.space_of("arowana") > TankSim.space_of("neon"), "Büyük balık daha çok yer kaplar")
 
 
 func _test_haggle() -> void:
@@ -194,6 +219,14 @@ func _test_tank_sim() -> void:
 	# Ölü balık kaldırma
 	full.fish[0].alive = false
 	check(TankSim.remove_dead(full) == 1, "Ölü balık çıkarılır")
+	# Olgunlaşmamış su
+	var raw := TankSim.new_tank(5, true, 25.0, false)
+	raw.heater_on = true
+	raw.fish.append(TankSim.new_fish("neon", 0.8))
+	for m in 60:
+		TankSim.step(raw, 1.0, rng)
+	check(TankSim.average_health(raw) < 100.0, "Olgunlaşmamış suda balık zorlanır")
+	check(raw.cycle > 0.0, "Su zamanla olgunlaşır")
 	# Tuzlu su
 	var sea := TankSim.new_tank(3, true, 26.0)
 	check(TankSim.check_add(sea, "palyaco") != "", "Tatlı su tankına deniz balığı konmaz")
@@ -228,6 +261,8 @@ func _test_meshes() -> void:
 
 func _test_save(game: Node) -> void:
 	game.new_game()
+	var e: Dictionary = game.add_furniture("akvaryum_beyaz", 1.0, 1.0, 45.0)
+	game.tanks[0].fish.append(TankSim.new_fish("neon"))
 	game.money = 4321
 	game.tanks[0].dirt = 33.0
 	var n: int = game.tanks[0].fish.size()
@@ -239,3 +274,79 @@ func _test_save(game: Node) -> void:
 	check(game.tanks[0].fish.size() == n, "Balıklar kaydedildi")
 	check(abs(float(game.tanks[0].dirt) - 33.0) < 0.01, "Su durumu kaydedildi")
 	check(typeof(game.tanks[0].fish[0].uid) == TYPE_INT, "UID tam sayı olarak yüklendi")
+	check(game.furniture.size() == 1 and abs(game.furniture[0].rot - 45.0) < 0.01, "Mobilya konumu kaydedildi")
+	check(game.sell_furniture(int(e.uid)) != "", "Dolu tank satılamaz")
+	game.tanks[0].fish.clear()
+	var m0: int = game.money
+	check(game.sell_furniture(int(e.uid)) == "" and game.money == m0 + 450, "Boş tank yarı fiyatına satılır")
+
+
+## Entegrasyon testi için dükkânı kurar: kasa, 2 akvaryum (tam donanım), raf.
+func _build_shop(game: Node) -> void:
+	var b = _main.builder
+	# Yerleştirme kuralları
+	b.start_new("kasa")
+	b.pos = Vector2(4.5, 2.5)
+	b.rot = 0.0
+	b._validate()
+	check(b.valid, "Kasa boş alana konabilir")
+	b.pos = Vector2(0.0, 4.4)
+	b._validate()
+	check(not b.valid, "Kapının önüne eşya konamaz")
+	b.pos = Vector2(7.5, 0.0)
+	b._validate()
+	check(not b.valid, "Duvarın dışına eşya konamaz")
+	b.cancel()
+	var money0: int = game.money
+	game.add_furniture("kasa", 4.5, 2.5, 0.0)
+	var t1: Dictionary = game.add_furniture("akvaryum_ceviz", -3.0, -4.4, 0.0)
+	var t2: Dictionary = game.add_furniture("akvaryum_beyaz", -6.45, 0.0, 90.0)
+	var sh: Dictionary = game.add_furniture("kavisli_raf", 6.7, -1.5, -90.0)
+	b.start_new("akvaryum_beyaz")
+	b.pos = Vector2(-3.0, -4.4)
+	b._validate()
+	check(not b.valid, "Eşyalar üst üste konamaz")
+	b.cancel()
+	check(game.money == money0, "Doğrudan ekleme para harcamaz (test)")
+	b.start_new("saksi_agave")
+	b.pos = Vector2(-6.2, 4.2)
+	b.rot = 30.0
+	b._validate()
+	var n0: int = game.furniture.size()
+	check(b.confirm() and game.money == money0 - 120 and game.furniture.size() == n0 + 1, "Yerleştirince eşya parası ödenir")
+	var plant: Dictionary = game.furniture[-1]
+	b.start_move(int(plant.uid))
+	b.pos = Vector2(-6.2, 3.0)
+	b._validate()
+	check(b.confirm() and abs(float(plant.z) - 3.0) < 0.01 and game.money == money0 - 120, "Eşya ücretsiz taşınır")
+	b.start_new("kasa")
+	b.pos = Vector2(2.0, -2.0)
+	b._validate()
+	check(not b.confirm(), "İkinci kasa alınamaz")
+	b.cancel()
+	for e in [t1, t2]:
+		var t: Dictionary = game.tanks[int(e.tank)]
+		check(t.cycle == 0.0 and str(t.gravel) == "" and not t.light, "Yeni tank çıplak gelir")
+		t.gravel = "natural"
+		t.heater_on = true
+		t.light = true
+		t.air = true
+		t.filter = 2
+		t.cycle = 100.0
+		t.decor = ["kaya", "bitki", "bitki", "kok"]
+	game.tanks[int(t2.tank)].heater = 21.0
+	game.tanks[int(t2.tank)].heater_on = false
+	var a: Dictionary = game.tanks[int(t1.tank)]
+	for i in 6:
+		a.fish.append(TankSim.new_fish("neon", 0.8))
+	for i in 4:
+		a.fish.append(TankSim.new_fish("lepistes", 0.8))
+	for i in 3:
+		game.tanks[int(t2.tank)].fish.append(TankSim.new_fish("japon", 0.8))
+	game.add_stock("yem", 10)
+	game.add_stock("filtre", 4)
+	check(game.stock_shelf(int(sh.uid), "yem", 6) == 6, "Depodan rafa ürün dizilir")
+	check(game.stock_shelf(int(sh.uid), "filtre", 4) == 4, "Rafa ikinci ürün dizilir")
+	check(game.stock_shelf(int(sh.uid), "ilac", 3) == 0, "Depoda olmayan ürün dizilemez")
+	for t in game.tanks:
+		game.tank_changed.emit(t.id)

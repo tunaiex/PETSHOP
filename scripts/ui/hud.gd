@@ -11,6 +11,7 @@ const C_BAD := Color(1.0, 0.38, 0.32)
 
 var main: Node
 var player: Player
+var builder: Builder
 
 var _root: Control
 var _theme: Theme
@@ -36,6 +37,10 @@ var _look_last := Vector2.ZERO
 var _interact_btn: Button
 var _menu_btn: Button
 var _speed_btn: Button
+var _phone_btn: Button
+var _build_bar: PanelContainer
+var _build_lbl: Label
+var _build_btns: Array = []
 var _haggle_customer: Customer
 var _ask_value: int = 0
 
@@ -52,6 +57,7 @@ func _ready() -> void:
 	_build_topbar()
 	_build_center()
 	_build_touch()
+	_build_build_bar()
 	Game.money_changed.connect(func(_v): _refresh_top())
 	Game.time_changed.connect(func(_m): _refresh_top())
 	Game.phase_changed.connect(func(_p): _refresh_top())
@@ -131,6 +137,10 @@ func _build_topbar() -> void:
 	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sp.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hb.add_child(sp)
+	_phone_btn = Button.new()
+	_phone_btn.text = "TELEFON"
+	_phone_btn.pressed.connect(open_phone)
+	hb.add_child(_phone_btn)
 	_speed_btn = Button.new()
 	_speed_btn.text = "Hız ×1"
 	_speed_btn.pressed.connect(_cycle_speed)
@@ -204,6 +214,43 @@ func _build_touch() -> void:
 		_root.add_child(hint)
 
 
+func _build_build_bar() -> void:
+	_build_bar = PanelContainer.new()
+	_build_bar.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_build_bar.offset_left = -440
+	_build_bar.offset_right = 440
+	_build_bar.offset_top = -150
+	_build_bar.offset_bottom = -20
+	_build_bar.visible = false
+	_root.add_child(_build_bar)
+	var vb := VBoxContainer.new()
+	_build_bar.add_child(vb)
+	_build_lbl = _lbl("", 20)
+	_build_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vb.add_child(_build_lbl)
+	var hb := HBoxContainer.new()
+	hb.alignment = BoxContainer.ALIGNMENT_CENTER
+	hb.add_theme_constant_override("separation", 12)
+	vb.add_child(hb)
+	for spec in [["⟲ 15°", func(): builder.rotate_by(Builder.ROT_STEP)], ["⟳ 15°", func(): builder.rotate_by(-Builder.ROT_STEP)], ["⟲ 90°", func(): builder.rotate_by(90.0)], ["YERLEŞTİR", func(): builder.confirm()], ["İptal", func(): builder.cancel()]]:
+		var b := Button.new()
+		b.text = spec[0]
+		b.custom_minimum_size = Vector2(120, 56)
+		b.add_theme_font_size_override("font_size", 22)
+		b.pressed.connect(spec[1])
+		hb.add_child(b)
+		_build_btns.append(b)
+
+
+## Builder durumu değişince çağrılır.
+func on_build_state() -> void:
+	var on: bool = builder != null and builder.active
+	_build_bar.visible = on
+	_interact_btn.visible = _touch and not on
+	if on and not _touch:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
 func _lbl(text: String, size: int = 22, color: Color = Color(0.93, 0.95, 0.96)) -> Label:
 	var l := Label.new()
 	l.text = text
@@ -222,7 +269,7 @@ func _refresh_top() -> void:
 	_rep.text = "★".repeat(stars) + "☆".repeat(5 - stars)
 	match Game.phase:
 		"prep":
-			_phase.text = "Hazırlık: kapıdan dükkânı aç"
+			_phase.text = "Hazırlık: dükkânı kur, sonra kapıdan aç"
 		"open":
 			_phase.text = "Açık"
 		"closing":
@@ -283,8 +330,8 @@ func _input(event: InputEvent) -> void:
 
 
 func _over_button(p: Vector2) -> bool:
-	for b in [_interact_btn, _menu_btn, _speed_btn]:
-		if b.visible and b.get_global_rect().has_point(p):
+	for b in [_interact_btn, _menu_btn, _speed_btn, _phone_btn] + _build_btns:
+		if b.visible and b.is_visible_in_tree() and b.get_global_rect().has_point(p):
 			return true
 	return false
 
@@ -434,6 +481,12 @@ func _bar(parent: Control, label: String, value: float, good_high: bool = true) 
 
 
 func _process(delta: float) -> void:
+	if builder and builder.active:
+		var info: Dictionary = FurnitureDB.item(builder.type)
+		var price: String = "" if builder.moving_uid >= 0 else " • %s ₺" % Aquarium._fmt(int(info.price))
+		var hint: String = "" if _touch else "   [R/teker: döndür • E/tık: yerleştir • ESC: iptal]"
+		_build_lbl.text = "%s%s • %d°  %s%s" % [info.name, price, int(builder.rot), "✓ Uygun" if builder.valid else "✗ " + builder.reason, hint]
+		_build_lbl.add_theme_color_override("font_color", C_GOOD if builder.valid else C_BAD)
 	if _panel_refresh.is_valid():
 		_refresh_timer -= delta
 		if _refresh_timer <= 0.0:
@@ -444,113 +497,204 @@ func _process(delta: float) -> void:
 # ------------------------------------------------------------------ Akvaryum paneli
 
 func open_tank(aq: Aquarium) -> void:
-	var body := _open("Tank %d" % (aq.tank_id + 1))
+	var body := _open("Tank %d" % (aq.tank_id + 1), 860)
 	var fill := func(): _fill_tank(body, aq)
 	fill.call()
 	_panel_refresh = fill
 
 
+func _buy_equipment(body: VBoxContainer, aq: Aquarium, key: String) -> void:
+	var t: Dictionary = Game.tanks[aq.tank_id]
+	var info: Dictionary = FurnitureDB.EQUIPMENT[key]
+	if Game.spend(int(info.price)):
+		match key:
+			"gravel_natural":
+				t.gravel = "natural"
+			"gravel_white":
+				t.gravel = "white"
+			"heater":
+				t.heater_on = true
+			"light":
+				t.light = true
+			"air":
+				t.air = true
+		Game.tank_changed.emit(aq.tank_id)
+		Game.notify.emit("%s takıldı." % info.name, "good")
+	_fill_tank(body, aq)
+
+
+func _buy_decor(body: VBoxContainer, aq: Aquarium, key: String) -> void:
+	var t: Dictionary = Game.tanks[aq.tank_id]
+	if t.decor.size() >= FurnitureDB.MAX_DECOR:
+		Game.notify.emit("Tankta dekor için yer kalmadı.", "bad")
+		return
+	if Game.spend(int(FurnitureDB.DECOR[key].price)):
+		t.decor.append(key)
+		Game.tank_changed.emit(aq.tank_id)
+	_fill_tank(body, aq)
+
+
+func _remove_decor(body: VBoxContainer, aq: Aquarium) -> void:
+	var t: Dictionary = Game.tanks[aq.tank_id]
+	if not t.decor.is_empty():
+		t.decor.pop_back()
+		Game.tank_changed.emit(aq.tank_id)
+	_fill_tank(body, aq)
+
+
+func _upgrade_filter(body: VBoxContainer, aq: Aquarium) -> void:
+	var t: Dictionary = Game.tanks[aq.tank_id]
+	var fl: int = int(t.filter)
+	if fl < 3 and Game.spend(TankSim.FILTER_COST[fl + 1]):
+		t.filter = fl + 1
+		Game.tank_changed.emit(aq.tank_id)
+		Game.notify.emit("Filtre seviye %d." % (fl + 1), "good")
+	_fill_tank(body, aq)
+
+
+func _feed(body: VBoxContainer, aq: Aquarium) -> void:
+	var t: Dictionary = Game.tanks[aq.tank_id]
+	if Game.use_stock("yem"):
+		var extra := TankSim.feed(t)
+		aq.play_feed()
+		if extra > 0.0:
+			Game.notify.emit("Fazla yem verdin, su kirlendi!", "warn")
+		Game.tank_changed.emit(aq.tank_id)
+	_fill_tank(body, aq)
+
+
+func _water_change(body: VBoxContainer, aq: Aquarium) -> void:
+	var t: Dictionary = Game.tanks[aq.tank_id]
+	if Game.use_stock("su_duzenleyici"):
+		TankSim.water_change(t)
+		Game.tank_changed.emit(aq.tank_id)
+		Game.notify.emit("Suyun yarısı değiştirildi.", "good")
+	_fill_tank(body, aq)
+
+
+func _medicate(body: VBoxContainer, aq: Aquarium) -> void:
+	var t: Dictionary = Game.tanks[aq.tank_id]
+	if Game.use_stock("ilac"):
+		TankSim.medicate(t)
+		Game.tank_changed.emit(aq.tank_id)
+		Game.notify.emit("İlaç verildi.", "good")
+	_fill_tank(body, aq)
+
+
+func _remove_dead(body: VBoxContainer, aq: Aquarium) -> void:
+	var n := TankSim.remove_dead(Game.tanks[aq.tank_id])
+	Game.tank_changed.emit(aq.tank_id)
+	Game.notify.emit("%d ölü balık çıkarıldı." % n, "info")
+	_fill_tank(body, aq)
+
+
+func _toggle_salt(body: VBoxContainer, aq: Aquarium) -> void:
+	var t: Dictionary = Game.tanks[aq.tank_id]
+	var salt: bool = bool(t.salt)
+	if not TankSim.living(t).is_empty():
+		Game.notify.emit("Önce tanktaki balıkları sat.", "bad")
+		return
+	if Game.spend(TankSim.SALT_COST):
+		TankSim.set_salt(t, not salt)
+		t.decor = []
+		Game.tank_changed.emit(aq.tank_id)
+		Game.notify.emit("Tank %d artık %s." % [aq.tank_id + 1, "tatlı su" if salt else "tuzlu su (deniz) tankı"], "good")
+	_fill_tank(body, aq)
+
+
+func _heater(body: VBoxContainer, aq: Aquarium, d: float) -> void:
+	var t: Dictionary = Game.tanks[aq.tank_id]
+	t.heater = clamp(t.heater + d, TankSim.ROOM_TEMP, 32.0)
+	_fill_tank(body, aq)
+
+
+func _section(body: VBoxContainer, text: String) -> void:
+	body.add_child(HSeparator.new())
+	body.add_child(_lbl(text, 23, C_ACCENT.lightened(0.45)))
+
+
+func _warn(body: VBoxContainer, text: String, col: Color = C_WARN) -> void:
+	var l := _lbl(text, 20, col)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size.x = 780
+	body.add_child(l)
+
+
+func _flow(body: VBoxContainer) -> HFlowContainer:
+	var f := HFlowContainer.new()
+	f.add_theme_constant_override("h_separation", 8)
+	f.add_theme_constant_override("v_separation", 8)
+	body.add_child(f)
+	return f
+
+
 func _fill_tank(body: VBoxContainer, aq: Aquarium) -> void:
 	_clear(body)
 	var t: Dictionary = Game.tanks[aq.tank_id]
-	if not t.unlocked:
-		body.add_child(_lbl("Bu tank boş ve kiralık. Kiralarsan içine balık koyabilirsin.\nGünlük elektrik gideri de artar.", 21))
-		_btn(body, "Kirala: %s ₺" % Aquarium._fmt(TankSim.UNLOCK_COST), func():
-			if Game.spend(TankSim.UNLOCK_COST):
-				t.unlocked = true
-				t.dirt = 5.0
-				t.temp = t.heater
-				Game.tank_changed.emit(aq.tank_id)
-				Game.notify.emit("Tank %d hazır!" % (aq.tank_id + 1), "good")
-				_fill_tank(body, aq), Game.money >= TankSim.UNLOCK_COST)
-		return
+	var salt: bool = bool(t.salt)
 	var info := _row(body)
-	info.add_child(_lbl("Su: %.1f°C  (ısıtıcı %.0f°C)" % [t.temp, t.heater], 21))
-	_btn(info, " − ", func(): t.heater = max(TankSim.ROOM_TEMP, t.heater - 1.0); _fill_tank(body, aq))
-	_btn(info, " + ", func(): t.heater = min(32.0, t.heater + 1.0); _fill_tank(body, aq))
+	info.add_child(_lbl("%s • Su %.1f°C" % ["Tuzlu su" if salt else "Tatlı su", t.temp], 21))
+	if t.heater_on:
+		info.add_child(_lbl("  Isıtıcı %.0f°C" % t.heater, 21))
+		_btn(info, " − ", _heater.bind(body, aq, -1.0))
+		_btn(info, " + ", _heater.bind(body, aq, 1.0))
 	_bar(body, "Su temizliği", 100.0 - t.dirt)
 	_bar(body, "Tokluk", t.food)
+	_bar(body, "Su olgunluğu", t.cycle)
+	_bar(body, "Çekicilik", TankSim.appeal(t))
+	if t.cycle < 60.0:
+		_warn(body, "Dikkat: Yeni kurulan su henüz olgunlaşmadı (yararlı bakteri yok). Balık koyarsan zorlanırlar. Filtre olgunlaşmayı hızlandırır.")
 	if t.sick:
-		body.add_child(_lbl("⚠ Beyaz benek hastalığı! (%d%%) İlaç ver ve suyu değiştir." % int(t.sick_level * 100), 21))
-		body.get_child(-1).add_theme_color_override("font_color", C_BAD)
+		_warn(body, "⚠ Beyaz benek hastalığı! (%d%%) İlaç ver ve suyu değiştir." % int(t.sick_level * 100), C_BAD)
 	var dead := TankSim.dead_count(t)
 	if dead > 0:
-		var dl := _lbl("⚠ Tankta %d ölü balık var, suyu hızla kirletiyor!" % dead, 21)
-		dl.add_theme_color_override("font_color", C_BAD)
-		body.add_child(dl)
-	# Uyumsuzluk uyarıları
+		_warn(body, "⚠ Tankta %d ölü balık var, suyu hızla kirletiyor!" % dead, C_BAD)
 	var sps: Array = TankSim.species_in(t)
 	for i in sps.size():
-		for j in range(i, sps.size()):
-			var r: String = FishDB.conflict_reason(sps[i], sps[j]) if i != j else (FishDB.conflict_reason(sps[i], sps[j]) if sps[i] == "beta" and TankSim._count_species(TankSim.living(t), "beta") > 1 else "")
+		for j in range(i + 1, sps.size()):
+			var r: String = FishDB.conflict_reason(sps[i], sps[j])
 			if r != "":
-				var wl := _lbl("⚠ " + r, 20)
-				wl.add_theme_color_override("font_color", C_WARN)
-				body.add_child(wl)
-	# Sıcaklık uyarıları
+				_warn(body, "⚠ " + r)
 	for sp in sps:
 		var s: Dictionary = FishDB.get_species(sp)
 		if t.temp < s.temp_min - 0.5 or t.temp > s.temp_max + 0.5:
-			var tl := _lbl("⚠ %s için su %s (ideal %d-%d°C)" % [s.name, "soğuk" if t.temp < s.temp_min else "sıcak", int(s.temp_min), int(s.temp_max)], 20)
-			tl.add_theme_color_override("font_color", C_WARN)
-			body.add_child(tl)
+			_warn(body, "⚠ %s için su %s (ideal %d-%d°C)%s" % [s.name, "soğuk" if t.temp < s.temp_min else "sıcak", int(s.temp_min), int(s.temp_max), "" if t.heater_on else " — ısıtıcı yok!"])
 
-	var acts := HFlowContainer.new()
-	acts.add_theme_constant_override("h_separation", 8)
-	acts.add_theme_constant_override("v_separation", 8)
-	body.add_child(acts)
-	_btn(acts, "Yem ver (%d)" % Game.stock.get("yem", 0), func():
-		if Game.use_stock("yem"):
-			var extra := TankSim.feed(t)
-			aq.play_feed()
-			if extra > 0.0:
-				Game.notify.emit("Fazla yem verdin, su kirlendi!", "warn")
-			Game.tank_changed.emit(aq.tank_id)
-		_fill_tank(body, aq))
-	_btn(acts, "Su değiştir (%d)" % Game.stock.get("su_duzenleyici", 0), func():
-		if Game.use_stock("su_duzenleyici"):
-			TankSim.water_change(t)
-			Game.tank_changed.emit(aq.tank_id)
-			Game.notify.emit("Suyun yarısı değiştirildi.", "good")
-		_fill_tank(body, aq))
-	_btn(acts, "İlaç ver (%d)" % Game.stock.get("ilac", 0), func():
-		if Game.use_stock("ilac"):
-			TankSim.medicate(t)
-			Game.tank_changed.emit(aq.tank_id)
-			Game.notify.emit("İlaç verildi.", "good")
-		_fill_tank(body, aq), t.sick)
-	_btn(acts, "Ölüleri çıkar", func():
-		var n := TankSim.remove_dead(t)
-		Game.tank_changed.emit(aq.tank_id)
-		Game.notify.emit("%d ölü balık çıkarıldı." % n, "info")
-		_fill_tank(body, aq), dead > 0)
-	var salt: bool = bool(t.get("salt", false))
-	var conv_txt := "Tatlı suya çevir" if salt else "Tuzlu suya çevir"
-	_btn(acts, "%s (%d ₺)" % [conv_txt, TankSim.SALT_COST], func():
-		if not TankSim.living(t).is_empty():
-			Game.notify.emit("Önce tanktaki balıkları sat.", "bad")
-			return
-		if Game.spend(TankSim.SALT_COST):
-			TankSim.set_salt(t, not salt)
-			Game.tank_changed.emit(aq.tank_id)
-			Game.notify.emit("Tank %d artık %s." % [aq.tank_id + 1, "tatlı su" if salt else "tuzlu su (deniz) tankı"], "good")
-		_fill_tank(body, aq), TankSim.living(t).is_empty() and Game.money >= TankSim.SALT_COST)
+	var acts := _flow(body)
+	_btn(acts, "Yem ver (%d)" % Game.stock.get("yem", 0), _feed.bind(body, aq))
+	_btn(acts, "Su değiştir (%d)" % Game.stock.get("su_duzenleyici", 0), _water_change.bind(body, aq))
+	_btn(acts, "İlaç ver (%d)" % Game.stock.get("ilac", 0), _medicate.bind(body, aq), t.sick)
+	_btn(acts, "Ölüleri çıkar", _remove_dead.bind(body, aq), dead > 0)
+
+	_section(body, "Ekipman")
+	var eq := _flow(body)
+	var gravel_key := "gravel_white" if salt else "gravel_natural"
+	var have := {"gravel_natural": str(t.gravel) != "", "gravel_white": str(t.gravel) != "", "heater": t.heater_on, "light": t.light, "air": t.air}
+	for key in [gravel_key, "heater", "light", "air"]:
+		var e: Dictionary = FurnitureDB.EQUIPMENT[key]
+		if have[key]:
+			eq.add_child(_lbl("✓ %s" % e.name, 19, C_GOOD))
+		else:
+			var b := _btn(eq, "%s (%d ₺)" % [e.name, e.price], _buy_equipment.bind(body, aq, key), Game.money >= int(e.price))
+			b.tooltip_text = e.desc
 	var fl: int = int(t.filter)
 	if fl < 3:
-		var cost: int = TankSim.FILTER_COST[fl + 1]
-		_btn(acts, "Filtre Sv.%d → %d (%s ₺)" % [fl, fl + 1, Aquarium._fmt(cost)], func():
-			if Game.spend(cost):
-				t.filter = fl + 1
-				Game.notify.emit("Filtre yükseltildi.", "good")
-			_fill_tank(body, aq), Game.money >= cost)
+		_btn(eq, ("Filtre al" if fl == 0 else "Filtre Sv.%d→%d" % [fl, fl + 1]) + " (%d ₺)" % TankSim.FILTER_COST[fl + 1], _upgrade_filter.bind(body, aq), Game.money >= TankSim.FILTER_COST[fl + 1])
 	else:
-		acts.add_child(_lbl("Filtre: en üst seviye", 20))
+		eq.add_child(_lbl("✓ Filtre Sv.3", 19, C_GOOD))
 
-	body.add_child(HSeparator.new())
+	_section(body, "Dekor (%d/%d)" % [t.decor.size(), FurnitureDB.MAX_DECOR])
+	var dec := _flow(body)
+	for key in FurnitureDB.decor_for(salt):
+		var d: Dictionary = FurnitureDB.DECOR[key]
+		_btn(dec, "%s (%d ₺)" % [d.name, d.price], _buy_decor.bind(body, aq, key), Game.money >= int(d.price) and t.decor.size() < FurnitureDB.MAX_DECOR)
+	if not t.decor.is_empty():
+		_btn(dec, "Son dekoru kaldır", _remove_decor.bind(body, aq))
+
+	_section(body, "Balıklar (yer: %d/%d)" % [TankSim.space_used(t), TankSim.CAPACITY])
 	var alive: Array = TankSim.living(t)
-	body.add_child(_lbl("Balıklar (%d/%d)" % [t.fish.size(), TankSim.CAPACITY], 24))
 	if alive.is_empty():
-		body.add_child(_lbl("Tank boş. Kasadaki tabletten balık sipariş et.", 20))
+		body.add_child(_lbl("Tank boş. Telefondan balık sipariş et.", 20))
 	var groups := {}
 	for f in alive:
 		if not groups.has(f.species):
@@ -566,117 +710,232 @@ func _fill_tank(body: VBoxContainer, aq: Aquarium) -> void:
 		h /= arr.size()
 		var row := _row(body)
 		var nm := _lbl("%s ×%d" % [FishDB.display_name(sp), arr.size()], 21)
-		nm.custom_minimum_size.x = 230
+		nm.custom_minimum_size.x = 260
 		row.add_child(nm)
 		var hl := _lbl("Sağlık %d%%" % int(h), 20)
 		hl.add_theme_color_override("font_color", C_GOOD if h > 70 else (C_WARN if h > 40 else C_BAD))
 		hl.custom_minimum_size.x = 150
 		row.add_child(hl)
 		row.add_child(_lbl("Değer ~%d ₺/adet" % int(v / arr.size()), 20))
-	var desc := ""
-	for sp in groups:
-		desc += "• %s: %s\n" % [FishDB.display_name(sp), FishDB.get_species(sp).desc]
-	if desc != "":
-		var dl := _lbl(desc.strip_edges(), 18, Color(0.75, 0.8, 0.82))
-		dl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		dl.custom_minimum_size.x = 680
-		body.add_child(dl)
+
+	_section(body, "Tank")
+	var mv := _flow(body)
+	_btn(mv, "Tuzlu suya çevir" if not salt else "Tatlı suya çevir", _toggle_salt.bind(body, aq), alive.is_empty() and Game.money >= TankSim.SALT_COST).tooltip_text = "%d ₺ (tuz, test kiti). Sadece boş tankta." % TankSim.SALT_COST
+	_btn(mv, "Taşı", _move_furniture.bind(aq.furniture_uid))
+	_btn(mv, "Sat (%d ₺)" % (int(FurnitureDB.item(Game.furniture_by_uid(aq.furniture_uid).get("type", "akvaryum_beyaz")).price) / 2), _sell_furniture.bind(aq.furniture_uid), t.fish.is_empty())
 
 
-# ------------------------------------------------------------------ Tedarik
+# ------------------------------------------------------------------ Eşya genel
+
+func _move_furniture(uid: int) -> void:
+	close_panel()
+	if builder:
+		builder.start_move(uid)
+
+
+func _sell_furniture(uid: int) -> void:
+	var err: String = Game.sell_furniture(uid)
+	if err != "":
+		toast(err, "bad")
+		return
+	toast("Eşya satıldı, yarı parası iade edildi.", "info")
+	close_panel()
+
+
+func open_furniture(item: FurnitureItem) -> void:
+	var info: Dictionary = FurnitureDB.item(item.type)
+	var body := _open(info.name, 620)
+	var d := _lbl(info.desc, 20)
+	d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	d.custom_minimum_size.x = 560
+	body.add_child(d)
+	var row := _row(body)
+	_btn(row, "Taşı", _move_furniture.bind(item.furniture_uid))
+	_btn(row, "Sat (%d ₺)" % (int(info.price) / 2), _sell_furniture.bind(item.furniture_uid))
+
+
+# ------------------------------------------------------------------ Raf
+
+func open_shelf(sh: Shelf) -> void:
+	var body := _open(FurnitureDB.item(sh.kind).name, 820)
+	_fill_shelf(body, sh)
+
+
+func _shelf_move(body: VBoxContainer, sh: Shelf, pid: String, n: int) -> void:
+	var moved: int
+	if n > 0:
+		moved = Game.stock_shelf(sh.furniture_uid, pid, n)
+		if moved == 0:
+			toast("Depoda yok ya da raf dolu.", "bad")
+	else:
+		Game.unstock_shelf(sh.furniture_uid, pid, -n)
+	_fill_shelf(body, sh)
+
+
+func _fill_shelf(body: VBoxContainer, sh: Shelf) -> void:
+	_clear(body)
+	var e: Dictionary = sh.entry()
+	var cap: int = int(FurnitureDB.item(sh.kind).capacity)
+	body.add_child(_lbl("Rafta %d / %d ürün. Ürünler depodan gelir, müşteriler sadece raftakini alır." % [Game.shelf_total(e), cap], 19, Color(0.8, 0.85, 0.87)))
+	for pid in ProductDB.ids():
+		var p: Dictionary = ProductDB.get_product(pid)
+		var row := _row(body)
+		var n := _lbl(p.name, 20)
+		n.custom_minimum_size.x = 230
+		row.add_child(n)
+		var c := _lbl("Rafta %d • Depoda %d" % [int(e.shelf.get(pid, 0)), int(Game.stock.get(pid, 0))], 19)
+		c.custom_minimum_size.x = 220
+		row.add_child(c)
+		_btn(row, "+1", _shelf_move.bind(body, sh, pid, 1), Game.stock.get(pid, 0) > 0)
+		_btn(row, "+5", _shelf_move.bind(body, sh, pid, 5), Game.stock.get(pid, 0) > 0)
+		_btn(row, "−1", _shelf_move.bind(body, sh, pid, -1), int(e.shelf.get(pid, 0)) > 0)
+	var mv := _row(body)
+	_btn(mv, "Taşı", _move_furniture.bind(sh.furniture_uid))
+	_btn(mv, "Sat (%d ₺, ürünler depoya döner)" % (int(FurnitureDB.item(sh.kind).price) / 2), _sell_furniture.bind(sh.furniture_uid))
+
+
+# ------------------------------------------------------------------ Telefon: mobilya, balık, ürün
 
 func open_supplier() -> void:
-	var body := _open("Tedarikçi Tableti", 860)
-	_fill_supplier(body, 0, "fish")
+	open_phone("fish")
 
 
-func _fill_supplier(body: VBoxContainer, target_tank: int, tab: String) -> void:
+func open_phone(tab: String = "furniture") -> void:
+	var body := _open("TELEFON", 900)
+	_fill_phone(body, tab, -1)
+
+
+func _fill_phone(body: VBoxContainer, tab: String, target_tank: int) -> void:
 	_clear(body)
 	var tabs := _row(body)
-	_btn(tabs, "Balıklar", func(): _fill_supplier(body, target_tank, "fish"), tab != "fish")
-	_btn(tabs, "Ürünler", func(): _fill_supplier(body, target_tank, "products"), tab != "products")
-	if tab == "products":
-		for pid in ProductDB.ids():
-			var p: Dictionary = ProductDB.get_product(pid)
-			var row := _row(body)
-			var n := _lbl(p.name, 21)
-			n.custom_minimum_size.x = 250
-			row.add_child(n)
-			var info := _lbl("Alış %d ₺  •  Satış %d ₺  •  Stok %d" % [p.buy, p.price, Game.stock.get(pid, 0)], 19)
-			info.custom_minimum_size.x = 380
-			row.add_child(info)
-			_btn(row, "×5 (%d ₺)" % (p.buy * 5), func():
-				if Game.spend(p.buy * 5):
-					Game.add_stock(pid, 5)
-					Game.notify.emit("5 adet %s geldi." % p.name, "good")
-				_fill_supplier(body, target_tank, tab), Game.money >= p.buy * 5)
+	_btn(tabs, "Mobilya", _fill_phone.bind(body, "furniture", target_tank), tab != "furniture")
+	_btn(tabs, "Balık", _fill_phone.bind(body, "fish", target_tank), tab != "fish")
+	_btn(tabs, "Ürün / Depo", _fill_phone.bind(body, "products", target_tank), tab != "products")
+	match tab:
+		"furniture":
+			_fill_catalog(body)
+		"products":
+			_fill_products(body, target_tank)
+		_:
+			_fill_fish(body, target_tank)
+
+
+func _buy_furniture(type: String) -> void:
+	var info: Dictionary = FurnitureDB.item(type)
+	if info.has("max") and Game.count_furniture(type) >= int(info.max):
+		toast("Bundan zaten var.", "bad")
 		return
+	if Game.money < int(info.price):
+		toast("Yeterli paran yok.", "bad")
+		return
+	close_panel()
+	builder.start_new(type)
+	toast("Yerleştir: bak, R/⟲⟳ ile döndür, E/tık ya da YERLEŞTİR.", "info")
+
+
+func _fill_catalog(body: VBoxContainer) -> void:
+	body.add_child(_lbl("Ödeme yerleştirince alınır. Eşyaları sonra taşıyabilir ya da yarı fiyatına satabilirsin.", 18, Color(0.8, 0.85, 0.87)))
+	for cat in FurnitureDB.CATEGORIES:
+		_section(body, cat[1])
+		for id in FurnitureDB.in_category(cat[0]):
+			var info: Dictionary = FurnitureDB.item(id)
+			var row := _row(body)
+			var n := _lbl(info.name, 21)
+			n.custom_minimum_size.x = 290
+			row.add_child(n)
+			var d := _lbl(info.desc, 17, Color(0.78, 0.82, 0.84))
+			d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			d.custom_minimum_size.x = 340
+			d.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			row.add_child(d)
+			var maxed: bool = info.has("max") and Game.count_furniture(id) >= int(info.max)
+			_btn(row, "Var" if maxed else "%s ₺" % Aquarium._fmt(int(info.price)), _buy_furniture.bind(id), not maxed and Game.money >= int(info.price))
+
+
+func _buy_products(body: VBoxContainer, pid: String, n: int, target_tank: int) -> void:
+	var p: Dictionary = ProductDB.get_product(pid)
+	if Game.spend(int(p.buy) * n):
+		Game.add_stock(pid, n)
+		Game.notify.emit("%d %s depoya geldi." % [n, p.name], "good")
+	_fill_phone(body, "products", target_tank)
+
+
+func _fill_products(body: VBoxContainer, target_tank: int) -> void:
+	body.add_child(_lbl("Siparişler depoya gelir. Satmak için raflara diz, bakım ürünlerini (yem, su düzenleyici, ilaç) tanklarda kullan.", 18, Color(0.8, 0.85, 0.87)))
+	for pid in ProductDB.ids():
+		var p: Dictionary = ProductDB.get_product(pid)
+		var row := _row(body)
+		var n := _lbl(p.name, 21)
+		n.custom_minimum_size.x = 250
+		row.add_child(n)
+		var info := _lbl("Alış %d ₺ • Satış %d ₺ • Depo %d" % [p.buy, p.price, Game.stock.get(pid, 0)], 19)
+		info.custom_minimum_size.x = 380
+		row.add_child(info)
+		_btn(row, "×5 (%d ₺)" % (p.buy * 5), _buy_products.bind(body, pid, 5, target_tank), Game.money >= p.buy * 5)
+		_btn(row, "×20 (%d ₺)" % (p.buy * 20), _buy_products.bind(body, pid, 20, target_tank), Game.money >= p.buy * 20)
+
+
+func _buy_fish(body: VBoxContainer, sp: String, qty: int, target_tank: int) -> void:
+	var tank: Dictionary = Game.tanks[target_tank]
+	var s: Dictionary = FishDB.get_species(sp)
+	if TankSim.space_used(tank) + TankSim.space_of(sp) * qty > TankSim.CAPACITY:
+		Game.notify.emit("Tankta yer yok.", "bad")
+		return
+	var warn: String = TankSim.check_add(tank, sp)
+	if Game.spend(int(s.buy) * qty):
+		for i in qty:
+			tank.fish.append(TankSim.new_fish(sp, Game.rng.randf_range(0.45, 0.8), Game.rng.randf_range(80.0, 95.0)))
+		Game.tank_changed.emit(target_tank)
+		Game.notify.emit("%d %s Tank %d'e kondu." % [qty, s.name, target_tank + 1], "good")
+		if warn != "":
+			Game.notify.emit("Dikkat: " + warn, "warn")
+		if float(tank.cycle) < 60.0:
+			Game.notify.emit("Dikkat: Tankın suyu daha olgunlaşmadı!", "warn")
+	_fill_phone(body, "fish", target_tank)
+
+
+func _fill_fish(body: VBoxContainer, target_tank: int) -> void:
 	var open_tanks: Array = []
 	for t in Game.tanks:
 		if t.unlocked:
 			open_tanks.append(t.id)
 	if open_tanks.is_empty():
-		body.add_child(_lbl("Önce bir tank kirala.", 21))
+		body.add_child(_lbl("Önce Mobilya sekmesinden bir akvaryum al ve yerleştir.", 21))
 		return
 	if not open_tanks.has(target_tank):
 		target_tank = open_tanks[0]
-	var trow := _row(body)
+	var trow := HFlowContainer.new()
+	trow.add_theme_constant_override("h_separation", 8)
+	body.add_child(trow)
 	trow.add_child(_lbl("Hedef tank:", 21))
 	for id in open_tanks:
 		var tk: Dictionary = Game.tanks[id]
-		_btn(trow, "T%d%s (%.0f°C, %d/%d)" % [id + 1, " 🌊" if tk.get("salt", false) else "", tk.heater, tk.fish.size(), TankSim.CAPACITY], func(): _fill_supplier(body, id, tab), id != target_tank)
+		_btn(trow, "T%d%s (%.0f°C, %d/%d)" % [id + 1, " (tuzlu)" if tk.salt else "", tk.temp, TankSim.space_used(tk), TankSim.CAPACITY], _fill_phone.bind(body, "fish", id), id != target_tank)
 	var tank: Dictionary = Game.tanks[target_tank]
-	body.add_child(HSeparator.new())
-	var salt: bool = bool(tank.get("salt", false))
-	var hdr := _lbl("%s türleri (Tank %d %s)" % ["Tuzlu su" if salt else "Tatlı su", target_tank + 1, "tuzlu" if salt else "tatlı su"], 20, C_ACCENT.lightened(0.4))
-	body.add_child(hdr)
+	var salt: bool = bool(tank.salt)
+	_section(body, "%s türleri (Tank %d)" % ["Tuzlu su" if salt else "Tatlı su", target_tank + 1])
 	if not salt:
-		body.add_child(_lbl("Deniz balıkları için tankı tuzlu suya çevir (tank panelinden).", 17, Color(0.75, 0.8, 0.82)))
+		body.add_child(_lbl("Deniz balıkları için boş tankı tank panelinden tuzlu suya çevir.", 17, Color(0.75, 0.8, 0.82)))
+	var temp_now: float = float(tank.temp) if not tank.heater_on else max(float(tank.heater), TankSim.ROOM_TEMP)
 	for sp in FishDB.salt_ids(salt):
 		var s: Dictionary = FishDB.get_species(sp)
 		var row := _row(body)
 		var n := _lbl(s.name, 21)
-		n.custom_minimum_size.x = 190
+		n.custom_minimum_size.x = 210
 		row.add_child(n)
-		var info := _lbl("Alış %d ₺ • Değer ~%d ₺ • %d-%d°C" % [s.buy, s.value, int(s.temp_min), int(s.temp_max)], 18)
-		info.custom_minimum_size.x = 380
+		var info := _lbl("Alış %d ₺ • Değer ~%d ₺ • %d-%d°C • %d yer" % [s.buy, s.value, int(s.temp_min), int(s.temp_max), TankSim.space_of(sp)], 18)
+		info.custom_minimum_size.x = 420
 		row.add_child(info)
 		var warn: String = TankSim.check_add(tank, sp)
-		if tank.heater < s.temp_min - 0.5 or max(tank.heater, TankSim.ROOM_TEMP) > s.temp_max + 0.5:
-			warn = "Isıtıcı ayarı (%.0f°C) bu türe uygun değil." % tank.heater if warn == "" else warn
+		if warn == "" and (temp_now < s.temp_min - 0.5 or temp_now > s.temp_max + 0.5):
+			warn = "Su sıcaklığı (%.0f°C) bu türe uygun değil%s." % [temp_now, "" if tank.heater_on else ", ısıtıcı yok"]
 		for qty in [1, 5]:
 			var cost: int = int(s.buy) * qty
-			var space: bool = tank.fish.size() + qty <= TankSim.CAPACITY
-			_btn(row, "×%d (%d ₺)" % [qty, cost], func():
-				if tank.fish.size() + qty > TankSim.CAPACITY:
-					Game.notify.emit("Tankta yer yok.", "bad")
-					return
-				if Game.spend(cost):
-					for i in qty:
-						tank.fish.append(TankSim.new_fish(sp, Game.rng.randf_range(0.45, 0.8), Game.rng.randf_range(80.0, 95.0)))
-					Game.tank_changed.emit(target_tank)
-					Game.notify.emit("%d %s Tank %d'e kondu." % [qty, s.name, target_tank + 1], "good")
-					if warn != "":
-						Game.notify.emit("Dikkat: " + warn, "warn")
-				_fill_supplier(body, target_tank, tab), Game.money >= cost and space)
+			var space: bool = TankSim.space_used(tank) + TankSim.space_of(sp) * qty <= TankSim.CAPACITY
+			_btn(row, "×%d (%d ₺)" % [qty, cost], _buy_fish.bind(body, sp, qty, target_tank), Game.money >= cost and space)
 		if warn != "":
-			var wl := _lbl("   ⚠ " + warn, 17)
-			wl.add_theme_color_override("font_color", C_WARN)
+			var wl := _lbl("   ⚠ " + warn, 17, C_WARN)
 			body.add_child(wl)
-
-
-# ------------------------------------------------------------------ Stok
-
-func open_stock() -> void:
-	var body := _open("Ürün Rafı")
-	for pid in ProductDB.ids():
-		var p: Dictionary = ProductDB.get_product(pid)
-		var row := _row(body)
-		var n := _lbl(p.name, 21)
-		n.custom_minimum_size.x = 260
-		row.add_child(n)
-		row.add_child(_lbl("Stok: %d   Satış: %d ₺" % [Game.stock.get(pid, 0), p.price], 20))
-	body.add_child(_lbl("Yem, su düzenleyici ve ilaç hem bakımda kullanılır hem müşteriye satılır.\nStok bitmesin, tabletten sipariş ver.", 18, Color(0.75, 0.8, 0.82)))
 
 
 # ------------------------------------------------------------------ Kasa / Pazarlık
@@ -707,9 +966,9 @@ func _fill_register(body: VBoxContainer, c: Customer, result_line: String) -> vo
 		var row := _row(body)
 		var nm: String
 		if item.type == "fish":
-			nm = "🐟 %s (Tank %d)" % [FishDB.display_name(item.species), item.tank + 1]
+			nm = "Balık: %s (Tank %d)" % [FishDB.display_name(item.species), item.tank + 1]
 		else:
-			nm = "📦 %s" % ProductDB.get_product(item.id).name
+			nm = "Ürün: %s" % ProductDB.get_product(item.id).name
 		var l := _lbl(nm, 20)
 		l.custom_minimum_size.x = 420
 		row.add_child(l)
@@ -817,22 +1076,27 @@ func open_menu() -> void:
 
 func show_help() -> void:
 	var body := _open("Nasıl Oynanır?", 820)
-	var text := """Akvaryum dükkânını ayakta tut!
+	var text := """Dükkânını sıfırdan kur ve ayakta tut!
 
-• Tatlı su ve tuzlu su (deniz) tankları vardır. Palyaço balığı (Nemo), mavi cerrah (Dory) gibi deniz balıkları için tankı tuzlu suya çevir.
+KURULUM
+• TELEFON > Mobilya: akvaryum, kasa tezgâhı, raf ve dekor al. Eşya baktığın yere gelir; döndürüp yerleştir.
+• Akvaryuma bakıp ETKİLEŞ: kum, filtre, ısıtıcı, lamba, hava motoru ve dekor ekle. Lambasız, kumsuz tank müşteriyi kaçırır.
+• Yeni kurulan su olgunlaşmalıdır. Hemen balık koyarsan zorlanırlar; filtre olgunlaşmayı hızlandırır.
+• TELEFON > Balık: tanka balık sipariş et. Büyük balıklar daha çok yer kaplar.
+• TELEFON > Ürün: ürünler depoya gelir. Rafa bakıp depodan rafa diz; müşteri sadece raftakini alır.
+• Eşyaları istediğin zaman taşıyabilir, yarı fiyatına satabilirsin.
 
-• Sabah hazırlık yap: tankları kontrol et, yem ver, gerekirse suyu değiştir.
-• Hazır olunca ön kapıdan dükkânı aç. Gün 09:00-19:00 arası sürer.
-• Müşteriler tankları gezer. Kirli su, hasta ya da ölü balık görürlerse itibarın düşer.
-• Müşteri kasaya gelince kasaya bak ve pazarlık yap. Çok pahalı söylersen sabrı tükenir ve gider.
-• Kasadaki tabletten balık ve ürün sipariş et. Türleri doğru tanka koy:
-   - Japon balığı soğuk su ister, tropikal balıklarla olmaz.
-   - Beta uzun yüzgeçlilere saldırır, melek balığı neonları yer.
-   - Diskus çok kazandırır ama çok hassastır.
-• Her akşam kira ve elektrik ödenir. 3 gün üst üste borçta kalırsan dükkân kapanır.
+GÜN
+• Hazır olunca ön kapıdan dükkânı aç (09:00-19:00). Kasa tezgâhı olmadan satış yapılamaz!
+• Müşteri kasaya gelince pazarlık yap. Fazla bekletir ya da kazık atarsan çekip gider.
+• Tür uyumu: japon/koi/alabalık soğuk su ister; beta, pirana, aslan balığı diğerlerine saldırır.
+• Tuzlu su tankında Nemo, Dory, mandarin, deniz atı, fener balığı satılır.
+• Her akşam artan kira ve elektrik ödenir. 3 gün üst üste borçta kalırsan dükkân kapanır.
 
-Kontroller: WASD + fare, E ile etkileşim, ESC menü.
-Telefonda: sol taraf yürü, sağ taraf bak, ETKİLEŞ butonu."""
+Kontroller: WASD + fare, E etkileşim, ESC menü. Yerleştirirken R / fare tekeri döndürür.
+Telefonda: sol taraf yürü, sağ taraf bak.
+
+Emeği geçenler: Karakterler "Business Man" ve "Low Poly Girl" – manoeldarochadeoliveira (Sketchfab, CC-BY 4.0). Balıklar polyy.ai, mobilyalar Innerscene ve tevy.dev (CC0)."""
 	var l := _lbl(text, 20)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size.x = 780

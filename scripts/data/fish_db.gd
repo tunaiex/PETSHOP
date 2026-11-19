@@ -191,6 +191,27 @@ const SPECIES := {
 		"model_fwd": Vector3(0, 0, 1), "upright": true,
 		"desc": "Çok yavaş ve narin. Saldırgan balıklarla asla tutma.",
 	},
+	"kedi": {
+		"name": "Kedi Balığı", "latin": "Ictalurus punctatus",
+		"buy": 60, "value": 150, "length": 0.18,
+		"temp_min": 18.0, "temp_max": 27.0, "dirt_rate": 2.2, "hardiness": 0.95,
+		"aggression": 0.5, "long_fins": false, "small": false, "schooling": 0.0, "speed": 0.35,
+		"desc": "Dipte yaşar, çok dayanıklı. Gece küçük balıkları yutar.",
+	},
+	"alabalik": {
+		"name": "Gökkuşağı Alabalığı", "latin": "Oncorhynchus mykiss",
+		"buy": 45, "value": 120, "length": 0.17,
+		"temp_min": 12.0, "temp_max": 20.0, "dirt_rate": 1.8, "hardiness": 0.5,
+		"aggression": 0.2, "long_fins": false, "small": false, "schooling": 0.6, "speed": 0.9,
+		"desc": "Soğuk ve çok temiz su ister. Isıtıcısız tankta mutlu.",
+	},
+	"fener": {
+		"name": "Fener Balığı", "latin": "Melanocetus johnsonii", "salt": true,
+		"buy": 700, "value": 1800, "length": 0.14,
+		"temp_min": 18.0, "temp_max": 24.0, "dirt_rate": 0.8, "hardiness": 0.35,
+		"aggression": 0.8, "long_fins": false, "small": false, "schooling": 0.0, "speed": 0.15,
+		"desc": "Koleksiyoncuların rüyası! Derin deniz balığı: soğukça, karanlık ve temiz su ister. Ağzına giren her şeyi yer.",
+	},
 }
 
 ## Eksik alanlar için varsayılanlar (prosedürel modelde ve simülasyonda kullanılır).

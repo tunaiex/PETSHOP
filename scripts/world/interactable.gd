@@ -17,6 +17,9 @@ static func create(parent: Node3D, size: Vector3, pos: Vector3, prompt: Callable
 	it.prompt_func = prompt
 	it.action = act
 	it.set_meta("interact", it)
+	# 2. katman: oyuncunun bakış ışını görür ama yürümeyi ve müşteri yolunu kapatmaz
+	it.collision_layer = 2
+	it.collision_mask = 0
 	parent.add_child(it)
 	return it
 

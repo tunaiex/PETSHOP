@@ -3,22 +3,63 @@ extends RefCounted
 ## Akvaryum simülasyonu. Tank verisi düz bir Dictionary'dir (kaydetmesi kolay).
 ## Tüm oranlar "oyun dakikası" başınadır. Bir iş günü 600 oyun dakikasıdır (09:00-19:00).
 
-const CAPACITY := 12
+const CAPACITY := 12 ## "Yer birimi": küçük balık 1, büyük balık daha fazla yer kaplar
 const ROOM_TEMP := 21.0
 const FILTER_EFF := [0.0, 0.35, 0.55, 0.75]
-const FILTER_COST := [0, 0, 450, 900]
+const FILTER_COST := [0, 200, 450, 900]
 const UNLOCK_COST := 1200
 const SALT_COST := 300 ## Tankı tuzlu/tatlı suya çevirme (tuz, test kiti, yeni kum)
 
 static var _uid_counter: int = 1000
 
 
-static func new_tank(id: int, unlocked: bool, heater: float = 25.0) -> Dictionary:
+## equipped: true ise tam donanımlı (eski kayıtlar ve testler için), false ise çıplak cam tank.
+static func new_tank(id: int, unlocked: bool, heater: float = 25.0, equipped: bool = true) -> Dictionary:
 	return {
-		"id": id, "unlocked": unlocked, "heater": heater, "temp": heater,
-		"dirt": 8.0, "food": 70.0, "sick": false, "sick_level": 0.0,
-		"filter": 1, "fish": [], "salt": false,
+		"id": id, "unlocked": unlocked, "heater": heater, "temp": heater if equipped else ROOM_TEMP,
+		"dirt": 8.0 if equipped else 0.0, "food": 70.0, "sick": false, "sick_level": 0.0,
+		"filter": 1 if equipped else 0, "fish": [], "salt": false,
+		"heater_on": equipped, "light": equipped, "air": equipped,
+		"gravel": "natural" if equipped else "", "decor": [],
+		"cycle": 100.0 if equipped else 0.0,
 	}
+
+
+## Eski kayıtlarda olmayan alanları tamamlar.
+static func normalize(tank: Dictionary) -> void:
+	var d := new_tank(int(tank.get("id", 0)), true)
+	for k in d:
+		if not tank.has(k):
+			tank[k] = d[k]
+	tank.filter = int(tank.filter)
+	tank.salt = bool(tank.salt)
+	tank.heater_on = bool(tank.heater_on)
+	tank.light = bool(tank.light)
+	tank.air = bool(tank.air)
+
+
+## Bir balığın kapladığı yer birimi (büyük balık daha çok)
+static func space_of(species: String) -> int:
+	return max(1, int(round(float(FishDB.get_species(species).length) / 0.07)))
+
+
+static func space_used(tank: Dictionary) -> int:
+	var n := 0
+	for f in tank.fish:
+		n += space_of(f.species)
+	return n
+
+
+## Müşteriler için tankın çekiciliği (0-100)
+static func appeal(tank: Dictionary) -> float:
+	var a := 0.0
+	if tank.get("light", false):
+		a += 25.0
+	if str(tank.get("gravel", "")) != "":
+		a += 15.0
+	a += min(tank.get("decor", []).size(), 6) * 7.0
+	a += (100.0 - float(tank.dirt)) * 0.18
+	return clamp(a, 0.0, 100.0)
 
 
 static func new_fish(species: String, growth: float = 0.6, health: float = 100.0) -> Dictionary:
@@ -50,8 +91,8 @@ static func species_in(tank: Dictionary) -> Array:
 static func check_add(tank: Dictionary, species: String) -> String:
 	if bool(tank.get("salt", false)) != FishDB.is_salt(species):
 		return "%s %s ister, bu tank %s." % [FishDB.display_name(species), "tuzlu su" if FishDB.is_salt(species) else "tatlı su", "tuzlu" if tank.get("salt", false) else "tatlı su"]
-	if tank.fish.size() >= CAPACITY:
-		return "Tank dolu (en fazla %d balık)." % CAPACITY
+	if space_used(tank) + space_of(species) > CAPACITY:
+		return "Tankta yer yok (%d/%d yer dolu, %s %d yer kaplar)." % [space_used(tank), CAPACITY, FishDB.display_name(species), space_of(species)]
 	for other in species_in(tank):
 		var r: String = FishDB.conflict_reason(species, other)
 		if r != "":
@@ -68,7 +109,7 @@ static func step(tank: Dictionary, minutes: float, rng: RandomNumberGenerator) -
 	var dead: int = tank.fish.size() - alive.size()
 
 	# Sıcaklık ısıtıcı hedefine yaklaşır (ısıtıcı oda sıcaklığının altına soğutamaz).
-	var target: float = max(tank.heater, ROOM_TEMP)
+	var target: float = max(tank.heater, ROOM_TEMP) if tank.get("heater_on", true) else ROOM_TEMP
 	tank.temp = move_toward(tank.temp, target, 0.05 * minutes)
 
 	# Kirlenme
@@ -77,6 +118,11 @@ static func step(tank: Dictionary, minutes: float, rng: RandomNumberGenerator) -
 		bioload += float(FishDB.get_species(f.species).dirt_rate) * lerp(0.5, 1.0, f.growth)
 	var eff: float = FILTER_EFF[clamp(int(tank.filter), 0, 3)]
 	tank.dirt = clamp(tank.dirt + (bioload * 0.012 * (1.0 - eff) + dead * 0.15) * minutes, 0.0, 100.0)
+
+	# Suyun olgunlaşması (yararlı bakteriler). Filtre hızlandırır.
+	var cyc: float = float(tank.get("cycle", 100.0))
+	if cyc < 100.0:
+		tank.cycle = min(100.0, cyc + (0.3 if int(tank.filter) > 0 else 0.05) * minutes)
 
 	# Açlık
 	if alive.size() > 0:
@@ -109,6 +155,10 @@ static func step(tank: Dictionary, minutes: float, rng: RandomNumberGenerator) -
 			stress += 0.05 * tank.sick_level
 		if bool(tank.get("salt", false)) != bool(s.salt):
 			stress += 0.4
+		if float(tank.get("cycle", 100.0)) < 60.0:
+			stress += (60.0 - float(tank.cycle)) / 60.0 * 0.06
+		if not tank.get("air", true) and alive.size() > 6:
+			stress += 0.02 * (alive.size() - 6) / 6.0
 		for other in present:
 			if other == f.species and other != "beta":
 				continue
@@ -151,7 +201,7 @@ static func step(tank: Dictionary, minutes: float, rng: RandomNumberGenerator) -
 
 	# Lepistes üremesi
 	var guppies: Array = living(tank).filter(func(f): return f.species == "lepistes" and f.health > 70.0 and f.growth > 0.5)
-	if guppies.size() >= 2 and tank.fish.size() < CAPACITY:
+	if guppies.size() >= 2 and space_used(tank) < CAPACITY:
 		if rng.randf() < 0.0006 * minutes:
 			tank.fish.append(new_fish("lepistes", 0.05, 90.0))
 			events.append("Tank %d: Lepistesler yavruladı!" % (tank.id + 1))

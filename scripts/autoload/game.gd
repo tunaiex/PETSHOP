@@ -8,6 +8,7 @@ signal notify(text: String, kind: String)
 signal tank_changed(id: int)
 signal stock_changed()
 signal day_ended(report: Dictionary)
+signal furniture_changed()
 
 const SAVE_PATH := "user://kayit.json"
 const OPEN_MINUTE := 9 * 60
@@ -16,16 +17,18 @@ const PREP_MINUTE := 8 * 60 + 30
 const SECONDS_PER_MINUTE := 0.5
 const RENT := 300
 const RENT_GROWTH := 25 ## Kira her gün artar (enflasyon!)
-const TANK_COUNT := 5
+const START_MONEY := 4000
 
-var money: int = 1000
+var money: int = START_MONEY
 var day: int = 1
 var minute: float = PREP_MINUTE
 var phase: String = "prep" ## prep | open | closing | report | over
 var reputation: float = 50.0
 var debt_days: int = 0
-var stock: Dictionary = {}
-var tanks: Array = []
+var stock: Dictionary = {}   ## Depo (arka oda). Raftaki ürünler mobilya kaydında durur.
+var tanks: Array = []        ## Satılan tanklar silinmez, "unlocked=false" olur (id'ler sabit kalsın)
+var furniture: Array = []    ## {"uid","type","x","z","rot", "tank"?, "shelf"?}
+var _fuid: int = 1
 var stats: Dictionary = {}
 var time_scale: float = 1.0
 var rng := RandomNumberGenerator.new()
@@ -40,27 +43,120 @@ func _ready() -> void:
 
 
 func new_game() -> void:
-	money = 1000
+	money = START_MONEY
 	day = 1
 	minute = PREP_MINUTE
 	phase = "prep"
 	reputation = 50.0
 	debt_days = 0
-	stock = {"yem": 6, "su_duzenleyici": 3, "ilac": 1, "filtre": 2, "dekor": 3, "kum": 3}
+	stock = {"yem": 4, "su_duzenleyici": 2}
 	tanks.clear()
-	for i in TANK_COUNT:
-		tanks.append(TankSim.new_tank(i, i <= 2, 25.0))
-	tanks[1].heater = 21.0
-	tanks[1].temp = 21.0
-	for i in 6:
-		tanks[0].fish.append(TankSim.new_fish("neon", rng.randf_range(0.5, 0.9)))
-	for i in 4:
-		tanks[0].fish.append(TankSim.new_fish("lepistes", rng.randf_range(0.5, 0.9)))
-	for i in 3:
-		tanks[1].fish.append(TankSim.new_fish("japon", rng.randf_range(0.5, 0.9)))
-	tanks[2].heater = 21.0
-	tanks[2].temp = 21.0
+	furniture.clear()
+	_fuid = 1
 	_reset_stats()
+
+
+# ---------------------------------------------------------------- Mobilya
+
+func furniture_by_uid(uid: int) -> Dictionary:
+	for f in furniture:
+		if int(f.uid) == uid:
+			return f
+	return {}
+
+
+func count_furniture(type: String) -> int:
+	return furniture.filter(func(f): return f.type == type).size()
+
+
+## Satın alınmış bir eşyayı kaydeder. Akvaryumsa yeni (çıplak) bir tank oluşturur.
+func add_furniture(type: String, x: float, z: float, rot: float) -> Dictionary:
+	var e := {"uid": _fuid, "type": type, "x": x, "z": z, "rot": rot}
+	_fuid += 1
+	if FurnitureDB.is_tank(type):
+		var t := TankSim.new_tank(tanks.size(), true, 25.0, false)
+		tanks.append(t)
+		e["tank"] = t.id
+	if FurnitureDB.is_shelf(type):
+		e["shelf"] = {}
+	furniture.append(e)
+	furniture_changed.emit()
+	return e
+
+
+func move_furniture(uid: int, x: float, z: float, rot: float) -> void:
+	var e := furniture_by_uid(uid)
+	if e.is_empty():
+		return
+	e.x = x
+	e.z = z
+	e.rot = rot
+	furniture_changed.emit()
+
+
+## Eşyayı satar (%50 iade). Dolu tank satılamaz, raftaki ürünler depoya döner.
+func sell_furniture(uid: int) -> String:
+	var e := furniture_by_uid(uid)
+	if e.is_empty():
+		return "Eşya bulunamadı."
+	if e.has("tank"):
+		var t: Dictionary = tanks[int(e.tank)]
+		if not t.fish.is_empty():
+			return "Önce tanktaki balıkları sat ya da çıkar."
+		t.unlocked = false
+	if e.has("shelf"):
+		for pid in e.shelf:
+			add_stock(pid, int(e.shelf[pid]))
+	var refund: int = int(FurnitureDB.item(e.type).price) / 2
+	add_money(refund)
+	furniture.erase(e)
+	furniture_changed.emit()
+	return ""
+
+
+func shelf_total(e: Dictionary) -> int:
+	var n := 0
+	for pid in e.get("shelf", {}):
+		n += int(e.shelf[pid])
+	return n
+
+
+## Depodan rafa ürün koyar. Gerçekten taşınan adedi döner.
+func stock_shelf(uid: int, pid: String, n: int) -> int:
+	var e := furniture_by_uid(uid)
+	if e.is_empty() or not e.has("shelf"):
+		return 0
+	var cap: int = int(FurnitureDB.item(e.type).get("capacity", 20))
+	var move: int = min(n, int(stock.get(pid, 0)), cap - shelf_total(e))
+	if move <= 0:
+		return 0
+	stock[pid] -= move
+	e.shelf[pid] = int(e.shelf.get(pid, 0)) + move
+	stock_changed.emit()
+	return move
+
+
+## Raftan depoya geri alır.
+func unstock_shelf(uid: int, pid: String, n: int) -> int:
+	var e := furniture_by_uid(uid)
+	if e.is_empty() or not e.has("shelf"):
+		return 0
+	var move: int = min(n, int(e.shelf.get(pid, 0)))
+	if move <= 0:
+		return 0
+	e.shelf[pid] -= move
+	if e.shelf[pid] <= 0:
+		e.shelf.erase(pid)
+	add_stock(pid, move)
+	return move
+
+
+## Dükkân dekorunun itibara katkısı
+func decor_appeal() -> float:
+	var a := 0.0
+	for f in furniture:
+		a += float(FurnitureDB.item(f.type).get("appeal", 0))
+	return a
 
 
 func _reset_stats() -> void:
@@ -137,7 +233,7 @@ func spend(v: int) -> bool:
 
 func use_stock(id: String, n: int = 1) -> bool:
 	if stock.get(id, 0) < n:
-		notify.emit("Stokta %s kalmadı. Tabletten sipariş ver." % ProductDB.get_product(id).name, "bad")
+		notify.emit("Depoda %s kalmadı. Telefondan sipariş ver." % ProductDB.get_product(id).name, "bad")
 		return false
 	stock[id] -= n
 	stock_changed.emit()
@@ -177,7 +273,13 @@ func daily_expenses() -> Dictionary:
 	var elec := 0
 	for t in tanks:
 		if t.unlocked:
-			elec += 12 + int(max(0.0, t.heater - TankSim.ROOM_TEMP) * 4.0) + int(t.filter) * 3
+			elec += 5 + int(t.filter) * 3
+			if t.get("light", false):
+				elec += 6
+			if t.get("air", false):
+				elec += 3
+			if t.get("heater_on", false):
+				elec += int(max(0.0, t.heater - TankSim.ROOM_TEMP) * 4.0)
 	var rent: int = RENT + RENT_GROWTH * (day - 1)
 	return {"rent": rent, "electric": elec, "total": rent + elec}
 
@@ -219,13 +321,14 @@ func next_day() -> void:
 
 func to_dict() -> Dictionary:
 	return {
-		"version": 1, "money": money, "day": day, "reputation": reputation,
+		"version": 2, "money": money, "day": day, "reputation": reputation,
 		"debt_days": debt_days, "stock": stock, "tanks": tanks,
+		"furniture": furniture, "fuid": _fuid,
 	}
 
 
 func from_dict(d: Dictionary) -> bool:
-	if int(d.get("version", 0)) != 1:
+	if int(d.get("version", 0)) != 2:
 		return false
 	money = int(d.money)
 	day = int(d.day)
@@ -239,13 +342,26 @@ func from_dict(d: Dictionary) -> bool:
 	for t in d.tanks:
 		var tank: Dictionary = t
 		tank.id = int(tank.id)
-		tank.filter = int(tank.filter)
-		tank["salt"] = bool(tank.get("salt", false))
+		TankSim.normalize(tank)
 		for f in tank.fish:
 			f.uid = int(f.uid)
 			max_uid = max(max_uid, f.uid)
 		tanks.append(tank)
 	TankSim.set_uid_floor(max_uid)
+	furniture = []
+	for f in d.get("furniture", []):
+		var e: Dictionary = f
+		e.uid = int(e.uid)
+		e.x = float(e.x)
+		e.z = float(e.z)
+		e.rot = float(e.rot)
+		if e.has("tank"):
+			e.tank = int(e.tank)
+		if e.has("shelf"):
+			for pid in e.shelf:
+				e.shelf[pid] = int(e.shelf[pid])
+		furniture.append(e)
+	_fuid = int(d.get("fuid", furniture.size() + 1))
 	minute = PREP_MINUTE
 	phase = "prep"
 	_reset_stats()

@@ -34,6 +34,7 @@ func _ready() -> void:
 	ray = RayCast3D.new()
 	ray.target_position = Vector3(0, 0, -REACH)
 	ray.collide_with_areas = false
+	ray.collision_mask = 1 | 2  # 2: kapı tabelası gibi yürümeyi engellemeyen etkileşim alanları
 	camera.add_child(ray)
 	_yaw = rotation.y
 	rotation = Vector3.ZERO
@@ -44,9 +45,35 @@ func look(delta_px: Vector2, sens: float) -> void:
 	_pitch = clamp(_pitch - delta_px.y * sens, deg_to_rad(-80), deg_to_rad(80))
 
 
+func _building() -> bool:
+	return hud != null and hud.builder != null and hud.builder.active
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if hud and hud.is_blocking():
 		return
+	if _building():
+		var b: Builder = hud.builder
+		if event is InputEventKey and event.pressed and not event.echo:
+			match event.keycode:
+				KEY_R:
+					b.rotate_by(Builder.ROT_STEP * (-1.0 if event.shift_pressed else 1.0))
+				KEY_ESCAPE:
+					b.cancel()
+				KEY_E, KEY_ENTER:
+					b.confirm()
+			if event.keycode in [KEY_R, KEY_ESCAPE, KEY_E, KEY_ENTER]:
+				return
+		elif event is InputEventMouseButton and event.pressed:
+			if event.button_index == MOUSE_BUTTON_WHEEL_UP:
+				b.rotate_by(Builder.ROT_STEP)
+				return
+			if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+				b.rotate_by(-Builder.ROT_STEP)
+				return
+			if event.button_index == MOUSE_BUTTON_LEFT and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+				b.confirm()
+				return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		look(event.relative, MOUSE_SENS)
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -102,4 +129,8 @@ func _update_focus() -> void:
 		if c and c.has_meta("interact"):
 			focus = c.get_meta("interact")
 	if hud:
-		hud.set_prompt(focus.get_prompt() if focus else "")
+		if _building():
+			focus = null
+			hud.set_prompt("")
+		else:
+			hud.set_prompt(focus.get_prompt() if focus else "")
