@@ -3,7 +3,13 @@ extends Node3D
 ## Müşteri: içeri girer, tanklara bakar, balık/ürün seçer, sıraya girer, pazarlık eder, çıkar.
 ## Görünüm: assets/models/characters/*.glb (yürüme/bekleme animasyonlu) yoksa prosedürel insan.
 
-const CHARACTERS := ["res://assets/models/characters/adam.glb", "res://assets/models/characters/kiz.glb"]
+## Mixamo karakterleri (yürüme/bekleme animasyonu MixamoAnim ile kodla üretilir)
+const CHARACTERS := [
+	"res://assets/models/characters/musteri_1.glb", "res://assets/models/characters/musteri_2.glb",
+	"res://assets/models/characters/musteri_3.glb", "res://assets/models/characters/musteri_4.glb",
+	"res://assets/models/characters/musteri_5.glb", "res://assets/models/characters/musteri_6.glb",
+	"res://assets/models/characters/musteri_7.glb", "res://assets/models/characters/musteri_8.glb",
+]
 
 enum State { ENTER, BROWSE, LOOK, SHELF, QUEUE, REGISTER, LEAVE, GONE }
 
@@ -33,6 +39,7 @@ var _to_visit: Array = []
 var _look_timer: float = 0.0
 var _current: Node3D           ## Baktığı akvaryum ya da raf
 var _walk_anim: String = ""
+var _phone_lover: bool = false
 var _idle_anim: String = ""
 var _bubble: Label3D
 var _bubble_timer: float = 0.0
@@ -237,20 +244,12 @@ func _build_body() -> void:
 		inst.scale = Vector3.ONE * _rng.randf_range(0.95, 1.05)
 		add_child(inst)
 		_add_collider()
-		var players := inst.find_children("*", "AnimationPlayer", true, false)
-		if not players.is_empty():
-			_anim = players[0]
-			for a in _anim.get_animation_list():
-				var low: String = a.to_lower()
-				if low == "walk" or low.ends_with("|walk"):
-					_walk_anim = a
-				elif low == "idle" or low.ends_with("|idle"):
-					_idle_anim = a
-			for a in [_walk_anim, _idle_anim]:
-				if a != "":
-					_anim.get_animation(a).loop_mode = Animation.LOOP_LINEAR
-			if _idle_anim != "":
-				_anim.play(_idle_anim)
+		_anim = MixamoAnim.setup(inst, _rng)
+		if _anim:
+			_walk_anim = "walk"
+			_idle_anim = "idle"
+			# Bazı müşteriler beklerken telefonla konuşur
+			_phone_lover = _anim.has_animation("phone") and _rng.randf() < 0.35
 		return
 	var skins := [Color(0.96, 0.8, 0.68), Color(0.87, 0.67, 0.5), Color(0.72, 0.52, 0.38), Color(0.5, 0.35, 0.25)]
 	var hairs := [Color(0.08, 0.06, 0.05), Color(0.3, 0.2, 0.12), Color(0.55, 0.4, 0.22), Color(0.75, 0.75, 0.75)]
@@ -813,10 +812,13 @@ func _face(p: Vector3) -> void:
 
 func _animate(delta: float, moving: bool) -> void:
 	if _anim:
-		var want_anim: String = _walk_anim if moving else _idle_anim
+		var idle_name: String = _idle_anim
+		if _phone_lover and (state == State.QUEUE or state == State.REGISTER) and haggle == null:
+			idle_name = "phone"
+		var want_anim: String = _walk_anim if moving else idle_name
 		if want_anim != "" and _anim.current_animation != want_anim:
 			_anim.play(want_anim, 0.25)
-		_anim.speed_scale = Game.time_scale if moving else 1.0
+		_anim.speed_scale = (Game.time_scale * _speed / 1.25) if moving else 1.0
 		return
 	if moving:
 		_walk_phase += delta * _speed * 5.5 * Game.time_scale

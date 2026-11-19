@@ -1488,7 +1488,7 @@ GÜN
 Kontroller: WASD + fare, E etkileşim, ESC menü. Yerleştirirken R / fare tekeri döndürür.
 Telefonda: sol taraf yürü, sağ taraf bak.
 
-Emeği geçenler: Karakterler "Business Man" ve "Low Poly Girl" – manoeldarochadeoliveira (Sketchfab, CC-BY 4.0). Balıklar polyy.ai, mobilyalar Innerscene ve tevy.dev (CC0)."""
+Emeği geçenler: Karakterler Adobe Mixamo. Balıklar polyy.ai, mobilyalar Innerscene ve tevy.dev, şehir Quaternius, dokular ambientCG ve Poly Haven (CC0)."""
 	var l := _lbl(text, 20)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size.x = 780

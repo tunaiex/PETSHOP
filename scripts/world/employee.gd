@@ -3,7 +3,7 @@ extends Node3D
 ## Çalışan: kasiyer kasada bekleyen müşteriye satış yapar,
 ## bakımcı tankları dolaşıp yem verir, ölü balıkları çıkarır, kirli suyu değiştirir.
 
-const CHARACTERS := ["res://assets/models/characters/adam.glb", "res://assets/models/characters/kiz.glb"]
+const CHARACTERS := ["res://assets/models/characters/musteri_2.glb", "res://assets/models/characters/musteri_6.glb"]
 
 var role: String = "kasiyer"
 var main: Node
@@ -27,18 +27,12 @@ func setup(r: String, m: Node, s: Shop) -> void:
 		var inst: Node3D = (load(path) as PackedScene).instantiate()
 		inst.rotation.y = PI
 		add_child(inst)
-		var players := inst.find_children("*", "AnimationPlayer", true, false)
-		if not players.is_empty():
-			_anim = players[0]
-			for a in _anim.get_animation_list():
-				var low: String = a.to_lower()
-				if low == "walk" or low.ends_with("|walk"):
-					_walk = a
-				elif low == "idle" or low.ends_with("|idle"):
-					_idle = a
-			for a in [_walk, _idle]:
-				if a != "":
-					_anim.get_animation(a).loop_mode = Animation.LOOP_LINEAR
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 11 if role == "kasiyer" else 23
+		_anim = MixamoAnim.setup(inst, rng)
+		if _anim:
+			_walk = "walk"
+			_idle = "idle"
 	Shop.add_blob_shadow(self, Vector2(0.8, 0.8), 0.4)
 	# Personel önlüğü (müşterilerden ayırt etmek için)
 	var apron := MeshKit.box(self, Vector3(0.36, 0.55, 0.03), Vector3(0, 1.05, -0.16), MeshKit.mat(Color(0.12, 0.5, 0.55), 0.7))

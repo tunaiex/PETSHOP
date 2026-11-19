@@ -10,6 +10,7 @@ müşteriler pazarlık eder ve kira her gün artar.
 ![Yerleştirme modu](docs/yerlestirme.png)
 ![Deniz tankı](docs/akvaryum.png)
 ![Kasa ve müşteriler](docs/kasa.png)
+![Müşteri karakterleri (yürüme, bekleme, telefon)](docs/karakterler.png)
 ![Elde koli](docs/koli.png)
 ![Kepçe mini oyunu](docs/kepce.png)
 ![Kaplumbağa teraryumu](docs/teraryum.png)
@@ -104,10 +105,12 @@ Gövde şekli, yüzgeçler, renkler ve desen bu alanlardan otomatik üretilir.
 
 ## 3D modeller
 
-Projede hazır modeller var: 15 balık, iki animasyonlu müşteri karakteri (yürüme/bekleme), ceviz akvaryum dolabı,
+Projede hazır modeller var: 15 balık, 8 Mixamo müşteri karakteri, ceviz akvaryum dolabı,
 kasa tezgâhı, metal duvar rafı, saksı bitkileri ve akvaryum dekorları. Kaynaklar ve lisanslar `assets/LISANSLAR.md` içinde
 (karakterler CC-BY 4.0, gerisi CC0).
 Hazır balık modelleri animasyonsuz geldiği için yüzme hareketi `shaders/fish_tex.gdshader` ile ekleniyor.
+Mixamo karakterlerinin yürüme ve bekleme animasyonları `scripts/world/mixamo_anim.gd` içinde kodla üretiliyor
+(Mixamo iskeletine uygun); "telefonla konuşma" gerçek Mixamo animasyonu.
 
 Yeni model eklemek için `.glb` dosyalarını aşağıdaki yerlere koyman yeterli, kod bunları otomatik kullanır:
 
