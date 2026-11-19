@@ -1176,8 +1176,8 @@ func _fill_register(body: VBoxContainer, c: Customer, result_line: String) -> vo
 	say_l.custom_minimum_size.x = 760
 	body.add_child(say_l)
 	_bar(body, "Sabır: " + h.mood_text(), h.patience * 100.0)
-	var row := _row(body)
-	row.add_child(_lbl("Senin fiyatın:", 22))
+	var price_row := _row(body)
+	price_row.add_child(_lbl("Senin fiyatın:", 22))
 	var ask_l := _lbl("%d ₺" % _ask_value, 28, C_GOOD)
 	ask_l.custom_minimum_size.x = 120
 	var slider := HSlider.new()
@@ -1188,8 +1188,8 @@ func _fill_register(body: VBoxContainer, c: Customer, result_line: String) -> vo
 	slider.custom_minimum_size = Vector2(380, 40)
 	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	slider.value_changed.connect(func(v): _ask_value = int(v); ask_l.text = "%d ₺" % _ask_value)
-	row.add_child(slider)
-	row.add_child(ask_l)
+	price_row.add_child(slider)
+	price_row.add_child(ask_l)
 	var fine := _row(body)
 	for d in [-50, -10, -1, 1, 10, 50]:
 		_btn(fine, ("%+d" % d), func(): slider.value = clamp(_ask_value + d, slider.min_value, slider.max_value))

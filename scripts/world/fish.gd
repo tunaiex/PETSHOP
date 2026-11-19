@@ -64,17 +64,17 @@ func _build_visual() -> void:
 		add_child(mi)
 		_visual = mi
 		return
-	var mi := MeshInstance3D.new()
-	mi.mesh = MeshKit.fish_mesh(species)
+	var pm := MeshInstance3D.new()
+	pm.mesh = MeshKit.fish_mesh(species)
 	_mat = MeshKit.shader_mat("res://shaders/fish.gdshader", {
 		"body_color": _data.body, "belly_color": _data.belly, "accent_color": _data.accent,
 		"fin_color": _data.fin, "fin_alpha": _data.fin_alpha, "pattern": _data.pattern,
 		"fish_len": _data.length, "phase": _phase,
 	})
-	mi.material_override = _mat
-	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(mi)
-	_visual = mi
+	pm.material_override = _mat
+	pm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(pm)
+	_visual = pm
 
 
 ## Prosedürel kaplumbağa: kubbe kabuk, karın, baş, dört yüzgeç-bacak, kuyruk. -Z'ye bakar.
