@@ -8,15 +8,17 @@ var _game: Node
 ## ad, oyuncu konumu, bakış (yaw), eğim (pitch), kurulmuş dükkân mı
 var _shots := [
 	["bos_disari", Vector3(0, 0.05, 8.0), 0.0, -2.0, false],
-	["bos_ic", Vector3(0, 0.05, 3.6), 0.0, -4.0, false],
-	["disari", Vector3(0, 0.05, 8.0), 0.0, -2.0, true],
 	["genel", Vector3(5.6, 0.05, 4.5), 42.0, -10.0, true],
 	["tank_tatli", Vector3(-3.5, 0.05, -3.25), 0.0, -16.0, true],
 	["tank_deniz", Vector3(0.0, 0.05, -3.25), 0.0, -16.0, true],
-	["tank_soguk", Vector3(3.5, 0.05, -3.25), 0.0, -16.0, true],
-	["raflar", Vector3(4.3, 0.05, -0.2), -90.0, -12.0, true],
+	["teraryum", Vector3(-1.2, 0.05, 0.2), 30.0, -22.0, true],
+	["koliler", Vector3(2.4, 0.05, 2.2), 180.0, -30.0, true],
 	["kasa", Vector3(2.2, 0.05, 4.4), -55.0, -10.0, true],
-	["yerlestirme", Vector3(-1.5, 0.05, 1.2), 90.0, -28.0, true],
+	["kepce", Vector3(2.2, 0.05, 4.4), -55.0, -10.0, true, "kepce"],
+	["telefon", Vector3(2.2, 0.05, 4.4), -55.0, -10.0, true, "telefon"],
+	["koli_elde", Vector3(3.0, 0.05, 0.5), -90.0, -10.0, true, "koli"],
+	["aksam_disari", Vector3(0, 0.05, 8.0), 0.0, 2.0, true, "aksam"],
+	["yerlestirme", Vector3(-1.5, 0.05, 1.2), 90.0, -28.0, true, "yerlestir"],
 ]
 var _idx := 0
 var _out := "user://shots"
@@ -48,8 +50,23 @@ func _process(_d: float) -> bool:
 		var s: Array = _shots[_idx]
 		if s[4] and not _built:
 			_build()
-		if s[0] == "yerlestirme":
-			_main.builder.start_new("akvaryum_beyaz")
+		_main.hud.close_panel()
+		var action: String = s[5] if s.size() > 5 else ""
+		match action:
+			"kepce":
+				_main.hud._open_catch(null, 100, "", 0, {"neon": 2})
+			"telefon":
+				_main.hud.open_phone("finance")
+			"koli":
+				_game.pick_box(int(_game.boxes[0].uid))
+			"aksam":
+				_game.carry_to_depot()
+				_game.minute = 19 * 60 + 25
+				_game.time_changed.emit(int(_game.minute))
+			"yerlestir":
+				_game.minute = 12 * 60
+				_game.time_changed.emit(int(_game.minute))
+				_main.builder.start_new("akvaryum_beyaz")
 		var p = _main.player
 		p.position = s[1]
 		p._yaw = deg_to_rad(s[2])
@@ -71,14 +88,21 @@ func _build() -> void:
 	var r1: Dictionary = g.add_furniture("kavisli_raf", 6.72, -1.6, -90.0)
 	var r2: Dictionary = g.add_furniture("duvar_rafi", 6.75, 1.0, -90.0)
 	g.add_furniture("saksi_agave", -6.3, 4.3, 0.0)
-	g.add_furniture("saksi_egrelti", -6.2, 2.0, 0.0)
-	g.add_furniture("saksi_calilik", 2.4, 4.4, 0.0)
+	g.add_furniture("saksi_egrelti", -6.2, 2.4, 0.0)
+	var ter: Dictionary = g.add_furniture("teraryum", -2.0, -1.4, 30.0)
+	g.add_furniture("jenerator", 6.4, 4.2, -90.0)
+	g.add_furniture("kamera", -6.6, -4.6, 45.0)
+	g.employees = {"kasiyer": true, "bakimci": true}
+	g.add_delivery("yem", 25)
+	g.add_delivery("kum", 10)
+	g.add_furniture("saksi_calilik", -3.6, 4.4, 0.0)
 	g.add_furniture("paspas", 0.0, 3.9, 0.0)
 	var setups := [
 		[a, false, 25.0, true, ["kaya", "bitki", "bitki", "kok", "kilic_bitki", "bitki"], {"neon": 6, "lepistes": 4}],
 		[b, true, 26.0, true, ["resif", "resif", "deniz_yildizi", "kabuk", "kestane"], {"palyaco": 3, "cerrah": 2, "mandarin": 1, "denizati": 1}],
 		[c, false, 21.0, false, ["kaya", "amfora", "bitki", "kirik_kaya"], {"japon": 3, "koi": 1}],
 		[d, false, 27.0, true, ["kok", "bitki", "bitki", "kilic_bitki", "kaya"], {"melek": 4}],
+		[ter, false, 26.0, true, ["kaya"], {"kaplumbaga": 3}],
 	]
 	for st in setups:
 		var t: Dictionary = g.tanks[int(st[0].tank)]
@@ -101,6 +125,10 @@ func _build() -> void:
 	for pid in ["yem", "su_duzenleyici", "ilac", "kum", "dekor", "filtre"]:
 		g.stock_shelf(int(r1.uid), pid, 4)
 		g.stock_shelf(int(r2.uid), pid, 3)
+	g.tanks[int(a.tank)].fish[0]["rare"] = true
+	g.tanks[int(a.tank)].fish[0]["rare_name"] = "Altın"
+	g.weather = "gunesli"
 	for t in g.tanks:
 		g.tank_changed.emit(t.id)
 	g.open_shop()
+	_main.sync_employees()

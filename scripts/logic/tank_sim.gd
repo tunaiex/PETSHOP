@@ -119,6 +119,9 @@ static func species_in(tank: Dictionary) -> Array:
 
 ## Bu türü tanka koymak sorun yaratır mı? Sorun metni ya da "".
 static func check_add(tank: Dictionary, species: String) -> String:
+	var terra: bool = tank.get("kind", "") == "teraryum"
+	if terra != FishDB.is_turtle(species):
+		return "Teraryuma sadece kaplumbağa konur." if terra else "%s bir teraryum ister." % FishDB.display_name(species)
 	if bool(tank.get("salt", false)) != FishDB.is_salt(species):
 		return "%s %s ister, bu tank %s." % [FishDB.display_name(species), "tuzlu su" if FishDB.is_salt(species) else "tatlı su", "tuzlu" if tank.get("salt", false) else "tatlı su"]
 	if space_used(tank) + space_of(species) > CAPACITY:

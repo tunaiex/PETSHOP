@@ -41,7 +41,17 @@ func setup(fish_data: Dictionary, aq: Node3D, swim_bounds: AABB) -> void:
 	apply_state(fish_data)
 
 
+var turtle: bool = false
+var _rest: float = 0.0
+var _to_island: bool = false
+var _legs: Array = []
+var _head: Node3D
+
+
 func _build_visual() -> void:
+	if FishDB.is_turtle(species):
+		_build_turtle()
+		return
 	var model: Dictionary = _model_template(species)
 	if not model.is_empty():
 		var mi := MeshInstance3D.new()
@@ -65,6 +75,115 @@ func _build_visual() -> void:
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mi)
 	_visual = mi
+
+
+## Prosedürel kaplumbağa: kubbe kabuk, karın, baş, dört yüzgeç-bacak, kuyruk. -Z'ye bakar.
+func _build_turtle() -> void:
+	turtle = true
+	var L: float = float(_data.length)
+	var root := Node3D.new()
+	add_child(root)
+	var skin := MeshKit.mat(Color(0.22, 0.28, 0.14), 0.6)
+	var shell := MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = L * 0.5
+	sm.height = L * 0.5
+	sm.is_hemisphere = true
+	sm.radial_segments = 24
+	sm.rings = 8
+	shell.mesh = sm
+	shell.scale = Vector3(0.82, 0.75, 1.0)
+	shell.material_override = MeshKit.shader_mat("res://shaders/shell.gdshader")
+	root.add_child(shell)
+	var belly := MeshInstance3D.new()
+	var bm := SphereMesh.new()
+	bm.radius = L * 0.47
+	bm.height = L * 0.14
+	belly.mesh = bm
+	belly.scale = Vector3(0.82, 1.0, 1.0)
+	belly.material_override = MeshKit.mat(Color(0.75, 0.68, 0.35), 0.6)
+	root.add_child(belly)
+	_head = Node3D.new()
+	_head.position = Vector3(0, L * 0.06, -L * 0.52)
+	root.add_child(_head)
+	var head := MeshInstance3D.new()
+	var hm := SphereMesh.new()
+	hm.radius = L * 0.11
+	hm.height = L * 0.2
+	head.mesh = hm
+	head.scale = Vector3(0.9, 0.85, 1.3)
+	head.material_override = skin
+	_head.add_child(head)
+	for side in [-1.0, 1.0]:
+		var eye := MeshKit.cylinder(_head, L * 0.02, L * 0.01, Vector3(side * L * 0.075, L * 0.03, -L * 0.07), MeshKit.mat(Color(0.05, 0.05, 0.03), 0.2), 8)
+		eye.rotation_degrees.z = 90
+		# Sarı yanak çizgisi
+		MeshKit.box(_head, Vector3(L * 0.012, L * 0.03, L * 0.14), Vector3(side * L * 0.095, -L * 0.01, 0), MeshKit.mat(Color(0.9, 0.8, 0.2), 0.5))
+	for corner in [[-1.0, -1.0], [1.0, -1.0], [-1.0, 1.0], [1.0, 1.0]]:
+		var pivot := Node3D.new()
+		pivot.position = Vector3(corner[0] * L * 0.36, 0.0, corner[1] * L * 0.3)
+		root.add_child(pivot)
+		var leg := MeshInstance3D.new()
+		var lm := CapsuleMesh.new()
+		lm.radius = L * 0.06
+		lm.height = L * (0.3 if corner[1] < 0 else 0.22)
+		leg.mesh = lm
+		leg.material_override = skin
+		leg.rotation_degrees = Vector3(0, 0, 90)
+		leg.scale = Vector3(1.0, 1.0, 0.45)
+		leg.position = Vector3(corner[0] * L * 0.1, 0, 0)
+		pivot.add_child(leg)
+		_legs.append([pivot, corner[0], corner[1]])
+	var tail := MeshKit.cylinder(root, L * 0.025, L * 0.12, Vector3(0, 0, L * 0.5), skin, 8)
+	tail.rotation_degrees.x = 90
+	for c in root.find_children("*", "MeshInstance3D", true, false):
+		(c as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_visual = root
+
+
+func _turtle_process(delta: float) -> void:
+	var t := Time.get_ticks_msec() * 0.001
+	var paddle: float = 0.0 if _rest > 0.0 else 1.0
+	for l in _legs:
+		var pivot: Node3D = l[0]
+		pivot.rotation.y = sin(t * 3.0 + l[1] * l[2] * 1.5) * 0.6 * paddle * l[1]
+	if _head:
+		_head.rotation.y = sin(t * 0.7 + _phase) * 0.35
+	if _rest > 0.0:
+		_rest -= delta
+		if _rest <= 0.0:
+			_to_island = false
+			_target = _random_point()
+		return
+	var spd: float = _speed * clamp(health / 100.0, 0.3, 1.0)
+	_retarget -= delta
+	var feed_point: Vector3 = aquarium.get_food_point() if aquarium else Vector3.INF
+	if feed_point != Vector3.INF:
+		_target = feed_point
+		_to_island = false
+	elif _retarget <= 0.0:
+		_retarget = _rng.randf_range(4.0, 9.0)
+		if aquarium and aquarium.has_method("island_point") and aquarium.terrarium and _rng.randf() < 0.35:
+			_to_island = true
+			_target = aquarium.island_point() + Vector3(0, 0, _rng.randf_range(-0.1, 0.1))
+		else:
+			_to_island = false
+			_target = _random_point()
+			_target.y = lerp(_lo().y, _hi().y, _rng.randf_range(0.0, 0.6))
+	var to: Vector3 = _target - position
+	if _to_island and to.length() < 0.04:
+		_rest = _rng.randf_range(6.0, 14.0)
+		velocity = Vector3.ZERO
+		return
+	velocity = velocity.lerp(to.normalized() * spd, clamp(delta * 1.5, 0.0, 1.0))
+	position += velocity * delta
+	if not _to_island:
+		position = position.clamp(_lo() - Vector3.ONE * 0.02, _hi() + Vector3.ONE * 0.02)
+	var flat := Vector3(velocity.x, velocity.y * 0.3, velocity.z)
+	if flat.length() > 0.002:
+		var want := Basis.looking_at(flat.normalized(), Vector3.UP)
+		var q := Quaternion(transform.basis.orthonormalized()).slerp(Quaternion(want), clamp(delta * 2.0, 0.0, 1.0))
+		transform.basis = Basis(q).scaled(scale)
 
 
 static var _templates: Dictionary = {}
@@ -195,6 +314,9 @@ func _random_point() -> Vector3:
 
 
 func _process(delta: float) -> void:
+	if turtle and alive:
+		_turtle_process(delta)
+		return
 	if not alive:
 		_process_dead(delta)
 		return

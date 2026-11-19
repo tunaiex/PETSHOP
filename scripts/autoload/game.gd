@@ -137,6 +137,8 @@ func add_furniture(type: String, x: float, z: float, rot: float) -> Dictionary:
 	_fuid += 1
 	if FurnitureDB.is_tank(type):
 		var t := TankSim.new_tank(tanks.size(), true, 25.0, false)
+		if type == "teraryum":
+			t["kind"] = "teraryum"
 		tanks.append(t)
 		e["tank"] = t.id
 	if FurnitureDB.is_shelf(type):

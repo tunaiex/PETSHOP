@@ -16,6 +16,11 @@ const ITEMS := {
 		"desc": "130 cm cam tank + ceviz dolap. Müşteriler ahşabı sever (+çekicilik).",
 		"appeal": 5,
 	},
+	"teraryum": {
+		"name": "Kaplumbağa teraryumu", "price": 1300, "cat": "akvaryum",
+		"size": Vector2(1.38, 0.58), "height": 1.5,
+		"desc": "Az sulu, karası olan cam teraryum + ısı lambası. Su kaplumbağaları için.",
+	},
 	"kasa": {
 		"name": "Kasa tezgâhı", "price": 700, "cat": "magaza", "max": 1,
 		"size": Vector2(2.64, 0.74), "height": 1.05,
@@ -103,7 +108,7 @@ static func decor_for(salt: bool) -> Array:
 
 
 static func is_tank(id: String) -> bool:
-	return id.begins_with("akvaryum")
+	return id.begins_with("akvaryum") or id == "teraryum"
 
 
 static func is_shelf(id: String) -> bool:

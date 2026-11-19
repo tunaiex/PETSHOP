@@ -398,6 +398,10 @@ func close_panel() -> void:
 	_panel = null
 	_panel_refresh = Callable()
 	_haggle_customer = null
+	if player and player.hands and player.hands.kind() == "net":
+		player.hands.clear()
+		if not Game.carrying.is_empty():
+			player.hands.hold_box(Game.carrying)
 	if not _touch:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
@@ -749,7 +753,8 @@ func _fill_tank(body: VBoxContainer, aq: Aquarium) -> void:
 
 	_section(body, "Tank")
 	var mv := _flow(body)
-	_btn(mv, "Tuzlu suya çevir" if not salt else "Tatlı suya çevir", _toggle_salt.bind(body, aq), alive.is_empty() and Game.money >= TankSim.SALT_COST).tooltip_text = "%d ₺ (tuz, test kiti). Sadece boş tankta." % TankSim.SALT_COST
+	if not aq.terrarium:
+		_btn(mv, "Tuzlu suya çevir" if not salt else "Tatlı suya çevir", _toggle_salt.bind(body, aq), alive.is_empty() and Game.money >= TankSim.SALT_COST).tooltip_text = "%d ₺ (tuz, test kiti). Sadece boş tankta." % TankSim.SALT_COST
 	_btn(mv, "Fotoğraf çek ve paylaş", _photo.bind(body, aq), not Game.photos_today.has(aq.tank_id))
 	_btn(mv, "Karantina: %s" % ("AÇIK" if t.get("quarantine", false) else "KAPALI"), _toggle_quarantine.bind(body, aq))
 	_btn(mv, "Taşı", _move_furniture.bind(aq.furniture_uid))
@@ -1094,11 +1099,12 @@ func _fill_fish(body: VBoxContainer, target_tank: int) -> void:
 		_btn(trow, "T%d%s (%.0f°C, %d/%d)" % [id + 1, " (tuzlu)" if tk.salt else "", tk.temp, TankSim.space_used(tk), TankSim.CAPACITY], _fill_phone.bind(body, "fish", id), id != target_tank)
 	var tank: Dictionary = Game.tanks[target_tank]
 	var salt: bool = bool(tank.salt)
-	_section(body, "%s türleri (Tank %d)" % ["Tuzlu su" if salt else "Tatlı su", target_tank + 1])
-	if not salt:
+	var terra: bool = tank.get("kind", "") == "teraryum"
+	_section(body, "%s (Tank %d)" % ["Kaplumbağalar" if terra else ("Tuzlu su türleri" if salt else "Tatlı su türleri"), target_tank + 1])
+	if not salt and not terra:
 		body.add_child(_lbl("Deniz balıkları için boş tankı tank panelinden tuzlu suya çevir.", 17, Color(0.75, 0.8, 0.82)))
 	var temp_now: float = float(tank.temp) if not tank.heater_on else max(float(tank.heater), TankSim.ROOM_TEMP)
-	for sp in FishDB.salt_ids(salt):
+	for sp in (FishDB.turtle_ids() if terra else FishDB.salt_ids(salt)):
 		var s: Dictionary = FishDB.get_species(sp)
 		var row := _row(body)
 		var n := _lbl(s.name, 21)
@@ -1455,6 +1461,9 @@ KURULUM
 • TELEFON > Balık: tanka balık sipariş et. Büyük balıklar daha çok yer kaplar.
 • TELEFON > Ürün: ürünler depoya gelir. Rafa bakıp depodan rafa diz; müşteri sadece raftakini alır.
 • Eşyaları istediğin zaman taşıyabilir, yarı fiyatına satabilirsin.
+
+• Ürün siparişleri kapıya KOLİ olarak gelir: koliyi al, rafa bakıp diz ya da depoya koy (G).
+• Yeni balıkları önce karantina tankına koy; bazıları hastalık taşır.
 
 GÜN
 • Hazır olunca ön kapıdan dükkânı aç (09:00-19:00). Kasa tezgâhı olmadan satış yapılamaz!

@@ -9,6 +9,10 @@ müşteriler pazarlık eder ve kira her gün artar.
 ![Yerleştirme modu](docs/yerlestirme.png)
 ![Deniz tankı](docs/akvaryum.png)
 ![Kasa ve müşteriler](docs/kasa.png)
+![Elde koli](docs/koli.png)
+![Kepçe mini oyunu](docs/kepce.png)
+![Kaplumbağa teraryumu](docs/teraryum.png)
+![Akşam](docs/aksam.png)
 
 ## Açmak
 
@@ -49,13 +53,31 @@ müşteriler pazarlık eder ve kira her gün artar.
 - Bakım: yem, su değişimi, hastalık (beyaz benek), ölü balıkları çıkarma, tür uyumu, sıcaklık.
 - Her akşam artan kira ve elektrik ödenir (ısıtıcı, lamba, filtre). **3 gün üst üste borçta kalırsan dükkân kapanır.**
 
-## Balık türleri (20)
+### Daha fazlası
+- **Koliler:** Ürün siparişleri kapının yanına koli olarak gelir. Koliyi eline al, bir rafa bakıp diz ya da depoya koy (G).
+- **Dükkânı kişiselleştir:** TELEFON > Dükkân: tabela adı, duvar rengi, zemin. Dükkânı iki kez 4'er metre büyütebilirsin.
+- **Personel:** Kasiyer (sen yetişemezsen satışı yapar, şikâyetlere iade eder) ve bakımcı (yem, ölü balık, su değişimi).
+- **Gün ve hava:** Akşam dışarısı kararır; günlük hava durumu (yağmurda az müşteri gelir).
+- **Elektrik kesintisi:** Isıtıcı, filtre ve lambalar durur. Jeneratör alırsan etkilenmezsin.
+- **Müfettiş:** Habersiz gelir; kirli su, ölü balık, hastalık, yanlış sıcaklık görürse ceza keser.
+- **Yetiştirme ve nadir balıklar:** Bakımlı tanklarda 9 tür yavrular. Yavruların %3'ü nadir (Albino, Altın...) ve 6 kat değerlidir.
+- **Karantina:** Tedarikçiden gelen balıkların bir kısmı hastalık taşır. Önce karantina tankında gözlemle, sonra satış tankına taşı.
+- **Kepçe mini oyunu:** Balık satarken kepçeyle doğru balıkları yakala (ayarlardan kapatılabilir).
+- **Müşteriler:** İsimli müdavimler (sadakat), şikâyete gelenler (iade/ret), soru soranlar (doğru cevaba bahşiş),
+  hırsızlar (güvenlik kamerası yakalar), cama vuran çocuklar (uyar), özel sipariş verenler (%50 fazla öder).
+- **Ekonomi:** Günlük değişen toptancı fiyatları, kampanya, sosyal medya (tank fotoğrafı paylaş, takipçi kazan),
+  banka kredisi, şube açma, her 7. gün akvaryum yarışması.
+- **Kaplumbağa teraryumu:** Karası ve ısı lambası olan teraryumda Hazar kaplumbağası satabilirsin.
+- **Sesler:** Kapı zili, kasa, kabarcık, yağmur, alarm... (hepsi kodla sentezlenir).
+
+## Balık ve hayvan türleri (21)
 
 | Tatlı su | Tuzlu su |
 |---|---|
 | Lepistes, Neon Tetra, Zebra Danio, Siyah Moli, Diskus | Palyaço Balığı, Mavi Cerrah, Mandarin |
 | Japon Balığı\*, Beta\*, Melek Balığı\*, Koi\* | Aslan Balığı\*, Balon Balığı\*, Deniz Atı\* |
 | Pirana\*, Gümüş Arowana\*, Kedi Balığı\*, Gökkuşağı Alabalığı\* | Fener Balığı\* (nadir) |
+| Hazar Kaplumbağası (teraryumda) | |
 
 \* Gerçek 3D modelli türler (Palyaço, Cerrah, Mandarin dahil 15 tür). Diğerleri koddan üretilen modellerle gösterilir.
 

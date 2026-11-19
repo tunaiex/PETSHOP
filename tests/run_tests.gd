@@ -476,6 +476,12 @@ func _test_fish_systems(game: Node) -> void:
 		if TankSim.supplier_fish("neon", rng).get("carrier", false):
 			carriers += 1
 	check(carriers > 20 and carriers < 120, "Tedarikçi balıklarının bir kısmı hastalık taşır (%d/400)" % carriers)
+	# Teraryum
+	var terra := TankSim.new_tank(5, true, 25.0)
+	terra["kind"] = "teraryum"
+	check(TankSim.check_add(terra, "kaplumbaga") == "", "Kaplumbağa teraryuma konur")
+	check(TankSim.check_add(terra, "neon") != "", "Teraryuma balık konmaz")
+	check(TankSim.check_add(TankSim.new_tank(6, true), "kaplumbaga") != "", "Akvaryuma kaplumbağa konmaz")
 	# Kepçe oyunu: hedeflere tıklayınca başarı
 	var tank := TankSim.new_tank(4, true, 25.0)
 	for i in 3:

@@ -191,6 +191,13 @@ const SPECIES := {
 		"model_fwd": Vector3(0, 0, 1), "upright": true,
 		"desc": "Çok yavaş ve narin. Saldırgan balıklarla asla tutma.",
 	},
+	"kaplumbaga": {
+		"name": "Hazar Kaplumbağası", "latin": "Mauremys rivulata", "habitat": "turtle",
+		"buy": 150, "value": 380, "length": 0.15,
+		"temp_min": 22.0, "temp_max": 28.0, "dirt_rate": 3.0, "hardiness": 0.9,
+		"aggression": 0.3, "long_fins": false, "small": false, "schooling": 0.0, "speed": 0.25,
+		"desc": "Yerli su kaplumbağası. Teraryum, ısı lambası ve bol temiz su ister. Çok kirletir, uzun yaşar.",
+	},
 	"kedi": {
 		"name": "Kedi Balığı", "latin": "Ictalurus punctatus",
 		"buy": 60, "value": 150, "length": 0.18,
@@ -247,6 +254,10 @@ static func model_path(id: String) -> String:
 	return p if ResourceLoader.exists(p) else ""
 
 
+static func is_turtle(id: String) -> bool:
+	return get_species(id).get("habitat", "") == "turtle"
+
+
 static func is_salt(id: String) -> bool:
 	return bool(get_species(id).get("salt", false))
 
@@ -260,7 +271,11 @@ static func display_name(id: String) -> String:
 
 
 static func salt_ids(salt: bool) -> Array:
-	return ids().filter(func(i): return is_salt(i) == salt)
+	return ids().filter(func(i): return is_salt(i) == salt and not is_turtle(i))
+
+
+static func turtle_ids() -> Array:
+	return ids().filter(func(i): return is_turtle(i))
 
 
 ## Tek bir balığın piyasa değeri. Sağlık ve büyüklükle değişir.

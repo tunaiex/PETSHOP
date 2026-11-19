@@ -31,8 +31,14 @@ var _y0: float = STAND_H + 0.025
 var _water_h: float = TH - 0.06
 
 
-func setup(id: int, wood: bool = false) -> void:
+var terrarium: bool = false
+
+
+func setup(id: int, wood: bool = false, terra: bool = false) -> void:
 	tank_id = id
+	terrarium = terra
+	if terra:
+		_water_h = TH * 0.42
 	wood_stand = wood and ResourceLoader.exists(CABINET_MODEL)
 	_build_static()
 	_rebuild_content()
@@ -225,6 +231,8 @@ func _rebuild_content() -> void:
 		var fh: float = 0.12 + fl * 0.05
 		MeshKit.box(_content, Vector3(0.07, fh, 0.05), Vector3(TW * 0.5 - 0.06, y0 + _water_h - fh * 0.5 - 0.02, -TD * 0.5 + 0.04), black)
 
+	if terrarium:
+		_build_island()
 	_build_decor(rng)
 	if d.get("air", false):
 		_build_particles()
@@ -314,6 +322,47 @@ func _build_decor(rng: RandomNumberGenerator) -> void:
 					_content.add_child(mi)
 
 
+const ISLAND_W := 0.42
+
+
+## Teraryum: sağ tarafta kara parçası ve üstünde ısı lambası
+func _build_island() -> void:
+	var gh := _gravel_h()
+	var top: float = _water_h + 0.05
+	var stone := MeshKit.mat(Color(0.42, 0.38, 0.33), 0.9)
+	MeshKit.box(_content, Vector3(ISLAND_W, top - gh, TD - 0.03), Vector3(TW * 0.5 - ISLAND_W * 0.5 - 0.012, _y0 + gh + (top - gh) * 0.5, 0), stone)
+	# Rampa
+	var ramp := MeshKit.box(_content, Vector3(0.3, 0.02, 0.22), Vector3(TW * 0.5 - ISLAND_W - 0.1, _y0 + gh + (top - gh) * 0.55, 0.05), stone)
+	ramp.rotation.z = deg_to_rad(-28)
+	_place_decor("kirik_kaya", 0.2, Vector3(TW * 0.5 - 0.18, _y0 + top, -0.12), 0.7)
+	# Isı lambası (kapağın altında, turuncu)
+	var lamp_mat := StandardMaterial3D.new()
+	lamp_mat.albedo_color = Color(1.0, 0.6, 0.3)
+	lamp_mat.emission_enabled = true
+	lamp_mat.emission = Color(1.0, 0.5, 0.2)
+	lamp_mat.emission_energy_multiplier = 4.0
+	var bulb := MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = 0.05
+	sm.height = 0.1
+	bulb.mesh = sm
+	bulb.material_override = lamp_mat
+	bulb.position = Vector3(TW * 0.5 - ISLAND_W * 0.5, _y0 + TH - 0.06, 0)
+	_content.add_child(bulb)
+	var heat := OmniLight3D.new()
+	heat.position = bulb.position - Vector3(0, 0.05, 0)
+	heat.light_color = Color(1.0, 0.6, 0.3)
+	heat.light_energy = 1.5
+	heat.omni_range = 0.7
+	heat.visible = not Game.power_out
+	_content.add_child(heat)
+
+
+## Kaplumbağanın dinlendiği nokta (kara üstü, yerel uzay)
+func island_point() -> Vector3:
+	return Vector3(TW * 0.5 - ISLAND_W * 0.5 - 0.03, _y0 + _water_h + 0.05 + 0.04, 0.05)
+
+
 func _build_food_particles() -> void:
 	var flake := QuadMesh.new()
 	flake.size = Vector2(0.008, 0.008)
@@ -392,7 +441,7 @@ func _build_particles() -> void:
 
 func swim_bounds() -> AABB:
 	var lo := Vector3(-TW * 0.5 + 0.07, _y0 + _gravel_h() + 0.06, -TD * 0.5 + 0.07)
-	var hi := Vector3(TW * 0.5 - 0.07, _y0 + _water_h - 0.04, TD * 0.5 - 0.07)
+	var hi := Vector3(TW * 0.5 - 0.07 - (ISLAND_W if terrarium else 0.0), _y0 + _water_h - 0.04, TD * 0.5 - 0.07)
 	return AABB(lo, hi - lo)
 
 

@@ -63,8 +63,8 @@ func hold_box(d: Dictionary) -> void:
 	_kind = "box"
 	_item = Node3D.new()
 	DeliveryBox.build_mesh(_item, d)
-	_item.position = Vector3(0, -0.42, -0.55)
-	_item.scale = Vector3.ONE * 0.9
+	_item.position = Vector3(0.05, -0.52, -0.62)
+	_item.scale = Vector3.ONE * 0.72
 	add_child(_item)
 	_arms.get_node("ArmL").position = Vector3(-0.2, -0.32, -0.42)
 	_arms.get_node("ArmR").position = Vector3(0.2, -0.32, -0.42)
@@ -131,6 +131,10 @@ func hold_phone() -> void:
 	add_child(_item)
 	visible = true
 	_anim = 1.2
+
+
+func kind() -> String:
+	return _kind
 
 
 func clear() -> void:

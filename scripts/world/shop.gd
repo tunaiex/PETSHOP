@@ -402,7 +402,7 @@ func spawn(e: Dictionary) -> Node3D:
 		var aq := Aquarium.new()
 		aq.furniture_uid = int(e.uid)
 		_furn_root.add_child(aq)
-		aq.setup(int(e.tank), e.type == "akvaryum_ceviz")
+		aq.setup(int(e.tank), e.type == "akvaryum_ceviz", e.type == "teraryum")
 		n = aq
 	elif FurnitureDB.is_shelf(e.type):
 		var sh := Shelf.new()

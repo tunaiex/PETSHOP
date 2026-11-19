@@ -9,6 +9,8 @@ const ROOM_MIN := Vector2(-6.95, -4.95) ## x sınırı dükkân büyüdükçe so
 const ROOM_MAX := Vector2(6.95, 4.95)
 ## Kapı önü boş kalmalı (müşteri girişi)
 const DOOR_ZONE := [Vector2(-1.4, 3.6), Vector2(1.4, 3.6), Vector2(1.4, 5.1), Vector2(-1.4, 5.1)]
+## Kapının sağındaki koli teslim alanı da boş kalmalı
+const DELIVERY_ZONE := [Vector2(1.45, 3.75), Vector2(3.7, 3.75), Vector2(3.7, 5.0), Vector2(1.45, 5.0)]
 const SNAP := 0.05
 const ROT_STEP := 15.0
 
@@ -117,6 +119,9 @@ func _validate() -> void:
 			return
 	if not info.get("walkable", false) and FurnitureDB.polys_overlap(mine, PackedVector2Array(DOOR_ZONE)):
 		reason = "Kapının önünü kapatma"
+		return
+	if not info.get("walkable", false) and FurnitureDB.polys_overlap(mine, PackedVector2Array(DELIVERY_ZONE)):
+		reason = "Burası koli teslim alanı"
 		return
 	for e in Game.furniture:
 		if int(e.uid) == moving_uid:
