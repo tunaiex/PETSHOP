@@ -40,6 +40,17 @@ var _look_timer: float = 0.0
 var _current: Node3D           ## Baktığı akvaryum ya da raf
 var _walk_anim: String = ""
 var _phone_lover: bool = false
+var _model: Node3D
+
+## Müdavimlerin her gelişte aynı görünmesi için sabit modelleri (isim/cinsiyet uyumlu)
+const REGULAR_MODELS := {
+	"Hüseyin Amca": "res://assets/models/characters/musteri_5.glb",
+	"Ayşe Hanım": "res://assets/models/characters/musteri_2.glb",
+	"Mert": "res://assets/models/characters/musteri_1.glb",
+	"Zeynep": "res://assets/models/characters/musteri_3.glb",
+	"Kemal Usta": "res://assets/models/characters/musteri_8.glb",
+	"Elif Teyze": "res://assets/models/characters/musteri_7.glb",
+}
 var _idle_anim: String = ""
 var _bubble: Label3D
 var _bubble_timer: float = 0.0
@@ -97,8 +108,25 @@ func setup(m: Node, s: Shop, seed_value: int) -> void:
 
 # ------------------------------------------------------------------ Özel müşteri türleri
 
+## Görünüşü belirli bir karakter modeliyle değiştirir.
+func set_model(path: String) -> void:
+	if not ResourceLoader.exists(path) or _model == null:
+		return
+	var old_scale: Vector3 = _model.scale
+	_model.queue_free()
+	var inst: Node3D = (load(path) as PackedScene).instantiate()
+	inst.rotation.y = PI
+	inst.scale = old_scale
+	add_child(inst)
+	_model = inst
+	_anim = MixamoAnim.setup(inst, _rng)
+	_phone_lover = _anim != null and _anim.has_animation("phone") and _rng.randf() < 0.35
+
+
 func make_regular(r: Dictionary) -> void:
 	kind = "regular"
+	if REGULAR_MODELS.has(r.name):
+		set_model(REGULAR_MODELS[r.name])
 	regular_name = r.name
 	profile = profile.duplicate()
 	profile.title = r.name
@@ -240,6 +268,7 @@ func _build_body() -> void:
 	var avail: Array = CHARACTERS.filter(func(p): return ResourceLoader.exists(p))
 	if not avail.is_empty():
 		var inst: Node3D = (load(avail[_rng.randi_range(0, avail.size() - 1)]) as PackedScene).instantiate()
+		_model = inst
 		inst.rotation.y = PI  # modeller +Z'ye bakıyor, müşteri -Z yönünde yürür
 		inst.scale = Vector3.ONE * _rng.randf_range(0.95, 1.05)
 		add_child(inst)
