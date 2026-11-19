@@ -1,0 +1,187 @@
+class_name Fish
+extends Node3D
+
+const VISUAL_SCALE := 1.35 ## Küçük balıkların ekranda seçilebilmesi için hafif büyütme
+## Tek bir balığın görseli ve hareketi. Veri Game.tanks içindedir; bu sadece görünüş.
+
+var uid: int = 0
+var species: String = ""
+var aquarium: Node3D
+var bounds: AABB              ## Akvaryumun yerel uzayında yüzme alanı
+var velocity: Vector3 = Vector3.ZERO
+var health: float = 100.0
+var alive: bool = true
+var sick: float = 0.0
+var growth: float = 1.0
+
+var _data: Dictionary
+var _target: Vector3
+var _retarget: float = 0.0
+var _speed: float = 0.05
+var _mat: ShaderMaterial
+var _visual: Node3D
+var _rng := RandomNumberGenerator.new()
+var _phase: float = 0.0
+var _burst: float = 0.0
+
+
+func setup(fish_data: Dictionary, aq: Node3D, swim_bounds: AABB) -> void:
+	uid = int(fish_data.uid)
+	species = fish_data.species
+	aquarium = aq
+	bounds = swim_bounds
+	_data = FishDB.get_species(species)
+	_rng.seed = uid * 7919
+	_phase = _rng.randf() * TAU
+	_speed = float(_data.speed) * float(_data.length) * 1.4 + 0.02
+	_build_visual()
+	position = _random_point()
+	_target = _random_point()
+	velocity = Vector3(_rng.randf_range(-1, 1), 0, _rng.randf_range(-1, 1)).normalized() * _speed
+	apply_state(fish_data)
+
+
+func _build_visual() -> void:
+	var glb := "res://assets/models/fish/%s.glb" % species
+	if ResourceLoader.exists(glb):
+		var scene: PackedScene = load(glb)
+		_visual = scene.instantiate()
+		add_child(_visual)
+		var aabb := _approx_aabb(_visual)
+		var longest: float = max(aabb.size.x, max(aabb.size.y, aabb.size.z))
+		if longest > 0.0:
+			_visual.scale = Vector3.ONE * (float(_data.length) / longest)
+		return
+	var mi := MeshInstance3D.new()
+	mi.mesh = MeshKit.fish_mesh(species)
+	_mat = MeshKit.shader_mat("res://shaders/fish.gdshader", {
+		"body_color": _data.body, "belly_color": _data.belly, "accent_color": _data.accent,
+		"fin_color": _data.fin, "fin_alpha": _data.fin_alpha, "pattern": _data.pattern,
+		"fish_len": _data.length, "phase": _phase,
+	})
+	mi.material_override = _mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
+	_visual = mi
+
+
+func _approx_aabb(n: Node) -> AABB:
+	var box := AABB()
+	var first := true
+	for c in n.find_children("*", "MeshInstance3D", true, false):
+		var m: MeshInstance3D = c
+		var b: AABB = m.get_aabb()
+		if first:
+			box = b
+			first = false
+		else:
+			box = box.merge(b)
+	return box
+
+
+func apply_state(fish_data: Dictionary) -> void:
+	health = float(fish_data.health)
+	alive = bool(fish_data.alive)
+	growth = float(fish_data.get("growth", 1.0))
+	var sc: float = lerp(0.45, 1.0, clamp(growth, 0.0, 1.0)) * VISUAL_SCALE
+	if _visual:
+		scale = Vector3.ONE * sc
+
+
+func set_sick(level: float) -> void:
+	sick = level
+	if _mat:
+		_mat.set_shader_parameter("sick", level)
+
+
+func _random_point() -> Vector3:
+	var p := bounds.position
+	var s := bounds.size
+	var y_bias: float = _rng.randf()
+	# Sürü balıkları ortada, diğerleri her yerde
+	if float(_data.schooling) > 0.7:
+		y_bias = _rng.randf_range(0.3, 0.8)
+	return Vector3(p.x + _rng.randf() * s.x, p.y + y_bias * s.y, p.z + _rng.randf() * s.z)
+
+
+func _process(delta: float) -> void:
+	if not alive:
+		_process_dead(delta)
+		return
+	var vigor: float = clamp(health / 100.0, 0.25, 1.0)
+	var spd: float = _speed * vigor
+	_retarget -= delta
+	var feed_point: Vector3 = aquarium.get_food_point() if aquarium and aquarium.has_method("get_food_point") else Vector3.INF
+	if feed_point != Vector3.INF:
+		_target = feed_point + Vector3(_rng.randf_range(-0.08, 0.08), -0.02, _rng.randf_range(-0.05, 0.05))
+		spd *= 2.2
+	elif _retarget <= 0.0 or position.distance_to(_target) < 0.05:
+		_target = _random_point()
+		_retarget = _rng.randf_range(2.0, 6.0)
+		if _rng.randf() < 0.15:
+			_burst = 0.6
+	if _burst > 0.0:
+		_burst -= delta
+		spd *= 2.5
+
+	var desired: Vector3 = (_target - position).normalized() * spd
+	# Sürü davranışı
+	var school: float = float(_data.schooling)
+	if school > 0.0 and aquarium and feed_point == Vector3.INF:
+		var center := Vector3.ZERO
+		var align := Vector3.ZERO
+		var sep := Vector3.ZERO
+		var n := 0
+		for other in aquarium.fish_nodes():
+			if other == self or other.species != species or not other.alive:
+				continue
+			var d: float = position.distance_to(other.position)
+			if d < 0.3:
+				center += other.position
+				align += other.velocity
+				n += 1
+				if d < 0.04:
+					sep += (position - other.position) / max(d, 0.005)
+		if n > 0:
+			center /= n
+			desired += ((center - position) * 0.6 + align / n * 0.8) * school
+			desired += sep * 0.002
+	# Duvarlardan uzak dur
+	var margin := 0.05
+	var lo: Vector3 = bounds.position + Vector3.ONE * margin
+	var hi: Vector3 = bounds.end - Vector3.ONE * margin
+	for axis in 3:
+		if position[axis] < lo[axis]:
+			desired[axis] += spd * 2.0
+		elif position[axis] > hi[axis]:
+			desired[axis] -= spd * 2.0
+	desired.y *= 0.6
+	if desired.length() > spd * 1.5:
+		desired = desired.normalized() * spd * 1.5
+	velocity = velocity.lerp(desired, clamp(delta * 2.0, 0.0, 1.0))
+	position += velocity * delta
+	position = position.clamp(bounds.position, bounds.end)
+
+	if velocity.length() > 0.002:
+		var flat := velocity
+		flat.y = clamp(flat.y, -flat.length() * 0.4, flat.length() * 0.4)
+		var want := Basis.looking_at(flat.normalized(), Vector3.UP)
+		var q := Quaternion(transform.basis.orthonormalized()).slerp(Quaternion(want), clamp(delta * 4.0, 0.0, 1.0))
+		transform.basis = Basis(q).scaled(scale)
+	if _mat:
+		_mat.set_shader_parameter("swim", clamp(velocity.length() / max(_speed, 0.001), 0.35, 2.5))
+		_mat.set_shader_parameter("health", clamp(health / 100.0, 0.15, 1.0))
+
+
+func _process_dead(delta: float) -> void:
+	if _mat:
+		_mat.set_shader_parameter("health", 0.0)
+		_mat.set_shader_parameter("swim", 0.0)
+	var top: float = bounds.end.y + 0.02
+	position.y = move_toward(position.y, top, delta * 0.03)
+	position.y += sin(Time.get_ticks_msec() * 0.001 + _phase) * 0.0005
+	var flat := Vector3(velocity.x, 0, velocity.z)
+	var dir: Vector3 = flat.normalized() if flat.length() > 0.001 else Vector3.FORWARD
+	var want := Basis.looking_at(dir, Vector3.UP) * Basis(Vector3.FORWARD, PI * 0.85)
+	var q := Quaternion(transform.basis.orthonormalized()).slerp(Quaternion(want.orthonormalized()), clamp(delta * 1.5, 0.0, 1.0))
+	transform.basis = Basis(q).scaled(scale)

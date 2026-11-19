@@ -1,0 +1,191 @@
+class_name TankSim
+extends RefCounted
+## Akvaryum simülasyonu. Tank verisi düz bir Dictionary'dir (kaydetmesi kolay).
+## Tüm oranlar "oyun dakikası" başınadır. Bir iş günü 600 oyun dakikasıdır (09:00-19:00).
+
+const CAPACITY := 12
+const ROOM_TEMP := 21.0
+const FILTER_EFF := [0.0, 0.35, 0.55, 0.75]
+const FILTER_COST := [0, 0, 450, 900]
+const UNLOCK_COST := 1200
+
+static var _uid_counter: int = 1000
+
+
+static func new_tank(id: int, unlocked: bool, heater: float = 25.0) -> Dictionary:
+	return {
+		"id": id, "unlocked": unlocked, "heater": heater, "temp": heater,
+		"dirt": 8.0, "food": 70.0, "sick": false, "sick_level": 0.0,
+		"filter": 1, "fish": [],
+	}
+
+
+static func new_fish(species: String, growth: float = 0.6, health: float = 100.0) -> Dictionary:
+	_uid_counter += 1
+	return {"uid": _uid_counter, "species": species, "health": health, "growth": growth, "alive": true}
+
+
+static func set_uid_floor(v: int) -> void:
+	_uid_counter = max(_uid_counter, v)
+
+
+static func living(tank: Dictionary) -> Array:
+	return tank.fish.filter(func(f): return f.alive)
+
+
+static func dead_count(tank: Dictionary) -> int:
+	return tank.fish.filter(func(f): return not f.alive).size()
+
+
+static func species_in(tank: Dictionary) -> Array:
+	var out: Array = []
+	for f in living(tank):
+		if not out.has(f.species):
+			out.append(f.species)
+	return out
+
+
+## Bu türü tanka koymak sorun yaratır mı? Sorun metni ya da "".
+static func check_add(tank: Dictionary, species: String) -> String:
+	if tank.fish.size() >= CAPACITY:
+		return "Tank dolu (en fazla %d balık)." % CAPACITY
+	for other in species_in(tank):
+		var r: String = FishDB.conflict_reason(species, other)
+		if r != "":
+			return r
+	return ""
+
+
+## Simülasyonu ilerletir. Olay metinleri dizisi döner.
+static func step(tank: Dictionary, minutes: float, rng: RandomNumberGenerator) -> Array:
+	var events: Array = []
+	if not tank.unlocked:
+		return events
+	var alive: Array = living(tank)
+	var dead: int = tank.fish.size() - alive.size()
+
+	# Sıcaklık ısıtıcı hedefine yaklaşır (ısıtıcı oda sıcaklığının altına soğutamaz).
+	var target: float = max(tank.heater, ROOM_TEMP)
+	tank.temp = move_toward(tank.temp, target, 0.05 * minutes)
+
+	# Kirlenme
+	var bioload: float = 0.0
+	for f in alive:
+		bioload += float(FishDB.get_species(f.species).dirt_rate) * lerp(0.5, 1.0, f.growth)
+	var eff: float = FILTER_EFF[clamp(int(tank.filter), 0, 3)]
+	tank.dirt = clamp(tank.dirt + (bioload * 0.012 * (1.0 - eff) + dead * 0.15) * minutes, 0.0, 100.0)
+
+	# Açlık
+	if alive.size() > 0:
+		tank.food = clamp(tank.food - 0.15 * minutes, 0.0, 100.0)
+
+	# Hastalık
+	if not tank.sick and tank.dirt > 60.0 and alive.size() > 0:
+		if rng.randf() < 0.002 * minutes * (tank.dirt - 60.0) / 40.0:
+			tank.sick = true
+			tank.sick_level = 0.1
+			events.append("Tank %d: Beyaz benek hastalığı başladı!" % (tank.id + 1))
+	if tank.sick:
+		tank.sick_level = min(1.0, tank.sick_level + 0.003 * minutes)
+
+	var present: Array = species_in(tank)
+	for f in alive:
+		var s: Dictionary = FishDB.get_species(f.species)
+		var stress: float = 0.0
+		if tank.dirt > 50.0:
+			stress += (tank.dirt - 50.0) / 50.0 * 0.08
+		if tank.food < 20.0:
+			stress += (20.0 - tank.food) / 20.0 * 0.06
+		var dt: float = 0.0
+		if tank.temp < s.temp_min:
+			dt = s.temp_min - tank.temp
+		elif tank.temp > s.temp_max:
+			dt = tank.temp - s.temp_max
+		stress += dt * 0.03
+		if tank.sick:
+			stress += 0.05 * tank.sick_level
+		for other in present:
+			if other == f.species and other != "beta":
+				continue
+			if other == "beta" and f.species == "beta" and _count_species(alive, "beta") < 2:
+				continue
+			var att: Dictionary = FishDB.get_species(other)
+			if (att.aggression >= 0.8 and s.long_fins and other != f.species) or (other == "beta" and f.species == "beta"):
+				stress += 0.05
+			elif att.aggression >= 0.5 and s.small and other != f.species:
+				stress += 0.03
+				if rng.randf() < 0.0008 * minutes:
+					f.alive = false
+					f.health = 0.0
+					f["eaten"] = true
+					events.append("Tank %d: %s bir %s balığını yedi!" % [tank.id + 1, att.name, s.name])
+					break
+		if not f.alive:
+			continue
+		stress /= max(0.2, float(s.hardiness))
+		if stress <= 0.0001:
+			f.health = min(100.0, f.health + 0.05 * minutes)
+		else:
+			f.health -= stress * minutes
+		f.growth = min(1.0, f.growth + 0.0004 * minutes)
+		if f.health <= 0.0:
+			f.health = 0.0
+			f.alive = false
+			events.append("Tank %d: Bir %s öldü." % [tank.id + 1, s.name])
+
+	# Yenen balıklar tamamen kaybolur.
+	tank.fish = tank.fish.filter(func(f): return not f.get("eaten", false))
+
+	# Lepistes üremesi
+	var guppies: Array = living(tank).filter(func(f): return f.species == "lepistes" and f.health > 70.0 and f.growth > 0.5)
+	if guppies.size() >= 2 and tank.fish.size() < CAPACITY:
+		if rng.randf() < 0.0006 * minutes:
+			tank.fish.append(new_fish("lepistes", 0.05, 90.0))
+			events.append("Tank %d: Lepistesler yavruladı!" % (tank.id + 1))
+	return events
+
+
+static func _count_species(arr: Array, sp: String) -> int:
+	var n := 0
+	for f in arr:
+		if f.species == sp:
+			n += 1
+	return n
+
+
+## Yem verir. Fazla yem suyu kirletir. Gerçekleşen kirlenme artışını döner.
+static func feed(tank: Dictionary) -> float:
+	var before: float = tank.food
+	tank.food = min(100.0, tank.food + 40.0)
+	var overflow: float = before + 40.0 - 100.0
+	if overflow > 0.0:
+		var extra: float = overflow * 0.25
+		tank.dirt = min(100.0, tank.dirt + extra)
+		return extra
+	return 0.0
+
+
+static func water_change(tank: Dictionary) -> void:
+	tank.dirt = max(0.0, tank.dirt - 55.0)
+	tank.temp = move_toward(tank.temp, ROOM_TEMP, 2.0)
+
+
+static func medicate(tank: Dictionary) -> void:
+	tank.sick = false
+	tank.sick_level = 0.0
+
+
+static func remove_dead(tank: Dictionary) -> int:
+	var n: int = dead_count(tank)
+	tank.fish = tank.fish.filter(func(f): return f.alive)
+	return n
+
+
+static func average_health(tank: Dictionary) -> float:
+	var a: Array = living(tank)
+	if a.is_empty():
+		return 0.0
+	var t := 0.0
+	for f in a:
+		t += f.health
+	return t / a.size()
