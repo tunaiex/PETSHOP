@@ -46,6 +46,16 @@ const ITEMS := {
 		"size": Vector2(0.65, 0.65), "height": 1.2, "appeal": 2, "model": "calilik", "plant_size": 0.7,
 		"desc": "Uzun boylu süs çalısı (+itibar).",
 	},
+	"jenerator": {
+		"name": "Jeneratör", "price": 1800, "cat": "magaza", "max": 1,
+		"size": Vector2(1.0, 0.6), "height": 0.8,
+		"desc": "Elektrik kesilince ısıtıcı, filtre ve lambalar çalışmaya devam eder.",
+	},
+	"kamera": {
+		"name": "Güvenlik kamerası", "price": 900, "cat": "magaza", "max": 1,
+		"size": Vector2(0.4, 0.4), "height": 2.4,
+		"desc": "Hırsızları yakalar. Kamera varken çalınan ürün geri alınır.",
+	},
 	"paspas": {
 		"name": "Kapı paspası", "price": 60, "cat": "dekor",
 		"size": Vector2(1.8, 1.0), "height": 0.02, "appeal": 1, "walkable": true,

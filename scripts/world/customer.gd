@@ -42,6 +42,8 @@ var _arms: Array = []
 var _rng := RandomNumberGenerator.new()
 var _anim: AnimationPlayer
 var _queue_index: int = -1
+var inspector: bool = false
+var _issues: Array = []
 
 
 func setup(m: Node, s: Shop, seed_value: int) -> void:
@@ -74,6 +76,53 @@ func setup(m: Node, s: Shop, seed_value: int) -> void:
 	_to_visit = targets.slice(0, _rng.randi_range(1, max(1, min(3, targets.size()))))
 	_path = [shop.entrance + Vector3(_rng.randf_range(-0.4, 0.4), 0, 0)]
 	state = State.ENTER
+
+
+## Bu müşteriyi belediye müfettişine çevirir: bütün tankları gezer, sorun bulursa ceza keser.
+func make_inspector() -> void:
+	inspector = true
+	profile = {"title": "Müfettiş", "patience": 3.0, "stingy": 1.0, "picky": 1.0}
+	_to_visit = shop.aquariums.duplicate()
+	_bubble.modulate = Color(1.0, 0.85, 0.4)
+	say("Belediye denetimi. Tanklara bakacağım.", 4.0)
+
+
+func _inspect(aq: Aquarium) -> void:
+	var t: Dictionary = Game.tanks[aq.tank_id]
+	var alive: Array = TankSim.living(t)
+	var found: Array = []
+	if t.dirt > 60.0:
+		found.append("kirli su")
+	if t.sick:
+		found.append("hastalık")
+	if TankSim.dead_count(t) > 0:
+		found.append("ölü balık")
+	if not alive.is_empty() and t.cycle < 60.0:
+		found.append("olgunlaşmamış su")
+	for sp in TankSim.species_in(t):
+		var sd: Dictionary = FishDB.get_species(sp)
+		if t.temp < sd.temp_min - 1.0 or t.temp > sd.temp_max + 1.0:
+			found.append("yanlış sıcaklık")
+			break
+	if found.is_empty():
+		say("Tank %d uygun." % (aq.tank_id + 1), 2.5)
+	else:
+		say("Tank %d: %s! Not ediyorum." % [aq.tank_id + 1, ", ".join(found)], 3.5)
+		_issues.append_array(found)
+
+
+func _inspection_result() -> void:
+	if _issues.is_empty():
+		say("Her şey yönetmeliğe uygun. Tebrikler!", 4.0)
+		Game.change_reputation(4.0)
+		Game.notify.emit("Müfettiş: Dükkân temiz çıktı! İtibar arttı.", "good")
+	else:
+		var fine: int = min(250 * _issues.size(), 1500)
+		Game.add_money(-fine)
+		Game.stats.fines += fine
+		Game.change_reputation(-5.0)
+		say("Ceza tutanağı: %d ₺." % fine, 4.0)
+		Game.notify.emit("Müfettiş %d sorun buldu (%s). Ceza: %d ₺" % [_issues.size(), ", ".join(_issues), fine], "bad")
 
 
 func _go(target: Vector3) -> void:
@@ -243,7 +292,9 @@ func _process(delta: float) -> void:
 				_look_timer = _rng.randf_range(3.0, 6.0)
 				if is_instance_valid(_current):
 					_face(_current.look_target())
-					if _current is Aquarium:
+					if inspector and _current is Aquarium:
+						_inspect(_current)
+					elif _current is Aquarium:
 						_evaluate_tank(_current)
 					elif _current is Shelf:
 						_evaluate_shelf(_current)
@@ -377,6 +428,12 @@ func _evaluate_shelf(sh: Shelf) -> void:
 
 
 func _go_queue() -> void:
+	if inspector:
+		_inspection_result()
+		state = State.LEAVE
+		_path = shop.path(position, shop.entrance)
+		_path.append(shop.outside)
+		return
 	if not basket.is_empty() and shop.counter == null:
 		say("Kasa bile yok, nereye ödeyeceğim?")
 		Game.record_lost_customer(true)

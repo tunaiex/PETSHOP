@@ -40,6 +40,8 @@ func _process(_delta: float) -> bool:
 				return false
 			print("== Kayıt testi ==")
 			_test_save(game)
+			print("== Dükkân sistemleri ==")
+			_test_shop_systems(game)
 			print("== Entegrasyon testi (tam bir iş günü) ==")
 			game.delete_save()
 			game.new_game()
@@ -350,3 +352,53 @@ func _build_shop(game: Node) -> void:
 	check(game.stock_shelf(int(sh.uid), "ilac", 3) == 0, "Depoda olmayan ürün dizilemez")
 	for t in game.tanks:
 		game.tank_changed.emit(t.id)
+
+
+func _test_shop_systems(game: Node) -> void:
+	game.new_game()
+	# Koliler
+	game.add_delivery("yem", 23)
+	check(game.boxes.size() == 3, "23 ürün 3 koli olarak gelir")
+	var sh: Dictionary = game.add_furniture("duvar_rafi", 6.5, 0.0, -90.0)
+	check(game.pick_box(int(game.boxes[0].uid)), "Koli alınır")
+	check(not game.pick_box(int(game.boxes[0].uid)), "Aynı anda iki koli taşınamaz")
+	check(game.carry_to_shelf(int(sh.uid)) == 10 and game.carrying.is_empty(), "Koli rafa dizilir")
+	game.pick_box(int(game.boxes[0].uid))
+	game.carry_to_depot()
+	check(int(game.stock.get("yem", 0)) == 4 + 10, "Koli depoya konur")
+	# Elektrik kesintisi
+	var t: Dictionary = TankSim.new_tank(0, true, 28.0)
+	t.temp = 28.0
+	TankSim.power_on = false
+	for m in 60:
+		TankSim.step(t, 1.0, game.rng)
+	TankSim.power_on = true
+	check(t.temp < 28.0, "Elektrik kesilince su soğur")
+	# Maaş ve genişleme
+	var base: int = game.daily_expenses().total
+	game.employees.kasiyer = true
+	check(game.daily_expenses().total == base + game.SALARY.kasiyer, "Maaş giderlere eklenir")
+	game.shop_level = 1
+	check(game.room_min_x() < -10.0, "Genişleyen dükkân sola büyür")
+	check(game.daily_expenses().rent > 300, "Büyük dükkânın kirası yüksek")
+	# Fiyatlar ve hava
+	check(game.buy_price("neon") > 0 and game.price_mult.size() > 10, "Günlük fiyatlar hesaplanır")
+	check(["gunesli", "bulutlu", "yagmurlu"].has(game.weather), "Hava durumu belirlenir")
+	# Yarışma
+	var tank: Dictionary = game.add_furniture("akvaryum_ceviz", 0, -4.4, 0)
+	var tk: Dictionary = game.tanks[int(tank.tank)]
+	tk.light = true
+	tk.gravel = "natural"
+	tk.decor = ["kaya", "bitki", "bitki", "kok", "amfora", "kilic_bitki"]
+	tk.cycle = 100.0
+	for sp in ["neon", "lepistes", "moli"]:
+		tk.fish.append(TankSim.new_fish(sp, 0.9))
+	var res: Dictionary = game.run_contest()
+	check(res.score > 50 and res.place >= 1 and res.place <= 4, "Yarışma puanlanır (%d puan, %d.)" % [res.score, res.place])
+	# Kayıt
+	game.settings.name = "NEMO PETSHOP"
+	game.save_game()
+	game.settings.name = "x"
+	game.load_game()
+	check(game.settings.name == "NEMO PETSHOP" and game.shop_level == 1 and game.employees.kasiyer, "Dükkân ayarları kaydedilir")
+	game.delete_save()

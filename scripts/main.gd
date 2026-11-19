@@ -12,6 +12,8 @@ var queue: Array = []
 var _spawn_timer: float = 4.0
 var _seed: int = 1
 var _report_shown := false
+var employees: Dictionary = {}  ## rol -> Employee
+var _inspector_spawned := false
 
 
 func _ready() -> void:
@@ -37,6 +39,8 @@ func _ready() -> void:
 	hud.builder = builder
 	builder.state_changed.connect(hud.on_build_state)
 	Game.furniture_changed.connect(func(): _update_queue.call_deferred())
+	Game.furniture_changed.connect(sync_employees)
+	sync_employees()
 	Game.phase_changed.connect(_on_phase)
 	if Game.day == 1 and Game.phase == "prep":
 		hud.show_help.call_deferred()
@@ -48,9 +52,15 @@ func _on_phase(p: String) -> void:
 		_report_shown = false
 	elif p == "prep":
 		_report_shown = false
+		_inspector_spawned = false
 
 
 func _process(delta: float) -> void:
+	if Game.phase == "open" and not _inspector_spawned and Game.events_today.has("inspector_at") and Game.minute >= int(Game.events_today.inspector_at):
+		_inspector_spawned = true
+		var ins := spawn_customer()
+		ins.make_inspector()
+		Game.notify.emit("Belediye müfettişi geldi! Tanklarını inceleyecek.", "warn")
 	if Game.phase == "open":
 		_spawn_timer -= delta * Game.time_scale
 		if _spawn_timer <= 0.0:
@@ -71,10 +81,36 @@ func _process(delta: float) -> void:
 
 func _next_spawn_delay() -> float:
 	var minutes: float = lerp(55.0, 18.0, Game.reputation / 100.0) * Game.rng.randf_range(0.6, 1.4)
+	if Game.weather == "yagmurlu":
+		minutes *= 1.4
+	elif Game.weather == "bulutlu":
+		minutes *= 1.1
+	if not Game.campaign.is_empty():
+		minutes *= 1.0 - float(Game.campaign.pct) / 100.0 * 1.5
+	minutes *= 1.0 - min(Game.followers / 2500.0, 0.4)
+	var dusk: float = smoothstep(17.5 * 60.0, 19.0 * 60.0, Game.minute)
+	minutes *= 1.0 + dusk * 0.5
 	return minutes * Game.SECONDS_PER_MINUTE
 
 
+## Çalışanları işe alım durumuna göre sahneye koyar ya da çıkarır.
+func sync_employees() -> void:
+	for role in ["kasiyer", "bakimci"]:
+		var want: bool = Game.employees.get(role, false) and (role != "kasiyer" or shop.counter != null)
+		var have: bool = employees.has(role) and is_instance_valid(employees[role])
+		if want and not have:
+			var e := Employee.new()
+			add_child(e)
+			e.setup(role, self, shop)
+			e.global_position = shop.counter.to_global(Vector3(-0.5, 0, -0.9)) if (role == "kasiyer" and shop.counter) else Vector3(-1.0, 0, 2.5)
+			employees[role] = e
+		elif not want and have:
+			employees[role].queue_free()
+			employees.erase(role)
+
+
 func spawn_customer() -> Customer:
+	Sfx.play("chime", -12.0)
 	var c := Customer.new()
 	add_child(c)
 	_seed += 1
@@ -153,6 +189,7 @@ func complete_sale(c: Customer, price: int) -> void:
 	for id in touched:
 		Game.tank_changed.emit(id)
 	Game.record_sale(price, fair)
+	Sfx.play("kaching")
 	if sick_sold:
 		Game.change_reputation(-3.0)
 		Game.notify.emit("Halsiz balık sattın. Müşteri memnun kalmayabilir, itibar düştü.", "warn")

@@ -17,6 +17,10 @@ func setup(uid: int, t: String, m: Node) -> void:
 	match type:
 		"kasa":
 			_build_counter()
+		"jenerator":
+			_build_generator()
+		"kamera":
+			_build_camera()
 		"paspas":
 			MeshKit.box(self, Vector3(info.size.x, 0.012, info.size.y), Vector3(0, 0.006, 0), MeshKit.mat(Color(0.2, 0.22, 0.24), 0.95))
 		_:
@@ -52,6 +56,38 @@ func _build_counter() -> void:
 		add_child(counter)
 	else:
 		MeshKit.box(self, Vector3(2.6, 1.0, 0.7), Vector3(0, 0.5, 0), MeshKit.mat(Color(0.93, 0.92, 0.9), 0.5))
+
+
+func _build_generator() -> void:
+	var yellow := MeshKit.mat(Color(0.95, 0.75, 0.1), 0.45)
+	var dark := MeshKit.mat(Color(0.12, 0.12, 0.13), 0.4)
+	MeshKit.box(self, Vector3(0.9, 0.55, 0.5), Vector3(0, 0.38, 0), yellow)
+	for x in [-0.4, 0.4]:
+		for z in [-0.2, 0.2]:
+			MeshKit.box(self, Vector3(0.05, 0.12, 0.05), Vector3(x, 0.06, z), dark)
+	MeshKit.box(self, Vector3(0.6, 0.06, 0.06), Vector3(0, 0.7, 0.2), dark)
+	MeshKit.box(self, Vector3(0.6, 0.06, 0.06), Vector3(0, 0.7, -0.2), dark)
+	MeshKit.cylinder(self, 0.05, 0.25, Vector3(0.35, 0.75, 0), dark, 10)
+	var panel := StandardMaterial3D.new()
+	panel.albedo_color = Color(0.1, 0.3, 0.1)
+	panel.emission_enabled = true
+	panel.emission = Color(0.2, 1.0, 0.3)
+	MeshKit.box(self, Vector3(0.15, 0.08, 0.01), Vector3(-0.2, 0.45, 0.255), panel)
+
+
+func _build_camera() -> void:
+	var grey := MeshKit.mat(Color(0.85, 0.85, 0.87), 0.35)
+	var dark := MeshKit.mat(Color(0.1, 0.1, 0.11), 0.3)
+	MeshKit.cylinder(self, 0.04, 2.3, Vector3(0, 1.15, 0), grey, 10)
+	MeshKit.cylinder(self, 0.16, 0.03, Vector3(0, 0.015, 0), grey, 16)
+	var head := MeshKit.box(self, Vector3(0.12, 0.1, 0.24), Vector3(0, 2.3, 0.08), grey)
+	head.rotation_degrees.x = 15
+	MeshKit.cylinder(self, 0.035, 0.02, Vector3(0, 2.27, 0.21), dark, 12).rotation_degrees.x = 90
+	var led := StandardMaterial3D.new()
+	led.emission_enabled = true
+	led.emission = Color(1, 0.1, 0.1)
+	led.albedo_color = Color(1, 0.1, 0.1)
+	MeshKit.box(self, Vector3(0.015, 0.015, 0.01), Vector3(0.04, 2.33, 0.2), led)
 
 
 func _build_plant(info: Dictionary) -> void:

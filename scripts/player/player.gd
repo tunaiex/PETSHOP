@@ -9,6 +9,7 @@ const REACH := 2.6
 
 var hud: Node
 var camera: Camera3D
+var hands: Hands
 var ray: RayCast3D
 var focus: Object = null
 
@@ -36,6 +37,16 @@ func _ready() -> void:
 	ray.collide_with_areas = false
 	ray.collision_mask = 1 | 2  # 2: kapı tabelası gibi yürümeyi engellemeyen etkileşim alanları
 	camera.add_child(ray)
+	hands = Hands.new()
+	camera.add_child(hands)
+	Game.carry_changed.connect(_on_carry)
+
+
+func _on_carry() -> void:
+	if Game.carrying.is_empty():
+		hands.clear()
+	else:
+		hands.hold_box(Game.carrying)
 	_yaw = rotation.y
 	rotation = Vector3.ZERO
 
@@ -84,6 +95,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				try_interact()
 	elif event.is_action_pressed("interact"):
 		try_interact()
+	elif event is InputEventKey and event.pressed and event.keycode == KEY_G and not Game.carrying.is_empty():
+		Game.carry_to_depot()
 	elif event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 		if hud:

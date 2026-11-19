@@ -139,8 +139,16 @@ func look_target() -> Vector3:
 func get_prompt() -> String:
 	var e := entry()
 	var cap: int = int(FurnitureDB.item(kind).get("capacity", 20))
+	if not Game.carrying.is_empty():
+		return "Koliden rafa diz (%d/%d)" % [Game.shelf_total(e), cap]
 	return "%s: Ürün diz (%d/%d)" % [FurnitureDB.item(kind).name, Game.shelf_total(e), cap]
 
 
 func interact(player: Node) -> void:
+	if not Game.carrying.is_empty():
+		var pid: String = Game.carrying.pid
+		var n: int = Game.carry_to_shelf(furniture_uid)
+		if n > 0:
+			Game.notify.emit("%d %s rafa dizildi." % [n, ProductDB.get_product(pid).name], "good")
+		return
 	player.hud.open_shelf(self)

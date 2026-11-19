@@ -5,7 +5,7 @@ extends Node3D
 
 signal state_changed()
 
-const ROOM_MIN := Vector2(-6.95, -4.95)
+const ROOM_MIN := Vector2(-6.95, -4.95) ## x sınırı dükkân büyüdükçe sola kayar (Game.room_min_x)
 const ROOM_MAX := Vector2(6.95, 4.95)
 ## Kapı önü boş kalmalı (müşteri girişi)
 const DOOR_ZONE := [Vector2(-1.4, 3.6), Vector2(1.4, 3.6), Vector2(1.4, 5.1), Vector2(-1.4, 5.1)]
@@ -112,7 +112,7 @@ func _validate() -> void:
 	var info: Dictionary = FurnitureDB.item(type)
 	var mine: PackedVector2Array = FurnitureDB.corners(type, pos, rot)
 	for c in mine:
-		if c.x < ROOM_MIN.x or c.y < ROOM_MIN.y or c.x > ROOM_MAX.x or c.y > ROOM_MAX.y:
+		if c.x < Game.room_min_x() + 0.05 or c.y < ROOM_MIN.y or c.x > ROOM_MAX.x or c.y > ROOM_MAX.y:
 			reason = "Dükkânın içine sığmıyor"
 			return
 	if not info.get("walkable", false) and FurnitureDB.polys_overlap(mine, PackedVector2Array(DOOR_ZONE)):

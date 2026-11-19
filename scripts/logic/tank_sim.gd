@@ -11,6 +11,7 @@ const UNLOCK_COST := 1200
 const SALT_COST := 300 ## Tankı tuzlu/tatlı suya çevirme (tuz, test kiti, yeni kum)
 
 static var _uid_counter: int = 1000
+static var power_on: bool = true ## Elektrik kesintisinde ısıtıcı, filtre, hava motoru çalışmaz
 
 
 ## equipped: true ise tam donanımlı (eski kayıtlar ve testler için), false ise çıplak cam tank.
@@ -109,14 +110,14 @@ static func step(tank: Dictionary, minutes: float, rng: RandomNumberGenerator) -
 	var dead: int = tank.fish.size() - alive.size()
 
 	# Sıcaklık ısıtıcı hedefine yaklaşır (ısıtıcı oda sıcaklığının altına soğutamaz).
-	var target: float = max(tank.heater, ROOM_TEMP) if tank.get("heater_on", true) else ROOM_TEMP
+	var target: float = max(tank.heater, ROOM_TEMP) if (tank.get("heater_on", true) and power_on) else ROOM_TEMP
 	tank.temp = move_toward(tank.temp, target, 0.05 * minutes)
 
 	# Kirlenme
 	var bioload: float = 0.0
 	for f in alive:
 		bioload += float(FishDB.get_species(f.species).dirt_rate) * lerp(0.5, 1.0, f.growth)
-	var eff: float = FILTER_EFF[clamp(int(tank.filter), 0, 3)]
+	var eff: float = FILTER_EFF[clamp(int(tank.filter), 0, 3)] if power_on else 0.0
 	tank.dirt = clamp(tank.dirt + (bioload * 0.012 * (1.0 - eff) + dead * 0.15) * minutes, 0.0, 100.0)
 
 	# Suyun olgunlaşması (yararlı bakteriler). Filtre hızlandırır.
@@ -157,7 +158,7 @@ static func step(tank: Dictionary, minutes: float, rng: RandomNumberGenerator) -
 			stress += 0.4
 		if float(tank.get("cycle", 100.0)) < 60.0:
 			stress += (60.0 - float(tank.cycle)) / 60.0 * 0.06
-		if not tank.get("air", true) and alive.size() > 6:
+		if (not tank.get("air", true) or not power_on) and alive.size() > 6:
 			stress += 0.02 * (alive.size() - 6) / 6.0
 		for other in present:
 			if other == f.species and other != "beta":

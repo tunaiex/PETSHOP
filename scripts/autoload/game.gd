@@ -9,6 +9,10 @@ signal tank_changed(id: int)
 signal stock_changed()
 signal day_ended(report: Dictionary)
 signal furniture_changed()
+signal boxes_changed()
+signal carry_changed()
+signal settings_changed()
+signal power_changed(on: bool)
 
 const SAVE_PATH := "user://kayit.json"
 const OPEN_MINUTE := 9 * 60
@@ -18,6 +22,26 @@ const SECONDS_PER_MINUTE := 0.5
 const RENT := 300
 const RENT_GROWTH := 25 ## Kira her gün artar (enflasyon!)
 const START_MONEY := 4000
+const SALARY := {"kasiyer": 180, "bakimci": 140}
+const EXPAND_COST := [6000, 9000]
+const MAX_LEVEL := 2
+const BOX_SIZE := 10
+const BRANCH_COST := 25000
+const LOANS := [[5000, 10, 600], [15000, 10, 1750]] ## tutar, gün, günlük taksit
+const WALL_COLORS := [
+	["Kırık beyaz", Color(0.86, 0.88, 0.84), Color(0.50, 0.36, 0.24)],
+	["Okyanus mavisi", Color(0.62, 0.78, 0.86), Color(0.22, 0.32, 0.42)],
+	["Nane yeşili", Color(0.72, 0.86, 0.76), Color(0.42, 0.33, 0.24)],
+	["Kum beji", Color(0.9, 0.83, 0.7), Color(0.45, 0.3, 0.2)],
+	["Antrasit", Color(0.32, 0.34, 0.37), Color(0.18, 0.18, 0.2)],
+]
+const FLOOR_TYPES := [
+	["Meşe parke", Color(0.62, 0.45, 0.30), Color(0.48, 0.33, 0.21)],
+	["Koyu ceviz", Color(0.36, 0.24, 0.16), Color(0.26, 0.17, 0.11)],
+	["Açık akçaağaç", Color(0.82, 0.7, 0.52), Color(0.7, 0.58, 0.42)],
+	["Gri beton", Color(0.55, 0.55, 0.55), Color(0.48, 0.48, 0.5)],
+]
+const REGULAR_NAMES := ["Hüseyin Amca", "Ayşe Hanım", "Mert", "Zeynep", "Kemal Usta", "Elif Teyze"]
 
 var money: int = START_MONEY
 var day: int = 1
@@ -29,6 +53,29 @@ var stock: Dictionary = {}   ## Depo (arka oda). Raftaki ürünler mobilya kayd�
 var tanks: Array = []        ## Satılan tanklar silinmez, "unlocked=false" olur (id'ler sabit kalsın)
 var furniture: Array = []    ## {"uid","type","x","z","rot", "tank"?, "shelf"?}
 var _fuid: int = 1
+
+# --- Dükkân
+var settings: Dictionary = {"wall": 0, "floor": 0, "name": "AKVARYUM DÜKKÂNI", "catch_game": true}
+var shop_level: int = 0
+var employees: Dictionary = {"kasiyer": false, "bakimci": false}
+var boxes: Array = []        ## Kapıya gelen koliler {"uid","pid","n"}
+var carrying: Dictionary = {}## Oyuncunun elindeki koli
+var _buid: int = 1
+# --- Günlük durum
+var weather: String = "gunesli" ## gunesli | bulutlu | yagmurlu
+var power_out: bool = false
+var events_today: Dictionary = {}
+var price_mult: Dictionary = {}
+var campaign: Dictionary = {}    ## {"target": "fish"|"products", "pct": 20}
+var photos_today: Array = []
+# --- Müşteriler
+var regulars: Array = []         ## {"name","loyalty","visits"}
+var complaints: Array = []       ## {"name","amount","species"}
+var special_orders: Array = []   ## {"id","name","species","qty","due","done"}
+# --- Ekonomi
+var followers: int = 0
+var loan: Dictionary = {}        ## {"days_left","daily"}
+var branches: int = 0
 var stats: Dictionary = {}
 var time_scale: float = 1.0
 var rng := RandomNumberGenerator.new()
@@ -53,7 +100,22 @@ func new_game() -> void:
 	tanks.clear()
 	furniture.clear()
 	_fuid = 1
+	settings = {"wall": 0, "floor": 0, "name": "AKVARYUM DÜKKÂNI", "catch_game": true}
+	shop_level = 0
+	employees = {"kasiyer": false, "bakimci": false}
+	boxes = []
+	carrying = {}
+	_buid = 1
+	regulars = []
+	for n in REGULAR_NAMES:
+		regulars.append({"name": n, "loyalty": 30, "visits": 0})
+	complaints = []
+	special_orders = []
+	followers = 0
+	loan = {}
+	branches = 0
 	_reset_stats()
+	roll_day()
 
 
 # ---------------------------------------------------------------- Mobilya
@@ -160,7 +222,111 @@ func decor_appeal() -> float:
 
 
 func _reset_stats() -> void:
-	stats = {"sales": 0, "revenue": 0, "purchases": 0, "deaths": 0, "lost_customers": 0, "happy": 0}
+	stats = {"sales": 0, "revenue": 0, "purchases": 0, "deaths": 0, "lost_customers": 0, "happy": 0, "stolen": 0, "fines": 0, "refunds": 0, "tips": 0}
+
+
+# ---------------------------------------------------------------- Günlük olaylar
+
+## Her sabah: hava, fiyatlar, rastgele olaylar.
+func roll_day() -> void:
+	var r: float = rng.randf()
+	weather = "gunesli" if r < 0.55 else ("bulutlu" if r < 0.8 else "yagmurlu")
+	price_mult = {}
+	for id in FishDB.ids():
+		price_mult[id] = snapped(rng.randf_range(0.75, 1.35), 0.05)
+	for id in ProductDB.ids():
+		price_mult[id] = snapped(rng.randf_range(0.8, 1.25), 0.05)
+	events_today = {}
+	if rng.randf() < 0.18:
+		events_today["power_at"] = rng.randi_range(OPEN_MINUTE + 60, CLOSE_MINUTE - 120)
+		events_today["power_len"] = rng.randi_range(40, 90)
+	if day > 1 and rng.randf() < 0.15:
+		events_today["inspector_at"] = rng.randi_range(OPEN_MINUTE + 60, CLOSE_MINUTE - 120)
+	if day % 7 == 0:
+		events_today["contest"] = true
+	campaign = {}
+	photos_today = []
+	power_out = false
+
+
+func buy_price(id: String) -> int:
+	var base: int = int(FishDB.get_species(id).buy) if FishDB.SPECIES.has(id) else int(ProductDB.get_product(id).buy)
+	return max(1, int(round(base * float(price_mult.get(id, 1.0)))))
+
+
+func room_min_x() -> float:
+	return -7.0 - 4.0 * shop_level
+
+
+func has_furniture(type: String) -> bool:
+	return count_furniture(type) > 0
+
+
+# ---------------------------------------------------------------- Koliler
+
+func add_delivery(pid: String, n: int) -> void:
+	while n > 0:
+		var k: int = min(n, BOX_SIZE)
+		boxes.append({"uid": _buid, "pid": pid, "n": k})
+		_buid += 1
+		n -= k
+	boxes_changed.emit()
+
+
+func pick_box(uid: int) -> bool:
+	if not carrying.is_empty():
+		notify.emit("Elinde zaten bir koli var.", "bad")
+		return false
+	for b in boxes:
+		if int(b.uid) == uid:
+			carrying = b
+			boxes.erase(b)
+			boxes_changed.emit()
+			carry_changed.emit()
+			return true
+	return false
+
+
+## Elindeki koliden rafa dizer. Dizilen adet.
+func carry_to_shelf(shelf_uid: int) -> int:
+	if carrying.is_empty():
+		return 0
+	var e := furniture_by_uid(shelf_uid)
+	var cap: int = int(FurnitureDB.item(e.type).get("capacity", 20))
+	var move: int = min(int(carrying.n), cap - shelf_total(e))
+	if move <= 0:
+		notify.emit("Raf dolu.", "bad")
+		return 0
+	e.shelf[carrying.pid] = int(e.shelf.get(carrying.pid, 0)) + move
+	carrying.n = int(carrying.n) - move
+	if carrying.n <= 0:
+		carrying = {}
+	carry_changed.emit()
+	stock_changed.emit()
+	return move
+
+
+func carry_to_depot() -> void:
+	if carrying.is_empty():
+		return
+	add_stock(carrying.pid, int(carrying.n))
+	carrying = {}
+	carry_changed.emit()
+
+
+# ---------------------------------------------------------------- Müşteri kayıtları
+
+func regular(name_: String) -> Dictionary:
+	for r in regulars:
+		if r.name == name_:
+			return r
+	return {}
+
+
+func change_loyalty(name_: String, d: float) -> void:
+	var r := regular(name_)
+	if not r.is_empty():
+		r.loyalty = clamp(float(r.loyalty) + d, 0.0, 100.0)
 
 
 func _process(delta: float) -> void:
@@ -174,6 +340,14 @@ func _process(delta: float) -> void:
 
 func advance_minute() -> void:
 	minute += 1.0
+	if events_today.has("power_at") and not has_furniture("jenerator"):
+		var start: int = int(events_today.power_at)
+		var out: bool = minute >= start and minute < start + int(events_today.power_len)
+		if out != power_out:
+			power_out = out
+			power_changed.emit(not out)
+			notify.emit("ELEKTRİK KESİLDİ! Isıtıcılar, filtreler ve lambalar durdu." if out else "Elektrik geldi.", "bad" if out else "good")
+	TankSim.power_on = not power_out
 	for t in tanks:
 		var before: int = TankSim.dead_count(t)
 		var events: Array = TankSim.step(t, 1.0, rng)
@@ -280,13 +454,31 @@ func daily_expenses() -> Dictionary:
 				elec += 3
 			if t.get("heater_on", false):
 				elec += int(max(0.0, t.heater - TankSim.ROOM_TEMP) * 4.0)
-	var rent: int = RENT + RENT_GROWTH * (day - 1)
-	return {"rent": rent, "electric": elec, "total": rent + elec}
+	var rent: int = RENT + RENT_GROWTH * (day - 1) + 150 * shop_level
+	var salary := 0
+	for k in employees:
+		if employees[k]:
+			salary += int(SALARY[k])
+	var loan_pay: int = int(loan.get("daily", 0)) if not loan.is_empty() else 0
+	return {"rent": rent, "electric": elec, "salary": salary, "loan": loan_pay, "total": rent + elec + salary + loan_pay}
 
 
 func end_day() -> Dictionary:
 	var costs: Dictionary = daily_expenses()
 	add_money(-costs.total)
+	if not loan.is_empty():
+		loan.days_left = int(loan.days_left) - 1
+		if loan.days_left <= 0:
+			loan = {}
+			notify.emit("Kredi borcu bitti!", "good")
+	var branch_income := 0
+	for i in branches:
+		branch_income += 250 + int(reputation * 7.0) + rng.randi_range(-200, 300) - 250
+	if branch_income != 0:
+		add_money(branch_income)
+	var contest: Dictionary = {}
+	if events_today.get("contest", false):
+		contest = run_contest()
 	if money < 0:
 		debt_days += 1
 	else:
@@ -295,6 +487,11 @@ func end_day() -> Dictionary:
 	report["day"] = day
 	report["rent"] = costs.rent
 	report["electric"] = costs.electric
+	report["salary"] = costs.salary
+	report["loan"] = costs.loan
+	report["branch"] = branch_income
+	report["contest"] = contest
+	report["followers"] = followers
 	report["money"] = money
 	report["reputation"] = reputation
 	report["debt_days"] = debt_days
@@ -308,10 +505,39 @@ func end_day() -> Dictionary:
 	return report
 
 
+## Yarışma: en iyi tankın puanı rakiplerle karşılaştırılır.
+func run_contest() -> Dictionary:
+	var best := 0.0
+	var best_id := -1
+	for t in tanks:
+		if not t.unlocked or TankSim.living(t).is_empty():
+			continue
+		var sc: float = TankSim.appeal(t) * 0.6 + TankSim.species_in(t).size() * 5.0 + TankSim.average_health(t) * 0.2
+		for f in TankSim.living(t):
+			if f.get("rare", false):
+				sc += 10.0
+		if sc > best:
+			best = sc
+			best_id = t.id
+	var rivals: Array = [rng.randf_range(45, 70), rng.randf_range(55, 80), rng.randf_range(65, 95)]
+	var place: int = 1
+	for r in rivals:
+		if r > best:
+			place += 1
+	var prizes := {1: [2500, 8.0], 2: [1000, 4.0], 3: [400, 2.0]}
+	var res := {"score": int(best), "tank": best_id, "place": place, "prize": 0}
+	if prizes.has(place):
+		res.prize = prizes[place][0]
+		add_money(prizes[place][0])
+		change_reputation(prizes[place][1])
+	return res
+
+
 func next_day() -> void:
 	day += 1
 	minute = PREP_MINUTE
 	_reset_stats()
+	roll_day()
 	set_phase("prep")
 	save_game()
 	time_changed.emit(int(minute))
@@ -324,6 +550,10 @@ func to_dict() -> Dictionary:
 		"version": 2, "money": money, "day": day, "reputation": reputation,
 		"debt_days": debt_days, "stock": stock, "tanks": tanks,
 		"furniture": furniture, "fuid": _fuid,
+		"settings": settings, "shop_level": shop_level, "employees": employees,
+		"boxes": boxes + ([carrying] if not carrying.is_empty() else []), "buid": _buid,
+		"regulars": regulars, "complaints": complaints, "special_orders": special_orders,
+		"followers": followers, "loan": loan, "branches": branches,
 	}
 
 
@@ -362,6 +592,30 @@ func from_dict(d: Dictionary) -> bool:
 				e.shelf[pid] = int(e.shelf[pid])
 		furniture.append(e)
 	_fuid = int(d.get("fuid", furniture.size() + 1))
+	var st: Dictionary = d.get("settings", {})
+	settings = {"wall": int(st.get("wall", 0)), "floor": int(st.get("floor", 0)), "name": str(st.get("name", "AKVARYUM DÜKKÂNI")), "catch_game": bool(st.get("catch_game", true))}
+	shop_level = int(d.get("shop_level", 0))
+	var em: Dictionary = d.get("employees", {})
+	employees = {"kasiyer": bool(em.get("kasiyer", false)), "bakimci": bool(em.get("bakimci", false))}
+	boxes = []
+	for b in d.get("boxes", []):
+		boxes.append({"uid": int(b.uid), "pid": str(b.pid), "n": int(b.n)})
+	carrying = {}
+	_buid = int(d.get("buid", boxes.size() + 1))
+	regulars = d.get("regulars", [])
+	if regulars.is_empty():
+		for n in REGULAR_NAMES:
+			regulars.append({"name": n, "loyalty": 30, "visits": 0})
+	complaints = d.get("complaints", [])
+	special_orders = []
+	for o in d.get("special_orders", []):
+		o.qty = int(o.qty)
+		o.due = int(o.due)
+		special_orders.append(o)
+	followers = int(d.get("followers", 0))
+	loan = d.get("loan", {})
+	branches = int(d.get("branches", 0))
+	roll_day()
 	minute = PREP_MINUTE
 	phase = "prep"
 	_reset_stats()

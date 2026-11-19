@@ -37,6 +37,9 @@ func setup(id: int, wood: bool = false) -> void:
 	_build_static()
 	_rebuild_content()
 	Game.tank_changed.connect(_on_tank_changed)
+	Game.power_changed.connect(func(on):
+		if is_instance_valid(_light):
+			_light.visible = on)
 
 
 func data() -> Dictionary:
@@ -207,6 +210,7 @@ func _rebuild_content() -> void:
 		_light.light_energy = 2.2
 		_light.light_color = Color(0.85, 0.95, 1.0)
 		_light.shadow_enabled = false
+		_light.visible = not Game.power_out
 		_content.add_child(_light)
 	_gravel_mat.set_shader_parameter("caustic_strength", 0.35 if d.get("light", false) else 0.0)
 
