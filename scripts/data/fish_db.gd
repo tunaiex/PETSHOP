@@ -264,13 +264,26 @@ static func salt_ids(salt: bool) -> Array:
 
 
 ## Tek bir balığın piyasa değeri. Sağlık ve büyüklükle değişir.
-static func market_value(id: String, health: float, growth: float = 1.0) -> int:
+const RARE_MULT := 6.0
+## Türlerin üreme hızı (dakika başına, uygun koşulda). Yoksa üremez.
+const BREED := {"lepistes": 0.0006, "moli": 0.0005, "zebra": 0.00025, "neon": 0.00012, "melek": 0.00015, "japon": 0.0001, "palyaco": 0.00012, "beta": 0.0001, "koi": 0.00006}
+## Nadir (mutasyonlu) balığın adı
+const RARE_NAMES := ["Albino", "Altın", "Platin", "Kızıl", "Gece Mavisi"]
+
+
+static func market_value(id: String, health: float, growth: float = 1.0, rare: bool = false) -> int:
 	var s: Dictionary = get_species(id)
 	if s.is_empty():
 		return 0
 	var h: float = clamp(health, 0.0, 100.0) / 100.0
 	var factor: float = lerp(0.25, 1.0, h * h) * lerp(0.7, 1.15, clamp(growth, 0.0, 1.0))
+	if rare:
+		factor *= RARE_MULT
 	return int(round(float(s.value) * factor))
+
+
+static func fish_value(f: Dictionary) -> int:
+	return market_value(f.species, f.health, f.get("growth", 1.0), f.get("rare", false))
 
 
 ## İki tür aynı tankta sorun çıkarır mı? Açıklama döner, sorun yoksa boş string.

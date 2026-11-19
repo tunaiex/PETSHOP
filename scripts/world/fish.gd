@@ -140,6 +140,8 @@ static func _model_template(sp: String) -> Dictionary:
 
 
 func apply_state(fish_data: Dictionary) -> void:
+	if _mat:
+		_mat.set_shader_parameter("rare", 1.0 if fish_data.get("rare", false) else 0.0)
 	health = float(fish_data.health)
 	alive = bool(fish_data.alive)
 	growth = float(fish_data.get("growth", 1.0))

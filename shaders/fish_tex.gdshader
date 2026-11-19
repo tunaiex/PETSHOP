@@ -17,6 +17,7 @@ uniform float swim = 1.0;
 uniform float phase = 0.0;
 uniform float health = 1.0;
 uniform float sick = 0.0;
+uniform float rare = 0.0;          // nadir mutasyon: altın/sedef parıltı
 uniform float upright = 0.0;   // deniz atı: yan salınım yerine hafif sallanma
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -39,6 +40,10 @@ void fragment() {
 		float sp = step(1.0 - sick * 0.12, hash(floor(v_obj.xy * 90.0 + v_obj.zz * 45.0)));
 		col = mix(col, vec3(1.0), sp);
 	}
+	if (rare > 0.0) {
+		float lum = dot(col, vec3(0.3, 0.59, 0.11));
+		col = mix(col, vec3(1.0, 0.82, 0.35) * (0.6 + lum), 0.65);
+	}
 	vec3 grey = vec3(dot(col, vec3(0.3, 0.59, 0.11)));
 	col = mix(grey * 0.7, col, clamp(health * 1.5, 0.0, 1.0));
 	ALBEDO = col;
@@ -47,5 +52,5 @@ void fragment() {
 	ROUGHNESS = roughness;
 	SPECULAR = 0.6;
 	float fres = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0);
-	EMISSION = col * fres * 0.2;
+	EMISSION = col * fres * 0.2 + rare * vec3(1.0, 0.8, 0.4) * (0.15 + 0.15 * sin(TIME * 3.0 + v_obj.x * 20.0));
 }

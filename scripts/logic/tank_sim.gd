@@ -8,6 +8,7 @@ const ROOM_TEMP := 21.0
 const FILTER_EFF := [0.0, 0.35, 0.55, 0.75]
 const FILTER_COST := [0, 200, 450, 900]
 const UNLOCK_COST := 1200
+const QUARANTINE_MIN := 180.0 ## Karantinada gözlem süresi (oyun dakikası)
 const SALT_COST := 300 ## Tankı tuzlu/tatlı suya çevirme (tuz, test kiti, yeni kum)
 
 static var _uid_counter: int = 1000
@@ -37,6 +38,34 @@ static func normalize(tank: Dictionary) -> void:
 	tank.heater_on = bool(tank.heater_on)
 	tank.light = bool(tank.light)
 	tank.air = bool(tank.air)
+
+
+## Tedarikçiden gelen balık: bazen hastalık taşır, çok nadiren mutasyonlu çıkar.
+static func supplier_fish(species: String, rng: RandomNumberGenerator) -> Dictionary:
+	var f := new_fish(species, rng.randf_range(0.45, 0.8), rng.randf_range(80.0, 95.0))
+	f["new"] = true
+	if rng.randf() < 0.15:
+		f["carrier"] = true
+	if rng.randf() < 0.02:
+		f["rare"] = true
+		f["rare_name"] = FishDB.RARE_NAMES[rng.randi_range(0, FishDB.RARE_NAMES.size() - 1)]
+	return f
+
+
+## Balıkları bir tanktan diğerine taşır. Taşınan adet.
+static func move_fish(src: Dictionary, dst: Dictionary, species: String, count: int) -> int:
+	var moved := 0
+	for f in src.fish.duplicate():
+		if moved >= count:
+			break
+		if f.species != species or not f.alive:
+			continue
+		if space_used(dst) + space_of(species) > CAPACITY:
+			break
+		src.fish.erase(f)
+		dst.fish.append(f)
+		moved += 1
+	return moved
 
 
 ## Bir balığın kapladığı yer birimi (büyük balık daha çok)
@@ -200,12 +229,39 @@ static func step(tank: Dictionary, minutes: float, rng: RandomNumberGenerator) -
 	# Yenen balıklar tamamen kaybolur.
 	tank.fish = tank.fish.filter(func(f): return not f.get("eaten", false))
 
-	# Lepistes üremesi
-	var guppies: Array = living(tank).filter(func(f): return f.species == "lepistes" and f.health > 70.0 and f.growth > 0.5)
-	if guppies.size() >= 2 and space_used(tank) < CAPACITY:
-		if rng.randf() < 0.0006 * minutes:
-			tank.fish.append(new_fish("lepistes", 0.05, 90.0))
-			events.append("Tank %d: Lepistesler yavruladı!" % (tank.id + 1))
+	# Üreme: sağlıklı, büyümüş en az iki balık + yer varsa. Yavruların %3'ü nadir (mutasyonlu) doğar.
+	var adults := {}
+	for f in living(tank):
+		if f.health > 70.0 and f.growth > 0.5 and FishDB.BREED.has(f.species):
+			adults[f.species] = adults.get(f.species, 0) + 1
+	for sp in adults:
+		if adults[sp] < 2 or space_used(tank) + space_of(sp) > CAPACITY or tank.dirt > 50.0:
+			continue
+		if rng.randf() < float(FishDB.BREED[sp]) * minutes * (1.3 if tank.get("decor", []).size() >= 4 else 1.0):
+			var fry := new_fish(sp, 0.05, 90.0)
+			if rng.randf() < 0.03:
+				fry["rare"] = true
+				fry["rare_name"] = FishDB.RARE_NAMES[rng.randi_range(0, FishDB.RARE_NAMES.size() - 1)]
+				events.append("Tank %d: NADİR bir %s %s yavrusu doğdu! (6 kat değerli)" % [tank.id + 1, fry.rare_name, FishDB.display_name(sp)])
+			else:
+				events.append("Tank %d: %s yavruladı!" % [tank.id + 1, FishDB.display_name(sp)])
+			tank.fish.append(fry)
+
+	# Karantina: yeni gelen balıklar gözlemden geçer; taşıyıcılar karantina dışında hastalık yayar.
+	var quarantine: bool = tank.get("quarantine", false)
+	for f in living(tank):
+		if quarantine and f.get("new", false):
+			f["q"] = float(f.get("q", 0.0)) + minutes
+			if f.q >= QUARANTINE_MIN:
+				f.erase("new")
+				if f.get("carrier", false):
+					f.erase("carrier")
+					events.append("Tank %d: Karantinadaki bir %s'nın hastalık taşıdığı anlaşıldı ve tedavi edildi." % [tank.id + 1, FishDB.display_name(f.species)])
+		elif not quarantine and f.get("carrier", false) and not tank.sick:
+			if rng.randf() < 0.004 * minutes:
+				tank.sick = true
+				tank.sick_level = 0.15
+				events.append("Tank %d: Yeni gelen balıklar hastalık getirdi! (karantinaya koymadın)" % (tank.id + 1))
 	return events
 
 

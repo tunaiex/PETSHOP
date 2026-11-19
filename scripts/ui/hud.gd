@@ -718,13 +718,20 @@ func _fill_tank(body: VBoxContainer, aq: Aquarium) -> void:
 		if not groups.has(f.species):
 			groups[f.species] = []
 		groups[f.species].append(f)
+	for f in alive:
+		if f.get("rare", false):
+			var rr := _row(body)
+			rr.add_child(_lbl("★ NADİR: %s %s — değer %d ₺" % [f.get("rare_name", ""), FishDB.display_name(f.species), FishDB.fish_value(f)], 20, Color(1.0, 0.85, 0.35)))
+	if t.get("quarantine", false):
+		var newc: int = alive.filter(func(f): return f.get("new", false)).size()
+		_warn(body, "KARANTİNA TANKI: Müşteriler bu tanka bakmaz. %d balık gözlemde (her biri %d dk). Gözlemi biten balıkları satış tankına taşı." % [newc, int(TankSim.QUARANTINE_MIN)], Color(0.6, 0.85, 1.0))
 	for sp in groups:
 		var arr: Array = groups[sp]
 		var h := 0.0
 		var v := 0
 		for f in arr:
 			h += f.health
-			v += FishDB.market_value(sp, f.health, f.growth)
+			v += FishDB.fish_value(f)
 		h /= arr.size()
 		var row := _row(body)
 		var nm := _lbl("%s ×%d" % [FishDB.display_name(sp), arr.size()], 21)
@@ -735,12 +742,57 @@ func _fill_tank(body: VBoxContainer, aq: Aquarium) -> void:
 		hl.custom_minimum_size.x = 150
 		row.add_child(hl)
 		row.add_child(_lbl("Değer ~%d ₺/adet" % int(v / arr.size()), 20))
+		var obs: int = arr.filter(func(f): return f.get("new", false)).size()
+		if t.get("quarantine", false) and obs > 0:
+			row.add_child(_lbl(" gözlemde %d" % obs, 18, Color(0.6, 0.85, 1.0)))
+		_btn(row, "Taşı →", _fill_move.bind(body, aq, sp))
 
 	_section(body, "Tank")
 	var mv := _flow(body)
 	_btn(mv, "Tuzlu suya çevir" if not salt else "Tatlı suya çevir", _toggle_salt.bind(body, aq), alive.is_empty() and Game.money >= TankSim.SALT_COST).tooltip_text = "%d ₺ (tuz, test kiti). Sadece boş tankta." % TankSim.SALT_COST
+	_btn(mv, "Karantina: %s" % ("AÇIK" if t.get("quarantine", false) else "KAPALI"), _toggle_quarantine.bind(body, aq))
 	_btn(mv, "Taşı", _move_furniture.bind(aq.furniture_uid))
 	_btn(mv, "Sat (%d ₺)" % (int(FurnitureDB.item(Game.furniture_by_uid(aq.furniture_uid).get("type", "akvaryum_beyaz")).price) / 2), _sell_furniture.bind(aq.furniture_uid), t.fish.is_empty())
+
+
+func _toggle_quarantine(body: VBoxContainer, aq: Aquarium) -> void:
+	var t: Dictionary = Game.tanks[aq.tank_id]
+	t["quarantine"] = not t.get("quarantine", false)
+	toast("Tank %d karantina %s." % [aq.tank_id + 1, "tankı oldu" if t.quarantine else "olmaktan çıktı"], "info")
+	_fill_tank(body, aq)
+
+
+## Bir türün balıklarını başka tanka taşıma ekranı
+func _fill_move(body: VBoxContainer, aq: Aquarium, sp: String) -> void:
+	_clear(body)
+	var src: Dictionary = Game.tanks[aq.tank_id]
+	var n: int = TankSim.living(src).filter(func(f): return f.species == sp).size()
+	body.add_child(_lbl("%d %s nereye taşınsın? (kepçeyle)" % [n, FishDB.display_name(sp)], 22))
+	var any := false
+	for t in Game.tanks:
+		if not t.unlocked or t.id == aq.tank_id:
+			continue
+		any = true
+		var row := _row(body)
+		var warn: String = TankSim.check_add(t, sp)
+		var l := _lbl("Tank %d%s (%d/%d yer)%s" % [t.id + 1, " • karantina" if t.get("quarantine", false) else "", TankSim.space_used(t), TankSim.CAPACITY, ("  ⚠ " + warn) if warn != "" else ""], 19, C_WARN if warn != "" else Color(0.93, 0.95, 0.96))
+		l.custom_minimum_size.x = 560
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		row.add_child(l)
+		_btn(row, "1 tane", _do_move.bind(body, aq, t.id, sp, 1))
+		_btn(row, "Hepsi", _do_move.bind(body, aq, t.id, sp, n))
+	if not any:
+		body.add_child(_lbl("Başka tank yok.", 20))
+	_btn(body, "Geri", _fill_tank.bind(body, aq))
+
+
+func _do_move(body: VBoxContainer, aq: Aquarium, dst_id: int, sp: String, n: int) -> void:
+	var moved: int = TankSim.move_fish(Game.tanks[aq.tank_id], Game.tanks[dst_id], sp, n)
+	Game.tank_changed.emit(aq.tank_id)
+	Game.tank_changed.emit(dst_id)
+	Sfx.play("splash", -10.0)
+	toast("%d %s Tank %d'e taşındı." % [moved, FishDB.display_name(sp), dst_id + 1] if moved > 0 else "Hedef tankta yer yok.", "good" if moved > 0 else "bad")
+	_fill_tank(body, aq)
 
 
 # ------------------------------------------------------------------ Eşya genel
@@ -996,8 +1048,17 @@ func _buy_fish(body: VBoxContainer, sp: String, qty: int, target_tank: int) -> v
 		return
 	var warn: String = TankSim.check_add(tank, sp)
 	if Game.spend(Game.buy_price(sp) * qty):
+		var rare_n := 0
 		for i in qty:
-			tank.fish.append(TankSim.new_fish(sp, Game.rng.randf_range(0.45, 0.8), Game.rng.randf_range(80.0, 95.0)))
+			var nf: Dictionary = TankSim.supplier_fish(sp, Game.rng)
+			if nf.get("rare", false):
+				rare_n += 1
+			tank.fish.append(nf)
+		if rare_n > 0:
+			Game.notify.emit("Şanslı günün! Kasadan %d NADİR %s çıktı!" % [rare_n, s.name], "good")
+			Sfx.play("good")
+		if not tank.get("quarantine", false):
+			Game.notify.emit("İpucu: Yeni balıkları önce karantina tankına koymak hastalık riskini önler.", "info")
 		Game.tank_changed.emit(target_tank)
 		Game.notify.emit("%d %s Tank %d'e kondu." % [qty, s.name, target_tank + 1], "good")
 		if warn != "":
@@ -1135,9 +1196,46 @@ func _say_price(body: VBoxContainer, c: Customer, h: Haggle) -> void:
 
 
 func _complete(c: Customer, price: int, line: String) -> void:
+	# Balık satışında önce kepçeyle yakalaman gerekir.
+	var want := {}
+	var tank_id := -1
+	for item in c.basket:
+		if item.type == "fish":
+			if tank_id < 0:
+				tank_id = int(item.tank)
+			if int(item.tank) == tank_id:
+				want[item.species] = int(want.get(item.species, 0)) + 1
+	if Game.settings.get("catch_game", true) and tank_id >= 0:
+		_open_catch(c, price, line, tank_id, want)
+		return
+	_finish_sale(c, price, line)
+
+
+func _finish_sale(c: Customer, price: int, line: String) -> void:
 	main.complete_sale(c, price)
 	close_panel()
 	toast("Satış: +%d ₺  “%s”" % [price, line], "good")
+
+
+func _open_catch(c: Customer, price: int, line: String, tank_id: int, want: Dictionary) -> void:
+	var body := _open("Kepçeyle yakala — Tank %d" % (tank_id + 1), 860)
+	var cg := CatchGame.new()
+	cg.setup(Game.tanks[tank_id], want)
+	var info := _lbl("Yakala: " + cg.wanted_text() + "   (yanlış balık süreni yer!)", 21, C_WARN)
+	body.add_child(info)
+	body.add_child(cg)
+	if player:
+		player.hands.hold_net()
+	cg.finished.connect(func(ok: bool):
+		if player:
+			player.hands.clear()
+		if ok:
+			_finish_sale(c, price, line)
+		else:
+			var reduced: int = int(price * 0.9)
+			Game.change_reputation(-1.0)
+			_finish_sale(c, reduced, "Ne kadar bekledim ama...")
+			toast("Balıkları zor yakaladın, müşteri bekledi: %d ₺ yerine %d ₺" % [price, reduced], "warn"))
 
 
 # ------------------------------------------------------------------ Gün sonu / menü

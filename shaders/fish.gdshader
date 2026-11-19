@@ -15,7 +15,8 @@ uniform float fish_len = 0.1;
 uniform float swim = 1.0;          // salınım şiddeti (hız)
 uniform float phase = 0.0;
 uniform float health = 1.0;        // 0 ölü -> gri ve hareketsiz
-uniform float sick = 0.0;          // beyaz benekler
+uniform float sick = 0.0;
+uniform float rare = 0.0;          // nadir mutasyon: altın/sedef parıltı          // beyaz benekler
 
 varying float v_fin;
 varying vec3 v_local;
@@ -83,6 +84,10 @@ void fragment() {
 		float sp = step(1.0 - sick * 0.12, hash(floor(vec2(t * 60.0, h * 25.0))));
 		col = mix(col, vec3(1.0), sp);
 	}
+	if (rare > 0.0) {
+		float lum = dot(col, vec3(0.3, 0.59, 0.11));
+		col = mix(col, vec3(1.0, 0.82, 0.35) * (0.6 + lum), 0.65);
+	}
 	vec3 grey = vec3(dot(col, vec3(0.3, 0.59, 0.11)));
 	col = mix(grey * 0.7, col, clamp(health * 1.5, 0.0, 1.0));
 	ALBEDO = col;
@@ -92,6 +97,6 @@ void fragment() {
 	SPECULAR = 0.6;
 	// yanardönerlik (pul parlaması)
 	float fres = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0);
-	EMISSION = col * fres * 0.25 * (1.0 - v_fin);
+	EMISSION = col * fres * 0.25 * (1.0 - v_fin) + rare * vec3(1.0, 0.8, 0.4) * (0.15 + 0.15 * sin(TIME * 3.0 + t * 20.0));
 	if (pattern == 2) EMISSION += accent_color * 0.5 * smoothstep(0.08, 0.02, abs(h - 0.62)) * step(0.15, t) * step(t, 0.8) * (1.0 - v_fin);
 }

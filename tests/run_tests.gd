@@ -42,6 +42,8 @@ func _process(_delta: float) -> bool:
 			_test_save(game)
 			print("== Dükkân sistemleri ==")
 			_test_shop_systems(game)
+			print("== Balık sistemleri ==")
+			_test_fish_systems(game)
 			print("== Entegrasyon testi (tam bir iş günü) ==")
 			game.delete_save()
 			game.new_game()
@@ -402,3 +404,82 @@ func _test_shop_systems(game: Node) -> void:
 	game.load_game()
 	check(game.settings.name == "NEMO PETSHOP" and game.shop_level == 1 and game.employees.kasiyer, "Dükkân ayarları kaydedilir")
 	game.delete_save()
+
+
+func _test_fish_systems(game: Node) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 11
+	# Üreme ve nadir yavru
+	var t := TankSim.new_tank(0, true, 25.0)
+	t.decor = ["kaya", "bitki", "bitki", "kok"]
+	for i in 2:
+		t.fish.append(TankSim.new_fish("lepistes", 0.9))
+	var births := 0
+	var rares := 0
+	for day in 30:
+		for m in 600:
+			TankSim.step(t, 1.0, rng)
+			t.food = 80.0
+			t.dirt = 5.0
+		births = t.fish.size() - 2
+		if births >= 8:
+			break
+	for f in t.fish:
+		if f.get("rare", false):
+			rares += 1
+	check(births > 0, "Bakımlı tankta balıklar yavrular (%d yavru)" % births)
+	var rf := TankSim.new_fish("neon", 1.0)
+	rf["rare"] = true
+	check(FishDB.fish_value(rf) >= FishDB.market_value("neon", 100, 1.0) * 5, "Nadir balık çok daha değerli")
+	# Karantina
+	var shop_tank := TankSim.new_tank(1, true, 25.0)
+	var carrier := TankSim.new_fish("neon", 0.8)
+	carrier["carrier"] = true
+	carrier["new"] = true
+	shop_tank.fish.append(carrier)
+	for m in 600:
+		TankSim.step(shop_tank, 1.0, rng)
+	check(shop_tank.sick, "Karantinasız taşıyıcı balık hastalık yayar")
+	var q := TankSim.new_tank(2, true, 25.0)
+	q.quarantine = true
+	var c2 := TankSim.new_fish("neon", 0.8)
+	c2["carrier"] = true
+	c2["new"] = true
+	q.fish.append(c2)
+	for m in 200:
+		TankSim.step(q, 1.0, rng)
+	check(not q.sick and not c2.has("carrier") and not c2.has("new"), "Karantinada taşıyıcı tedavi edilir")
+	# Taşıma
+	var dst := TankSim.new_tank(3, true, 25.0)
+	check(TankSim.move_fish(q, dst, "neon", 5) == 1 and dst.fish.size() == 1 and q.fish.is_empty(), "Balık tanklar arası taşınır")
+	# Tedarikçi riskleri
+	var carriers := 0
+	for i in 400:
+		if TankSim.supplier_fish("neon", rng).get("carrier", false):
+			carriers += 1
+	check(carriers > 20 and carriers < 120, "Tedarikçi balıklarının bir kısmı hastalık taşır (%d/400)" % carriers)
+	# Kepçe oyunu: hedeflere tıklayınca başarı
+	var tank := TankSim.new_tank(4, true, 25.0)
+	for i in 3:
+		tank.fish.append(TankSim.new_fish("neon", 0.8))
+	for i in 3:
+		tank.fish.append(TankSim.new_fish("lepistes", 0.8))
+	var cg = ResourceLoader.load("res://scripts/ui/catch_game.gd", "", ResourceLoader.CACHE_MODE_IGNORE).new()
+	root.add_child(cg)
+	cg.size = Vector2(800, 360)
+	cg.setup(tank, {"neon": 2})
+	var result := [null]
+	cg.finished.connect(func(ok): result[0] = ok)
+	var wrong_time: float = cg.time_left
+	for sp in cg._sprites:
+		if sp.species == "lepistes":
+			cg._try_catch(sp.pos)
+			break
+	check(cg.time_left < wrong_time, "Yanlış balık süre kaybettirir")
+	for k in 2:
+		for sp in cg._sprites:
+			if sp.species == "neon":
+				cg._try_catch(sp.pos)
+				break
+	check(result[0] == true, "Doğru balıkları yakalayınca kepçe oyunu kazanılır")
+	cg.queue_free()

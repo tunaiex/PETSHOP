@@ -67,7 +67,8 @@ func setup(m: Node, s: Shop, seed_value: int) -> void:
 	# Bakacağı yerler: balıklı tanklar ve dolu raflar
 	var targets: Array = []
 	for aq in shop.aquariums:
-		if not TankSim.living(Game.tanks[aq.tank_id]).is_empty():
+		var tk: Dictionary = Game.tanks[aq.tank_id]
+		if not TankSim.living(tk).is_empty() and not tk.get("quarantine", false):
 			targets.append(aq)
 	for sh in shop.shelves:
 		if Game.shelf_total(sh.entry()) > 0:
@@ -375,8 +376,16 @@ func _evaluate_tank(aq: Aquarium) -> void:
 	var choices: Array = alive.filter(func(f): return not reserved.has(int(f.uid)) and f.growth > 0.3)
 	if choices.is_empty():
 		return
+	var rares: Array = choices.filter(func(f): return f.get("rare", false))
+	if not rares.is_empty() and _rng.randf() < 0.6:
+		var rf: Dictionary = rares[0]
+		basket.append({"type": "fish", "tank": aq.tank_id, "uid": int(rf.uid), "species": rf.species})
+		say("Vay! Şu %s %s'yı istiyorum, ne kadar?" % [rf.get("rare_name", "Nadir"), FishDB.display_name(rf.species)])
+		return
 	var sp: String = choices[_rng.randi_range(0, choices.size() - 1)].species
-	var same: Array = choices.filter(func(f): return f.species == sp)
+	var same: Array = choices.filter(func(f): return f.species == sp and not f.get("rare", false))
+	if same.is_empty():
+		return
 	var want: int = 1
 	var s: Dictionary = FishDB.get_species(sp)
 	if float(s.schooling) > 0.6:
@@ -480,7 +489,7 @@ func item_value(item: Dictionary) -> int:
 	var f: Dictionary = main.find_fish(int(item.tank), int(item.uid))
 	if f.is_empty() or not f.alive:
 		return 0
-	return FishDB.market_value(item.species, f.health, f.growth)
+	return FishDB.fish_value(f)
 
 
 ## Satış öncesi: ölen/satılamayan kalemleri sepetten çıkar.
