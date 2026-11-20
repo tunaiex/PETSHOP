@@ -18,6 +18,9 @@ oyunlarda ücretsiz kullanılabilir (modellerin kendisi tek başına dağıtıla
 | `models/animals/orumcek.glb` | "Low Poly Spider" – DennisH2010 (3dartdh.wordpress.com) | Kaynak lisansına bakılmalı |
 | `models/hands/el.res` | "Rigged Hand" OBJ (proje sahibinin yüklediği dosya; OBJ olduğu için iskeletsiz) | Kaynak lisansına bakılmalı |
 | `models/characters/anim_*.res` | Adobe Mixamo animasyonları (Walking, Idle, Look Around, Standing Arguing, Walking With Shopping Bag) | Mixamo koşulları |
+| `models/products/kopek_*.glb`, `kedi_mamalari.glb`, `kopek_konserve.glb` | Proje sahibinin tasarımı ("Aegeans Eat" ambalajları) – sadeleştirildi | Proje sahibine ait |
+| `models/products/kemik.glb`, `mama_kabi.glb`, `pet_aksesuar.glb` | Sketchfab (proje sahibinin yüklediği dosyalar) – sadeleştirildi | Kaynak lisansına bakılmalı |
+| `models/animals/labrador.glb` | "Labrador – Rigged & Animated Game Asset" (proje sahibinin yüklediği paket) – 10 animasyon bırakıldı | Paket lisansı: ham dosyalar dağıtılamaz, repo gizli tutulmalı |
 | `textures/terrazzo_*` | "Tiles109" – ambientCG | CC0 1.0 |
 | `textures/plaster_*` | "White Plaster 02" – Poly Haven | CC0 1.0 |
 

@@ -25,6 +25,8 @@ func setup(uid: int, t: String, m: Node) -> void:
 			MeshKit.box(self, Vector3(info.size.x, 0.012, info.size.y), Vector3(0, 0.006, 0), MeshKit.mat(Color(0.2, 0.22, 0.24), 0.95))
 		_:
 			var sm: Node3D = FurnitureDB.instance_model(type)
+			if sm == null and info.has("product_model"):
+				sm = ProductDB.instance_path(info.product_model, str(info.get("part", "")), float(info.get("model_h", 1.0)))
 			if sm:
 				add_child(sm)
 			else:

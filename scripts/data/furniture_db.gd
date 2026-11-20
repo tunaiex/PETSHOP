@@ -91,6 +91,12 @@ const ITEMS := {
 		"shelf": {"levels": [0.55], "width": 1.3, "depth": 0.5, "z": 0.0, "sides": 1, "cold": true},
 		"desc": "Üstten açılan dondurucu.",
 	},
+	"kedi_agaci": {
+		"name": "Kedi tırmalama ağacı", "price": 240, "cat": "dekor", "appeal": 3,
+		"product_model": "pet_aksesuar", "part": "cat_tree", "model_h": 1.1,
+		"size": Vector2(0.7, 0.7), "height": 1.1,
+		"desc": "Vitrinde kedi ağacı: kedi sahiplerini çeker (+itibar).",
+	},
 	"kose_rafi": {
 		"name": "Köşe rafı", "price": 220, "cat": "dekor", "model": "shelf_corner",
 		"size": Vector2(0.9, 0.9), "height": 2.0,

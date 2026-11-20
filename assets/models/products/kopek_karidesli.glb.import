@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://3bu4v02ojagc"
-path="res://.godot/imported/dog_food_bag.glb-3942d45ed5ff7e8a3dcdab345e7f8e80.scn"
+uid="uid://bol516ad77xle"
+path="res://.godot/imported/kopek_karidesli.glb-d41a3eacfcbdc19149211bbda888d830.scn"
 
 [deps]
 
-source_file="res://assets/models/products/dog_food_bag.glb"
-dest_files=["res://.godot/imported/dog_food_bag.glb-3942d45ed5ff7e8a3dcdab345e7f8e80.scn"]
+source_file="res://assets/models/products/kopek_karidesli.glb"
+dest_files=["res://.godot/imported/kopek_karidesli.glb-d41a3eacfcbdc19149211bbda888d830.scn"]
 
 [params]
 

@@ -68,6 +68,12 @@ func build() -> void:
 	sync_boxes()
 	Game.boxes_changed.connect(sync_boxes)
 	Game.time_changed.connect(func(_m): _clock.text = Game.clock_text())
+	# Dükkânın köpeği
+	var dog := ShopDog.new()
+	dog.position = Vector3(-1.2, 0, 2.7)
+	dog.rotation.y = PI * 0.5
+	add_child(dog)
+	dog.setup(self)
 
 
 # ------------------------------------------------------------------ Ortam
