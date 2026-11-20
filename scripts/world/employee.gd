@@ -126,9 +126,10 @@ func _care(aq: Aquarium) -> void:
 	var dead := TankSim.remove_dead(t)
 	if dead > 0:
 		did.append("%d ölü balığı çıkardı" % dead)
-	if not TankSim.living(t).is_empty() and t.food < 35.0 and Game.stock.get("yem", 0) > 0:
-		Game.use_stock("yem")
-		TankSim.feed(t)
+	var food_pid: String = TankSim.best_food(t, Game.stock)
+	if not TankSim.living(t).is_empty() and t.food < 35.0 and food_pid != "":
+		Game.use_stock(food_pid)
+		TankSim.feed(t, ProductDB.get_product(food_pid).food)
 		aq.play_feed()
 		did.append("yem verdi")
 	if t.dirt > 60.0 and Game.stock.get("su_duzenleyici", 0) > 0:
@@ -138,7 +139,7 @@ func _care(aq: Aquarium) -> void:
 	if not did.is_empty():
 		Game.tank_changed.emit(aq.tank_id)
 		Game.notify.emit("Bakımcı (Tank %d): %s." % [aq.tank_id + 1, ", ".join(did)], "info")
-	elif Game.stock.get("yem", 0) == 0:
+	elif TankSim.best_food(t, Game.stock) == "":
 		Game.notify.emit("Bakımcı: Depoda yem kalmadı!", "warn")
 
 

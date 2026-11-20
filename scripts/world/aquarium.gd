@@ -9,6 +9,11 @@ const TD := 0.5
 const STAND_H := 0.82
 const GRAVEL := 0.07
 const CABINET_MODEL := "res://assets/models/props/akvaryum_dolabi.glb"
+const RACK_TANK_MODEL := "res://assets/models/props/isikli_akvaryum.glb"
+## Raf akvaryumu iç ölçüleri (yaklaşık 95 × 50 × 52 cm cam tank)
+const RACK_TW := 0.9
+const RACK_TH := 0.48
+const RACK_TD := 0.45
 
 var tank_id: int = 0
 var wood_stand: bool = false ## true: hazır ceviz dolap modeli, false: beyaz modern dolap
@@ -27,8 +32,14 @@ var _content: Node3D
 var _light: SpotLight3D
 var _built_unlocked: bool = false
 var _sync_timer: float = 0.0
+var _tw: float = TW
+var _th: float = TH
+var _td: float = TD
 var _y0: float = STAND_H + 0.025
 var _water_h: float = TH - 0.06
+## Raf akvaryumu ise kat numarası (0 alt kat), değilse -1
+var rack_level: int = -1
+var _rack_size: Vector2 = Vector2.ZERO
 
 
 var terrarium: bool = false
@@ -38,7 +49,7 @@ func setup(id: int, wood: bool = false, terra: bool = false) -> void:
 	tank_id = id
 	terrarium = terra
 	if terra:
-		_water_h = TH * 0.42
+		_water_h = _th * 0.42
 	wood_stand = wood and ResourceLoader.exists(CABINET_MODEL)
 	_build_static()
 	_rebuild_content()
@@ -46,6 +57,19 @@ func setup(id: int, wood: bool = false, terra: bool = false) -> void:
 	Game.power_changed.connect(func(on):
 		if is_instance_valid(_light):
 			_light.visible = on)
+
+
+## 3 katlı rafın bir katındaki küçük ışıklı akvaryum. Düğüm kökü zemindedir,
+## tank `y0` yüksekliğindeki raf tablasına oturur.
+func setup_rack(id: int, level: int, y0: float, rack_size: Vector2) -> void:
+	rack_level = level
+	_rack_size = rack_size
+	_tw = RACK_TW
+	_th = RACK_TH
+	_td = RACK_TD
+	_y0 = y0 + 0.012
+	_water_h = _th - 0.05
+	setup(id)
 
 
 func data() -> Dictionary:
@@ -60,44 +84,47 @@ func _on_tank_changed(id: int) -> void:
 # ------------------------------------------------------------------ İnşa
 
 func _build_static() -> void:
+	if rack_level >= 0:
+		_build_rack_tank()
+		return
 	var dark := MeshKit.mat(Color(0.05, 0.05, 0.055), 0.35)
 	if wood_stand:
 		# Hazır model: 1.304 x 0.894 x 0.62 (üst tabla). Tank ölçüsüne uydur.
 		var cab: Node3D = (load(CABINET_MODEL) as PackedScene).instantiate()
-		cab.scale = Vector3((TW + 0.04) / 1.304, (STAND_H + 0.025) / 0.894, (TD + 0.04) / 0.62)
+		cab.scale = Vector3((_tw + 0.04) / 1.304, (STAND_H + 0.025) / 0.894, (_td + 0.04) / 0.62)
 		add_child(cab)
 	else:
 		var cabinet := MeshKit.mat(Color(0.87, 0.87, 0.85), 0.45)
 		var seam := MeshKit.mat(Color(0.55, 0.55, 0.53), 0.6)
-		MeshKit.box(self, Vector3(TW + 0.04, STAND_H - 0.06, TD + 0.04), Vector3(0, STAND_H * 0.5 + 0.03, 0), cabinet)
-		MeshKit.box(self, Vector3(TW, 0.06, TD), Vector3(0, 0.03, -0.01), dark)
+		MeshKit.box(self, Vector3(_tw + 0.04, STAND_H - 0.06, _td + 0.04), Vector3(0, STAND_H * 0.5 + 0.03, 0), cabinet)
+		MeshKit.box(self, Vector3(_tw, 0.06, _td), Vector3(0, 0.03, -0.01), dark)
 		# Dolap kapakları
 		for i in 2:
-			var x: float = -TW / 6.0 + i * TW / 3.0
-			MeshKit.box(self, Vector3(0.004, STAND_H - 0.1, 0.004), Vector3(x, STAND_H * 0.5 + 0.03, TD * 0.5 + 0.021), seam)
+			var x: float = -_tw / 6.0 + i * _tw / 3.0
+			MeshKit.box(self, Vector3(0.004, STAND_H - 0.1, 0.004), Vector3(x, STAND_H * 0.5 + 0.03, _td * 0.5 + 0.021), seam)
 		for i in 3:
-			var x: float = -TW / 3.0 + i * TW / 3.0
-			MeshKit.box(self, Vector3(0.012, 0.12, 0.012), Vector3(x + 0.12, STAND_H * 0.62, TD * 0.5 + 0.028), MeshKit.mat(Color(0.7, 0.7, 0.72), 0.25, 0.9))
-		MeshKit.box(self, Vector3(TW + 0.05, 0.025, TD + 0.05), Vector3(0, STAND_H + 0.0125, 0), dark)
+			var x: float = -_tw / 3.0 + i * _tw / 3.0
+			MeshKit.box(self, Vector3(0.012, 0.12, 0.012), Vector3(x + 0.12, STAND_H * 0.62, _td * 0.5 + 0.028), MeshKit.mat(Color(0.7, 0.7, 0.72), 0.25, 0.9))
+		MeshKit.box(self, Vector3(_tw + 0.05, 0.025, _td + 0.05), Vector3(0, STAND_H + 0.0125, 0), dark)
 
 	# Cam kenar çerçeveleri (siyah silikon görünümü)
 	var y0 := _y0
-	MeshKit.box(self, Vector3(TW + 0.012, 0.022, TD + 0.012), Vector3(0, y0 + 0.011, 0), dark)
-	for z in [-TD * 0.5, TD * 0.5]:
-		MeshKit.box(self, Vector3(TW + 0.012, 0.012, 0.014), Vector3(0, y0 + TH - 0.006, z), dark)
-	for x in [-TW * 0.5, TW * 0.5]:
-		MeshKit.box(self, Vector3(0.014, 0.012, TD + 0.012), Vector3(x, y0 + TH - 0.006, 0), dark)
-		for z in [-TD * 0.5, TD * 0.5]:
-			MeshKit.box(self, Vector3(0.012, TH, 0.012), Vector3(x, y0 + TH * 0.5, z), dark)
+	MeshKit.box(self, Vector3(_tw + 0.012, 0.022, _td + 0.012), Vector3(0, y0 + 0.011, 0), dark)
+	for z in [-_td * 0.5, _td * 0.5]:
+		MeshKit.box(self, Vector3(_tw + 0.012, 0.012, 0.014), Vector3(0, y0 + _th - 0.006, z), dark)
+	for x in [-_tw * 0.5, _tw * 0.5]:
+		MeshKit.box(self, Vector3(0.014, 0.012, _td + 0.012), Vector3(x, y0 + _th - 0.006, 0), dark)
+		for z in [-_td * 0.5, _td * 0.5]:
+			MeshKit.box(self, Vector3(0.012, _th, 0.012), Vector3(x, y0 + _th * 0.5, z), dark)
 
 	# Arka fon (koyu lacivert, gerçek akvaryumlardaki gibi)
 	var bg := StandardMaterial3D.new()
 	bg.albedo_color = Color(0.02, 0.05, 0.07)
 	bg.roughness = 0.9
-	MeshKit.box(self, Vector3(TW - 0.01, TH - 0.01, 0.004), Vector3(0, y0 + TH * 0.5, -TD * 0.5 - 0.004), bg)
+	MeshKit.box(self, Vector3(_tw - 0.01, _th - 0.01, 0.004), Vector3(0, y0 + _th * 0.5, -_td * 0.5 - 0.004), bg)
 
 	# Kapak / lamba
-	var hood := MeshKit.box(self, Vector3(TW + 0.03, 0.07, TD + 0.03), Vector3(0, y0 + TH + 0.035, 0), dark)
+	var hood := MeshKit.box(self, Vector3(_tw + 0.03, 0.07, _td + 0.03), Vector3(0, y0 + _th + 0.035, 0), dark)
 	hood.name = "Hood"
 	# Küçük dijital gösterge
 	var lcd := StandardMaterial3D.new()
@@ -105,13 +132,13 @@ func _build_static() -> void:
 	lcd.emission_enabled = true
 	lcd.emission = Color(0.3, 0.6, 1.0)
 	lcd.emission_energy_multiplier = 1.5
-	MeshKit.box(self, Vector3(0.09, 0.025, 0.004), Vector3(0, y0 + TH + 0.04, TD * 0.5 + 0.017), lcd)
+	MeshKit.box(self, Vector3(0.09, 0.025, 0.004), Vector3(0, y0 + _th + 0.04, _td * 0.5 + 0.017), lcd)
 
 	# Cam paneller
 	_glass_mat = MeshKit.shader_mat("res://shaders/glass.gdshader")
-	MeshKit.box(self, Vector3(TW, TH, 0.008), Vector3(0, y0 + TH * 0.5, TD * 0.5), _glass_mat)
-	MeshKit.box(self, Vector3(0.008, TH, TD), Vector3(-TW * 0.5, y0 + TH * 0.5, 0), _glass_mat)
-	MeshKit.box(self, Vector3(0.008, TH, TD), Vector3(TW * 0.5, y0 + TH * 0.5, 0), _glass_mat)
+	MeshKit.box(self, Vector3(_tw, _th, 0.008), Vector3(0, y0 + _th * 0.5, _td * 0.5), _glass_mat)
+	MeshKit.box(self, Vector3(0.008, _th, _td), Vector3(-_tw * 0.5, y0 + _th * 0.5, 0), _glass_mat)
+	MeshKit.box(self, Vector3(0.008, _th, _td), Vector3(_tw * 0.5, y0 + _th * 0.5, 0), _glass_mat)
 
 	# Etiket
 	_label = Label3D.new()
@@ -119,7 +146,7 @@ func _build_static() -> void:
 	_label.pixel_size = 0.0011
 	_label.outline_size = 0
 	_label.modulate = Color(0.15, 0.15, 0.17)
-	_label.position = Vector3(0, STAND_H - 0.1, TD * 0.5 + (0.045 if wood_stand else 0.022))
+	_label.position = Vector3(0, STAND_H - 0.1, _td * 0.5 + (0.045 if wood_stand else 0.022))
 	if wood_stand:
 		_label.modulate = Color(0.95, 0.9, 0.8)
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -131,9 +158,87 @@ func _build_static() -> void:
 	var body := StaticBody3D.new()
 	var cs := CollisionShape3D.new()
 	var shape := BoxShape3D.new()
-	shape.size = Vector3(TW + 0.06, y0 + TH + 0.08, TD + 0.06)
+	shape.size = Vector3(_tw + 0.06, y0 + _th + 0.08, _td + 0.06)
 	cs.shape = shape
 	cs.position = Vector3(0, shape.size.y * 0.5, 0)
+	body.add_child(cs)
+	body.set_meta("interact", self)
+	add_child(body)
+
+
+## Raf akvaryumu: oyuncunun tasarladığı siyah çerçeveli model + oyunun cam, su ve LED'i.
+func _build_rack_tank() -> void:
+	var y0 := _y0
+	if ResourceLoader.exists(RACK_TANK_MODEL):
+		var m: Node3D = (load(RACK_TANK_MODEL) as PackedScene).instantiate()
+		# Modelin kumunu ve camlarını gizle: kum, cam ve su oyunda çiziliyor.
+		for c in m.find_children("*", "MeshInstance3D", true, false):
+			var mi: MeshInstance3D = c
+			var mat = mi.get_active_material(0)
+			if mat is BaseMaterial3D and (mat.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED or mat.albedo_texture != null):
+				mi.visible = false
+		var box: AABB = MeshKit.model_aabb(m)
+		# Model uzun kenarı Z'de: 90° döndürüp tank ölçüsüne uydur.
+		var holder := Node3D.new()
+		holder.rotation_degrees.y = 90.0
+		m.scale = Vector3((_td + 0.03) / box.size.x, (_th + 0.025) / box.size.y, (_tw + 0.03) / box.size.z)
+		m.position = -Vector3(box.get_center().x * m.scale.x, box.position.y * m.scale.y, box.get_center().z * m.scale.z)
+		holder.position = Vector3(0, y0 - 0.012, 0)
+		holder.add_child(m)
+		add_child(holder)
+	else:
+		var dark := MeshKit.mat(Color(0.05, 0.05, 0.055), 0.35)
+		for x in [-_tw * 0.5, _tw * 0.5]:
+			for z in [-_td * 0.5, _td * 0.5]:
+				MeshKit.box(self, Vector3(0.02, _th, 0.02), Vector3(x, y0 + _th * 0.5, z), dark)
+
+	# Arka fon
+	var bg := StandardMaterial3D.new()
+	bg.albedo_color = Color(0.02, 0.05, 0.07)
+	bg.roughness = 0.9
+	MeshKit.box(self, Vector3(_tw - 0.01, _th - 0.01, 0.004), Vector3(0, y0 + _th * 0.5, -_td * 0.5 - 0.004), bg)
+
+	# Cam paneller
+	_glass_mat = MeshKit.shader_mat("res://shaders/glass.gdshader")
+	MeshKit.box(self, Vector3(_tw, _th, 0.006), Vector3(0, y0 + _th * 0.5, _td * 0.5), _glass_mat)
+	MeshKit.box(self, Vector3(0.006, _th, _td), Vector3(-_tw * 0.5, y0 + _th * 0.5, 0), _glass_mat)
+	MeshKit.box(self, Vector3(0.006, _th, _td), Vector3(_tw * 0.5, y0 + _th * 0.5, 0), _glass_mat)
+
+	# Dahili LED bar: ön üst kenarda ince ışık şeridi (lamba her zaman takılı gelir)
+	var bar := MeshKit.mat(Color(0.08, 0.08, 0.09), 0.3, 0.6)
+	MeshKit.box(self, Vector3(_tw - 0.04, 0.018, 0.05), Vector3(0, y0 + _th + 0.022, _td * 0.18), bar)
+	var led := StandardMaterial3D.new()
+	led.albedo_color = Color(0.85, 0.95, 1.0)
+	led.emission_enabled = true
+	led.emission = Color(0.7, 0.88, 1.0)
+	led.emission_energy_multiplier = 4.0
+	var strip := MeshKit.box(self, Vector3(_tw - 0.06, 0.004, 0.035), Vector3(0, y0 + _th + 0.011, _td * 0.18), led)
+	strip.name = "LedStrip"
+	for side in [-1.0, 1.0]:
+		MeshKit.box(self, Vector3(0.02, 0.03, _td * 0.6), Vector3(side * (_tw * 0.5 - 0.05), y0 + _th + 0.02, _td * 0.05), bar)
+
+	# Etiket: ön camın alt kenarında, tek satır
+	_label = Label3D.new()
+	_label.font_size = 22
+	_label.pixel_size = 0.001
+	_label.outline_size = 5
+	_label.outline_modulate = Color(0, 0, 0, 0.8)
+	_label.modulate = Color(0.95, 0.95, 0.92)
+	_label.position = Vector3(0, y0 + 0.012, _td * 0.5 + 0.008)
+	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	_label.double_sided = false
+	_label.no_depth_test = false
+	add_child(_label)
+
+	# Çarpışma + etkileşim: bu katın tamamı
+	var body := StaticBody3D.new()
+	var cs := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	var fp: Vector2 = _rack_size if _rack_size != Vector2.ZERO else Vector2(_tw + 0.06, _td + 0.06)
+	shape.size = Vector3(fp.x, _th + 0.07, fp.y)
+	cs.shape = shape
+	cs.position = Vector3(0, y0 + shape.size.y * 0.5 - 0.02, 0)
 	body.add_child(cs)
 	body.set_meta("interact", self)
 	add_child(body)
@@ -181,7 +286,7 @@ func _rebuild_content() -> void:
 			_gravel_mat.set_shader_parameter("color_a", Color(0.12, 0.14, 0.15))
 			_gravel_mat.set_shader_parameter("color_b", Color(0.08, 0.09, 0.1))
 			_gravel_mat.set_shader_parameter("scale", 2.0)
-	MeshKit.box(_content, Vector3(TW - 0.016, gh, TD - 0.016), Vector3(0, y0 + gh * 0.5, 0), _gravel_mat)
+	MeshKit.box(_content, Vector3(_tw - 0.016, gh, _td - 0.016), Vector3(0, y0 + gh * 0.5, 0), _gravel_mat)
 
 	# Su
 	_water_mat = MeshKit.shader_mat("res://shaders/water.gdshader")
@@ -189,10 +294,10 @@ func _rebuild_content() -> void:
 	if _built_salt:
 		_water_mat.set_shader_parameter("clean_color", Color(0.35, 0.7, 0.95))
 		_surface_mat.set_shader_parameter("clean_color", Color(0.35, 0.7, 0.95))
-	MeshKit.box(_content, Vector3(TW - 0.016, _water_h - gh, TD - 0.016), Vector3(0, y0 + gh + (_water_h - gh) * 0.5, 0), _water_mat)
+	MeshKit.box(_content, Vector3(_tw - 0.016, _water_h - gh, _td - 0.016), Vector3(0, y0 + gh + (_water_h - gh) * 0.5, 0), _water_mat)
 	var surf := MeshInstance3D.new()
 	var pm := PlaneMesh.new()
-	pm.size = Vector2(TW - 0.016, TD - 0.016)
+	pm.size = Vector2(_tw - 0.016, _td - 0.016)
 	pm.subdivide_width = 24
 	pm.subdivide_depth = 10
 	surf.mesh = pm
@@ -207,11 +312,11 @@ func _rebuild_content() -> void:
 		led.emission_enabled = true
 		led.emission = Color(0.85, 0.95, 1.0)
 		led.emission_energy_multiplier = 3.0
-		MeshKit.box(_content, Vector3(TW - 0.12, 0.004, 0.05), Vector3(0, y0 + TH - 0.002, 0), led)
+		MeshKit.box(_content, Vector3(_tw - 0.12, 0.004, 0.05), Vector3(0, y0 + _th - 0.002, 0), led)
 		_light = SpotLight3D.new()
-		_light.position = Vector3(0, y0 + TH - 0.02, 0)
+		_light.position = Vector3(0, y0 + _th - 0.02, 0)
 		_light.rotation_degrees = Vector3(-90, 0, 0)
-		_light.spot_range = 1.2
+		_light.spot_range = 1.2 if rack_level < 0 else _th + 0.25
 		_light.spot_angle = 65.0
 		_light.light_energy = 2.2
 		_light.light_color = Color(0.85, 0.95, 1.0)
@@ -222,10 +327,10 @@ func _rebuild_content() -> void:
 		for k in 3:
 			var shaft := MeshInstance3D.new()
 			var qm := QuadMesh.new()
-			qm.size = Vector2(0.38, _water_h - _gravel_h())
+			qm.size = Vector2(0.38 * _tw / TW, _water_h - _gravel_h())
 			shaft.mesh = qm
 			shaft.material_override = MeshKit.shader_mat("res://shaders/lightshaft.gdshader", {"seed": float(tank_id * 7 + k * 3), "strength": 0.16 if not _built_salt else 0.2})
-			shaft.position = Vector3(-0.38 + k * 0.38, y0 + _gravel_h() + (_water_h - _gravel_h()) * 0.5, -0.05 + k * 0.05)
+			shaft.position = Vector3((-0.38 + k * 0.38) * _tw / TW, y0 + _gravel_h() + (_water_h - _gravel_h()) * 0.5, -0.05 + k * 0.05)
 			shaft.rotation_degrees = Vector3(0, 12.0 * (k - 1), 8.0 * (k - 1))
 			shaft.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			_content.add_child(shaft)
@@ -234,13 +339,13 @@ func _rebuild_content() -> void:
 	# Görünür ekipman: ısıtıcı (sol arka), filtre (sağ arka)
 	var black := MeshKit.mat(Color(0.06, 0.06, 0.07), 0.3)
 	if d.get("heater_on", false):
-		var h := MeshKit.cylinder(_content, 0.012, 0.3, Vector3(-TW * 0.5 + 0.04, y0 + gh + 0.18, -TD * 0.5 + 0.03), MeshKit.mat(Color(0.75, 0.85, 0.9, 1.0), 0.1), 12)
+		var h := MeshKit.cylinder(_content, 0.012, 0.3, Vector3(-_tw * 0.5 + 0.04, y0 + gh + 0.18, -_td * 0.5 + 0.03), MeshKit.mat(Color(0.75, 0.85, 0.9, 1.0), 0.1), 12)
 		h.rotation_degrees.z = 8
-		MeshKit.box(_content, Vector3(0.03, 0.03, 0.02), Vector3(-TW * 0.5 + 0.04, y0 + _water_h + 0.01, -TD * 0.5 + 0.03), black)
+		MeshKit.box(_content, Vector3(0.03, 0.03, 0.02), Vector3(-_tw * 0.5 + 0.04, y0 + _water_h + 0.01, -_td * 0.5 + 0.03), black)
 	var fl: int = int(d.filter)
 	if fl > 0:
 		var fh: float = 0.12 + fl * 0.05
-		MeshKit.box(_content, Vector3(0.07, fh, 0.05), Vector3(TW * 0.5 - 0.06, y0 + _water_h - fh * 0.5 - 0.02, -TD * 0.5 + 0.04), black)
+		MeshKit.box(_content, Vector3(0.07, fh, 0.05), Vector3(_tw * 0.5 - 0.06, y0 + _water_h - fh * 0.5 - 0.02, -_td * 0.5 + 0.04), black)
 
 	if terrarium:
 		_build_island()
@@ -298,18 +403,18 @@ func _build_decor(rng: RandomNumberGenerator) -> void:
 		var rot: float = rng.randf() * TAU
 		match id:
 			"bitki", "kilic_bitki":
-				var x: float = -TW * 0.42 + fmod(plant_i * 0.37 + 0.1, TW * 0.84)
+				var x: float = -_tw * 0.42 + fmod(plant_i * 0.37 + 0.1, _tw * 0.84)
 				plant_i += 1
 				var pal: Array = greens[2] if (id == "kilic_bitki" and rng.randf() < 0.4) else greens[rng.randi_range(0, 1)]
 				var mi := MeshInstance3D.new()
 				if id == "bitki":
 					mi.mesh = MeshKit.grass_clump(rng.randi() % 1000, rng.randi_range(7, 11), rng.randf_range(0.28, _water_h - 0.12))
 					mi.material_override = MeshKit.shader_mat("res://shaders/plant.gdshader", {"base_color": pal[0], "tip_color": pal[1]})
-					mi.position = Vector3(x, y0 - 0.01, -TD * 0.3 + rng.randf_range(-0.04, 0.04))
+					mi.position = Vector3(x, y0 - 0.01, -_td * 0.3 + rng.randf_range(-0.04, 0.04))
 				else:
 					mi.mesh = MeshKit.sword_plant(rng.randi() % 1000, rng.randi_range(8, 11), rng.randf_range(0.16, 0.22))
 					mi.material_override = MeshKit.shader_mat("res://shaders/plant.gdshader", {"base_color": pal[0], "tip_color": pal[1], "sway": 0.4})
-					mi.position = Vector3(x, y0 - 0.005, -TD * 0.12)
+					mi.position = Vector3(x, y0 - 0.005, -_td * 0.12)
 				_content.add_child(mi)
 			"kok":
 				var pts: Array = []
@@ -325,6 +430,10 @@ func _build_decor(rng: RandomNumberGenerator) -> void:
 				_content.add_child(wood)
 			_:
 				var size: float = float(info.size) * rng.randf_range(0.85, 1.15)
+				size = min(size, _td * 0.7)
+				# Küçük tanklarda dekor camdan taşmasın
+				slot.x = clamp(slot.x, -_tw * 0.5 + size * 0.6 + 0.02, _tw * 0.5 - size * 0.6 - 0.02)
+				slot.y = clamp(slot.y, -_td * 0.5 + size * 0.5 + 0.02, _td * 0.5 - size * 0.5 - 0.02)
 				if not _place_decor(info.model, size, Vector3(slot.x, y0, slot.y), rot):
 					var mi := MeshInstance3D.new()
 					mi.mesh = MeshKit.rock(rng.randi(), Vector3(size, size * 0.6, size * 0.7))
@@ -341,11 +450,11 @@ func _build_island() -> void:
 	var gh := _gravel_h()
 	var top: float = _water_h + 0.05
 	var stone := MeshKit.mat(Color(0.42, 0.38, 0.33), 0.9)
-	MeshKit.box(_content, Vector3(ISLAND_W, top - gh, TD - 0.03), Vector3(TW * 0.5 - ISLAND_W * 0.5 - 0.012, _y0 + gh + (top - gh) * 0.5, 0), stone)
+	MeshKit.box(_content, Vector3(ISLAND_W, top - gh, _td - 0.03), Vector3(_tw * 0.5 - ISLAND_W * 0.5 - 0.012, _y0 + gh + (top - gh) * 0.5, 0), stone)
 	# Rampa
-	var ramp := MeshKit.box(_content, Vector3(0.3, 0.02, 0.22), Vector3(TW * 0.5 - ISLAND_W - 0.1, _y0 + gh + (top - gh) * 0.55, 0.05), stone)
+	var ramp := MeshKit.box(_content, Vector3(0.3, 0.02, 0.22), Vector3(_tw * 0.5 - ISLAND_W - 0.1, _y0 + gh + (top - gh) * 0.55, 0.05), stone)
 	ramp.rotation.z = deg_to_rad(-28)
-	_place_decor("kirik_kaya", 0.2, Vector3(TW * 0.5 - 0.18, _y0 + top, -0.12), 0.7)
+	_place_decor("kirik_kaya", 0.2, Vector3(_tw * 0.5 - 0.18, _y0 + top, -0.12), 0.7)
 	# Isı lambası (kapağın altında, turuncu)
 	var lamp_mat := StandardMaterial3D.new()
 	lamp_mat.albedo_color = Color(1.0, 0.6, 0.3)
@@ -358,7 +467,7 @@ func _build_island() -> void:
 	sm.height = 0.1
 	bulb.mesh = sm
 	bulb.material_override = lamp_mat
-	bulb.position = Vector3(TW * 0.5 - ISLAND_W * 0.5, _y0 + TH - 0.06, 0)
+	bulb.position = Vector3(_tw * 0.5 - ISLAND_W * 0.5, _y0 + _th - 0.06, 0)
 	_content.add_child(bulb)
 	var heat := OmniLight3D.new()
 	heat.position = bulb.position - Vector3(0, 0.05, 0)
@@ -371,7 +480,7 @@ func _build_island() -> void:
 
 ## Kaplumbağanın dinlendiği nokta (kara üstü, yerel uzay)
 func island_point() -> Vector3:
-	return Vector3(TW * 0.5 - ISLAND_W * 0.5 - 0.03, _y0 + _water_h + 0.05 + 0.04, 0.05)
+	return Vector3(_tw * 0.5 - ISLAND_W * 0.5 - 0.03, _y0 + _water_h + 0.05 + 0.04, 0.05)
 
 
 func _build_food_particles() -> void:
@@ -411,7 +520,7 @@ func _build_particles() -> void:
 	bubbles.mesh = bm
 	bubbles.amount = 40
 	bubbles.lifetime = 2.6
-	bubbles.position = Vector3(TW * 0.3, _y0 + _gravel_h() + 0.01, -TD * 0.35)
+	bubbles.position = Vector3(_tw * 0.3, _y0 + _gravel_h() + 0.01, -_td * 0.35)
 	bubbles.direction = Vector3.UP
 	bubbles.spread = 6.0
 	bubbles.gravity = Vector3(0, 0.05, 0)
@@ -451,8 +560,8 @@ func _build_particles() -> void:
 # ------------------------------------------------------------------ Eşitleme
 
 func swim_bounds() -> AABB:
-	var lo := Vector3(-TW * 0.5 + 0.07, _y0 + _gravel_h() + 0.06, -TD * 0.5 + 0.07)
-	var hi := Vector3(TW * 0.5 - 0.07 - (ISLAND_W if terrarium else 0.0), _y0 + _water_h - 0.04, TD * 0.5 - 0.07)
+	var lo := Vector3(-_tw * 0.5 + 0.07, _y0 + _gravel_h() + 0.06, -_td * 0.5 + 0.07)
+	var hi := Vector3(_tw * 0.5 - 0.07 - (ISLAND_W if terrarium else 0.0), _y0 + _water_h - 0.04, _td * 0.5 - 0.07)
 	return AABB(lo, hi - lo)
 
 
@@ -497,6 +606,10 @@ func _update_label() -> void:
 		lines.append("%s ×%d" % [FishDB.display_name(sp), counts[sp]])
 	if counts.is_empty():
 		lines.append("(boş)")
+	if rack_level >= 0:
+		lines[0] = "TANK %d%s %.1f°C" % [tank_id + 1, " TUZLU" if d.get("salt", false) else "", d.temp]
+		_label.text = "  •  ".join(lines)
+		return
 	_label.text = "\n".join(lines)
 
 
@@ -532,7 +645,7 @@ func get_food_point() -> Vector3:
 func play_feed() -> void:
 	if not _food_particles:
 		return
-	_food_point = Vector3(randf_range(-0.3, 0.3), _y0 + _water_h - 0.06, randf_range(-0.05, 0.1))
+	_food_point = Vector3(randf_range(-0.3, 0.3) * _tw / TW, _y0 + _water_h - 0.06, randf_range(-0.05, 0.1))
 	_food_particles.position = _food_point + Vector3(0, 0.05, 0)
 	_food_particles.restart()
 	_food_particles.emitting = true
@@ -541,11 +654,11 @@ func play_feed() -> void:
 
 ## Müşterinin baktığı nokta (dünya uzayında)
 func view_point() -> Vector3:
-	return to_global(Vector3(0, 0, TD * 0.5 + 0.9))
+	return to_global(Vector3(0, 0, _td * 0.5 + 0.9))
 
 
 func look_target() -> Vector3:
-	return to_global(Vector3(0, _y0 + TH * 0.5, 0))
+	return to_global(Vector3(0, _y0 + _th * 0.5, 0))
 
 
 func get_prompt() -> String:

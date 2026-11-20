@@ -61,13 +61,16 @@ func _process(_delta: float) -> bool:
 		"built":
 			if _frame < 12:
 				return false
-			check(_main.shop.aquariums.size() == 2, "2 akvaryum yerleştirildi")
+			check(_main.shop.aquariums.size() == 3, "2 akvaryum + 1 raf akvaryumu yerleştirildi (%d)" % _main.shop.aquariums.size())
+			var rack_aq: Array = _main.shop.aquariums.filter(func(a): return a.rack_level >= 0)
+			check(rack_aq.size() == 1 and rack_aq[0].rack_level == 1, "Raf akvaryumu doğru katta")
+			check(rack_aq.size() == 1 and rack_aq[0].look_target().y > 1.0, "Orta kat akvaryumu yerden yüksekte")
 			check(_main.shop.counter != null, "Kasa yerleştirildi")
 			check(_main.shop.shelves.size() == 1, "Raf yerleştirildi")
 			var fish_nodes: int = 0
 			for aq in _main.shop.aquariums:
 				fish_nodes += aq.fish_nodes().size()
-			check(fish_nodes == 13, "Balıklar sahnede (%d)" % fish_nodes)
+			check(fish_nodes == 16, "Balıklar sahnede (%d)" % fish_nodes)
 			var p: Array = _main.shop.path(Vector3(0, 0, 8), _main.shop.counter.register_point())
 			print("  yol: ", p)
 			check(p.size() >= 2 and p[-1].distance_to(_main.shop.counter.register_point()) < 0.5, "Dışarıdan kasaya yol bulunur (%d nokta)" % p.size())
@@ -209,6 +212,17 @@ func _test_tank_sim() -> void:
 	t.food = 90.0
 	var extra := TankSim.feed(t)
 	check(extra > 0.0, "Fazla yem suyu kirletir")
+	# Yem çeşitleri: neonlar tropikal yemle tam, Japon balığı yemiyle yarım doyar
+	t.food = 20.0
+	TankSim.feed(t, "tropikal")
+	check(abs(t.food - 60.0) < 0.01, "Uygun yem tam doyurur")
+	t.food = 20.0
+	TankSim.feed(t, "soguk")
+	check(abs(t.food - 40.0) < 0.01, "Uygun olmayan yem az doyurur")
+	check(FishDB.food_type("koi") == "soguk" and FishDB.food_type("palyaco") == "tropikal", "Türlerin yem tercihi")
+	check(TankSim.best_food(t, {"yem": 1, "yem_japon": 5}) == "yem", "En uygun yem seçilir")
+	check(TankSim.best_food(t, {"yem_japon": 2}) == "yem_japon", "Uygun yem yoksa eldeki verilir")
+	check(TankSim.best_food(t, {}) == "", "Depoda yem yoksa boş döner")
 	# Soğuk suda tropikal balık zorlanır
 	var cold := TankSim.new_tank(1, true, 18.0)
 	cold.temp = 18.0
@@ -353,6 +367,14 @@ func _build_shop(game: Node) -> void:
 	check(game.stock_shelf(int(sh.uid), "yem", 6) == 6, "Depodan rafa ürün dizilir")
 	check(game.stock_shelf(int(sh.uid), "filtre", 4) == 4, "Rafa ikinci ürün dizilir")
 	check(game.stock_shelf(int(sh.uid), "ilac", 3) == 0, "Depoda olmayan ürün dizilemez")
+	# 3 katlı akvaryum rafı: orta kata akvaryum alınır, içine 3 neon
+	var rk: Dictionary = game.add_furniture("tank_rafi", 1.2, -4.45, 0.0)
+	check(game.buy_rack_tank(int(rk.uid), 1) == "", "Raf katına akvaryum alınır (sahne)")
+	var rt: Dictionary = game.tanks[int(rk.tanks[1])]
+	rt.gravel = "natural"
+	rt.cycle = 100.0
+	for i in 3:
+		rt.fish.append(TankSim.new_fish("neon", 0.8))
 	for t in game.tanks:
 		game.tank_changed.emit(t.id)
 
@@ -369,6 +391,25 @@ func _test_shop_systems(game: Node) -> void:
 	game.pick_box(int(game.boxes[0].uid))
 	game.carry_to_depot()
 	check(int(game.stock.get("yem", 0)) == 4 + 10, "Koli depoya konur")
+	# Akvaryum rafı
+	var rk: Dictionary = game.add_furniture("tank_rafi", 0.0, -4.4, 0.0)
+	check(rk.tanks.size() == 3, "Raf 3 kat tank kaydı açar")
+	check(not game.tanks[int(rk.tanks[0])].unlocked, "Raf katları boş gelir")
+	var rack_m0: int = game.money
+	check(game.buy_rack_tank(int(rk.uid), 0) == "" and game.money == rack_m0 - game.RACK_TANK_PRICE, "Raf katına akvaryum alınır")
+	var rt: Dictionary = game.tanks[int(rk.tanks[0])]
+	check(rt.unlocked and rt.light and TankSim.capacity(rt) == game.RACK_TANK_CAP, "Raf akvaryumu ışıklı ve küçük")
+	check(game.buy_rack_tank(int(rk.uid), 0) != "", "Dolu kata ikinci akvaryum konamaz")
+	rt.fish.append(TankSim.new_fish("neon", 0.8))
+	check(game.remove_rack_tank(int(rk.uid), 0) != "", "Balıklı raf akvaryumu kaldırılamaz")
+	check(game.sell_furniture(int(rk.uid)) != "", "Balıklı raf satılamaz")
+	rt.fish.clear()
+	var saved: Dictionary = game.to_dict()
+	check(game.from_dict(JSON.parse_string(JSON.stringify(saved))), "Raflı kayıt yüklenir")
+	var rk2: Dictionary = game.furniture_by_uid(int(rk.uid))
+	check(rk2.tanks.size() == 3 and typeof(rk2.tanks[0]) == TYPE_INT and game.tanks[int(rk2.tanks[0])].unlocked, "Raf katları kayıttan döner")
+	rack_m0 = game.money
+	check(game.sell_furniture(int(rk.uid)) == "" and game.money == rack_m0 + 450 / 2 + game.RACK_TANK_PRICE / 2, "Raf, üstündeki akvaryumla birlikte satılır")
 	# Elektrik kesintisi
 	var t: Dictionary = TankSim.new_tank(0, true, 28.0)
 	t.temp = 28.0

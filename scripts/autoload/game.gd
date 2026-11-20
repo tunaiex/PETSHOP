@@ -52,6 +52,8 @@ var phase: String = "prep" ## prep | open | closing | report | over
 var reputation: float = 50.0
 var debt_days: int = 0
 var stock: Dictionary = {}   ## Depo (arka oda). Raftaki ürünler mobilya kaydında durur.
+const RACK_TANK_PRICE := 420 ## Raf katına konan ışıklı akvaryum
+const RACK_TANK_CAP := 8      ## Raf akvaryumunun yer kapasitesi
 var tanks: Array = []        ## Satılan tanklar silinmez, "unlocked=false" olur (id'ler sabit kalsın)
 var furniture: Array = []    ## {"uid","type","x","z","rot", "tank"?, "shelf"?}
 var _fuid: int = 1
@@ -145,6 +147,15 @@ func add_furniture(type: String, x: float, z: float, rot: float) -> Dictionary:
 		e["tank"] = t.id
 	if FurnitureDB.is_shelf(type):
 		e["shelf"] = {}
+	if FurnitureDB.is_rack(type):
+		# Raf katları boş gelir: tanklar kilitli açılır, oyuncu katlara akvaryum alır.
+		var ids: Array = []
+		for i in int(FurnitureDB.item(type).get("levels", 3)):
+			var t := TankSim.new_tank(tanks.size(), false, 25.0, false)
+			t["cap"] = RACK_TANK_CAP
+			tanks.append(t)
+			ids.append(t.id)
+		e["tanks"] = ids
 	furniture.append(e)
 	furniture_changed.emit()
 	return e
@@ -160,6 +171,41 @@ func move_furniture(uid: int, x: float, z: float, rot: float) -> void:
 	furniture_changed.emit()
 
 
+## Raf katına ışıklı akvaryum koyar. Başarılıysa "" döner.
+func buy_rack_tank(uid: int, level: int) -> String:
+	var e := furniture_by_uid(uid)
+	if e.is_empty() or not e.has("tanks") or level < 0 or level >= e.tanks.size():
+		return "Raf bulunamadı."
+	var id: int = int(e.tanks[level])
+	if tanks[id].unlocked:
+		return "Bu katta zaten akvaryum var."
+	if not spend(RACK_TANK_PRICE):
+		return "Yeterli paran yok (%d ₺)." % RACK_TANK_PRICE
+	var t := TankSim.new_tank(id, true, 25.0, false)
+	t["cap"] = RACK_TANK_CAP
+	t.light = true
+	tanks[id] = t
+	furniture_changed.emit()
+	tank_changed.emit(id)
+	return ""
+
+
+## Raf katındaki boş akvaryumu kaldırır (%50 iade).
+func remove_rack_tank(uid: int, level: int) -> String:
+	var e := furniture_by_uid(uid)
+	if e.is_empty() or not e.has("tanks") or level < 0 or level >= e.tanks.size():
+		return "Raf bulunamadı."
+	var t: Dictionary = tanks[int(e.tanks[level])]
+	if not t.unlocked:
+		return "Bu kat zaten boş."
+	if not t.fish.is_empty():
+		return "Önce tanktaki balıkları sat ya da taşı."
+	t.unlocked = false
+	add_money(RACK_TANK_PRICE / 2)
+	furniture_changed.emit()
+	return ""
+
+
 ## Eşyayı satar (%50 iade). Dolu tank satılamaz, raftaki ürünler depoya döner.
 func sell_furniture(uid: int) -> String:
 	var e := furniture_by_uid(uid)
@@ -170,10 +216,18 @@ func sell_furniture(uid: int) -> String:
 		if not t.fish.is_empty():
 			return "Önce tanktaki balıkları sat ya da çıkar."
 		t.unlocked = false
+	var refund: int = int(FurnitureDB.item(e.type).price) / 2
+	if e.has("tanks"):
+		for id in e.tanks:
+			if not tanks[int(id)].fish.is_empty():
+				return "Önce raftaki tanklardaki balıkları sat ya da çıkar."
+		for id in e.tanks:
+			if tanks[int(id)].unlocked:
+				tanks[int(id)].unlocked = false
+				refund += RACK_TANK_PRICE / 2
 	if e.has("shelf"):
 		for pid in e.shelf:
 			add_stock(pid, int(e.shelf[pid]))
-	var refund: int = int(FurnitureDB.item(e.type).price) / 2
 	add_money(refund)
 	furniture.erase(e)
 	furniture_changed.emit()
@@ -596,6 +650,8 @@ func from_dict(d: Dictionary) -> bool:
 		e.rot = float(e.rot)
 		if e.has("tank"):
 			e.tank = int(e.tank)
+		if e.has("tanks"):
+			e.tanks = e.tanks.map(func(v): return int(v))
 		if e.has("shelf"):
 			for pid in e.shelf:
 				e.shelf[pid] = int(e.shelf[pid])

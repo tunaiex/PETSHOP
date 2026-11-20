@@ -645,6 +645,8 @@ func sync_furniture() -> void:
 			nodes[uid] = n
 		n.position = Vector3(e.x, 0, e.z)
 		n.rotation = Vector3(0, deg_to_rad(e.rot), 0)
+		if n is AquariumRack:
+			n.refresh()
 	for uid in nodes.keys():
 		if not seen.has(uid):
 			nodes[uid].queue_free()
@@ -661,6 +663,11 @@ func spawn(e: Dictionary) -> Node3D:
 		_furn_root.add_child(aq)
 		aq.setup(int(e.tank), e.type == "akvaryum_ceviz", e.type == "teraryum")
 		n = aq
+	elif FurnitureDB.is_rack(e.type):
+		var rk := AquariumRack.new()
+		_furn_root.add_child(rk)
+		rk.setup(int(e.uid))
+		n = rk
 	elif FurnitureDB.is_shelf(e.type):
 		var sh := Shelf.new()
 		_furn_root.add_child(sh)
@@ -702,6 +709,8 @@ func _index() -> void:
 			continue
 		if n is Aquarium:
 			aquariums.append(n)
+		elif n is AquariumRack:
+			aquariums.append_array(n.aquariums())
 		elif n is Shelf:
 			shelves.append(n)
 		elif n is FurnitureItem and n.type == "kasa":

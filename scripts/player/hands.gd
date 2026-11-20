@@ -104,12 +104,18 @@ func hold_net() -> void:
 	visible = true
 
 
-func hold_food() -> void:
+func hold_food(pid: String = "yem") -> void:
 	_clear_item()
 	_kind = "food"
 	_item = Node3D.new()
-	MeshKit.cylinder(_item, 0.04, 0.11, Vector3.ZERO, MeshKit.mat(Color(0.85, 0.35, 0.15), 0.4), 14)
-	MeshKit.cylinder(_item, 0.041, 0.04, Vector3(0, 0.0, 0), MeshKit.mat(Color(0.95, 0.95, 0.9), 0.5), 14)
+	var model: Node3D = ProductDB.instance_model(pid, 0.12)
+	if model:
+		model.position.y = -0.06
+		model.rotation_degrees.y = -25.0
+		_item.add_child(model)
+	else:
+		MeshKit.cylinder(_item, 0.04, 0.11, Vector3.ZERO, MeshKit.mat(Color(0.85, 0.35, 0.15), 0.4), 14)
+		MeshKit.cylinder(_item, 0.041, 0.04, Vector3(0, 0.0, 0), MeshKit.mat(Color(0.95, 0.95, 0.9), 0.5), 14)
 	_item.position = Vector3(0.22, -0.26, -0.45)
 	add_child(_item)
 	visible = true

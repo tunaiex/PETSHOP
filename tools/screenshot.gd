@@ -20,6 +20,10 @@ var _shots := [
 	["koli_elde", Vector3(3.0, 0.05, 0.5), -90.0, -10.0, true, "koli"],
 	["aksam_disari", Vector3(0, 0.05, 8.0), 0.0, 2.0, true, "aksam"],
 	["yerlestirme", Vector3(-1.5, 0.05, 1.2), 90.0, -28.0, true, "yerlestir"],
+	["akvaryum_rafi", Vector3(-4.0, 0.05, 1.0), 90.0, 4.0, true],
+	["raf_yakin", Vector3(-5.3, 0.05, 1.0), 90.0, -8.0, true],
+	["yem_rafi", Vector3(4.6, 0.05, -1.6), -90.0, -14.0, true],
+	["yem_elde", Vector3(-5.3, 0.05, 1.0), 90.0, -8.0, true, "yem"],
 ]
 var _idx := 0
 var _out := "user://shots"
@@ -67,6 +71,9 @@ func _process(_d: float) -> bool:
 				_game.carry_to_depot()
 				_game.minute = 19 * 60 + 25
 				_game.time_changed.emit(int(_game.minute))
+			"yem":
+				_main.player.hands.hold_food("yem_japon")
+				_main.player.hands._anim = 1000.0
 			"yerlestir":
 				_game.minute = 12 * 60
 				_game.time_changed.emit(int(_game.minute))
@@ -126,11 +133,29 @@ func _build() -> void:
 				t.fish.append(TankSim.new_fish(sp, 0.85))
 	for pid in ProductDB.ids():
 		g.add_stock(pid, 20)
-	for pid in ["yem", "su_duzenleyici", "ilac", "kum", "dekor", "filtre"]:
+	for pid in ["yem", "yem_japon", "su_duzenleyici", "ilac", "kum", "dekor", "filtre"]:
 		g.stock_shelf(int(r1.uid), pid, 4)
 		g.stock_shelf(int(r2.uid), pid, 3)
 	g.tanks[int(a.tank)].fish[0]["rare"] = true
 	g.tanks[int(a.tank)].fish[0]["rare_name"] = "Altın"
+	# 3 katlı akvaryum rafı: üç kat da dolu
+	var rk: Dictionary = g.add_furniture("tank_rafi", -6.5, 1.0, 90.0)
+	var rack_fish := [{"neon": 8}, {"japon": 3}, {"palyaco": 2, "mandarin": 1}]
+	for lv in 3:
+		g.buy_rack_tank(int(rk.uid), lv)
+		var rt: Dictionary = g.tanks[int(rk.tanks[lv])]
+		rt.salt = lv == 2
+		rt.gravel = "white" if lv == 2 else "natural"
+		rt.heater_on = lv != 1
+		rt.heater = 21.0 if lv == 1 else 26.0
+		rt.temp = rt.heater
+		rt.filter = 1
+		rt.air = lv == 0
+		rt.cycle = 100.0
+		rt.decor = [["bitki", "kaya", "bitki"], ["kaya", "amfora"], ["resif", "deniz_yildizi"]][lv]
+		for sp in rack_fish[lv]:
+			for i in rack_fish[lv][sp]:
+				rt.fish.append(TankSim.new_fish(sp, 0.85))
 	g.weather = "gunesli"
 	for t in g.tanks:
 		g.tank_changed.emit(t.id)

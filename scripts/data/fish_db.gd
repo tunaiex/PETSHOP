@@ -254,6 +254,14 @@ static func model_path(id: String) -> String:
 	return p if ResourceLoader.exists(p) else ""
 
 
+## Türün en iyi beslendiği yem çeşidi: "soguk" (Japon balığı yemi) ya da "tropikal".
+## Kaplumbağalar ikisini de yer ("hepsi").
+static func food_type(id: String) -> String:
+	if is_turtle(id):
+		return "hepsi"
+	return "soguk" if id in ["japon", "koi", "alabalik"] else "tropikal"
+
+
 static func is_turtle(id: String) -> bool:
 	return get_species(id).get("habitat", "") == "turtle"
 

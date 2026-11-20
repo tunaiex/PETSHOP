@@ -21,6 +21,11 @@ const ITEMS := {
 		"size": Vector2(1.38, 0.58), "height": 1.5,
 		"desc": "Az sulu, karası olan cam teraryum + ısı lambası. Su kaplumbağaları için.",
 	},
+	"tank_rafi": {
+		"name": "3 katlı akvaryum rafı", "price": 450, "cat": "akvaryum",
+		"size": Vector2(1.1, 0.86), "height": 2.15, "levels": 3,
+		"desc": "Üst üste 3 ışıklı akvaryum alır. Her kata akvaryumu ayrıca alıp koyarsın (LED lamba dahil, 8 yer).",
+	},
 	"kasa": {
 		"name": "Kasa tezgâhı", "price": 700, "cat": "magaza", "max": 1,
 		"size": Vector2(2.64, 0.74), "height": 1.05,
@@ -109,6 +114,10 @@ static func decor_for(salt: bool) -> Array:
 
 static func is_tank(id: String) -> bool:
 	return id.begins_with("akvaryum") or id == "teraryum"
+
+
+static func is_rack(id: String) -> bool:
+	return id == "tank_rafi"
 
 
 static func is_shelf(id: String) -> bool:

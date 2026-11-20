@@ -102,11 +102,18 @@ func refresh() -> void:
 			if row >= _rows.size():
 				break
 			var x: float = -_width * 0.5 + (col + 0.5) * _width / per_row
-			_product_mesh(_items, p, Vector3(x, _rows[row], 0.02))
+			_product_mesh(_items, p, Vector3(x, _rows[row], 0.02), pid)
 			slot += 1
 
 
-func _product_mesh(parent: Node3D, p: Dictionary, pos: Vector3) -> void:
+func _product_mesh(parent: Node3D, p: Dictionary, pos: Vector3, pid: String = "") -> void:
+	if p.has("model"):
+		var model: Node3D = ProductDB.instance_model(pid, 0.15)
+		if model:
+			model.position = pos
+			model.rotation_degrees.y = randf_range(-12.0, 12.0)
+			parent.add_child(model)
+			return
 	var col: Color = p.color
 	var m := MeshKit.mat(col, 0.45)
 	var label := MeshKit.mat(Color(0.95, 0.95, 0.92), 0.6)

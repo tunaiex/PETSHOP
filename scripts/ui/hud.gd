@@ -584,16 +584,28 @@ func _upgrade_filter(body: VBoxContainer, aq: Aquarium) -> void:
 	_fill_tank(body, aq)
 
 
-func _feed(body: VBoxContainer, aq: Aquarium) -> void:
+func _remove_rack_tank(aq: Aquarium) -> void:
+	var err: String = Game.remove_rack_tank(aq.furniture_uid, aq.rack_level)
+	if err != "":
+		toast(err, "bad")
+		return
+	close_panel()
+
+
+func _feed(body: VBoxContainer, aq: Aquarium, pid: String) -> void:
 	var t: Dictionary = Game.tanks[aq.tank_id]
-	if Game.use_stock("yem"):
-		var extra := TankSim.feed(t)
+	if Game.use_stock(pid):
+		var food: String = ProductDB.get_product(pid).food
+		var fit: float = TankSim.food_match(t, food)
+		var extra := TankSim.feed(t, food)
 		aq.play_feed()
 		Sfx.play("bubble")
 		if player:
-			player.hands.hold_food()
+			player.hands.hold_food(pid)
 		if extra > 0.0:
 			Game.notify.emit("Fazla yem verdin, su kirlendi!", "warn")
+		elif fit < 0.99:
+			Game.notify.emit("Bu yem tanktaki bazı balıklara uygun değil, az doydular.", "warn")
 		Game.tank_changed.emit(aq.tank_id)
 	_fill_tank(body, aq)
 
@@ -696,7 +708,10 @@ func _fill_tank(body: VBoxContainer, aq: Aquarium) -> void:
 			_warn(body, "⚠ %s için su %s (ideal %d-%d°C)%s" % [s.name, "soğuk" if t.temp < s.temp_min else "sıcak", int(s.temp_min), int(s.temp_max), "" if t.heater_on else " — ısıtıcı yok!"])
 
 	var acts := _flow(body)
-	_btn(acts, "Yem ver (%d)" % Game.stock.get("yem", 0), _feed.bind(body, aq))
+	for pid in ProductDB.food_ids():
+		var fp: Dictionary = ProductDB.get_product(pid)
+		var ideal: bool = TankSim.food_match(t, fp.food) > 0.99 and not TankSim.living(t).is_empty()
+		_btn(acts, "%s%s (%d)" % ["★ " if ideal else "", fp.name, Game.stock.get(pid, 0)], _feed.bind(body, aq, pid))
 	_btn(acts, "Su değiştir (%d)" % Game.stock.get("su_duzenleyici", 0), _water_change.bind(body, aq))
 	_btn(acts, "İlaç ver (%d)" % Game.stock.get("ilac", 0), _medicate.bind(body, aq), t.sick)
 	_btn(acts, "Ölüleri çıkar", _remove_dead.bind(body, aq), dead > 0)
@@ -726,7 +741,7 @@ func _fill_tank(body: VBoxContainer, aq: Aquarium) -> void:
 	if not t.decor.is_empty():
 		_btn(dec, "Son dekoru kaldır", _remove_decor.bind(body, aq))
 
-	_section(body, "Balıklar (yer: %d/%d)" % [TankSim.space_used(t), TankSim.CAPACITY])
+	_section(body, "Balıklar (yer: %d/%d)" % [TankSim.space_used(t), TankSim.capacity(t)])
 	var alive: Array = TankSim.living(t)
 	if alive.is_empty():
 		body.add_child(_lbl("Tank boş. Telefondan balık sipariş et.", 20))
@@ -770,8 +785,12 @@ func _fill_tank(body: VBoxContainer, aq: Aquarium) -> void:
 		_btn(mv, "Tuzlu suya çevir" if not salt else "Tatlı suya çevir", _toggle_salt.bind(body, aq), alive.is_empty() and Game.money >= TankSim.SALT_COST).tooltip_text = "%d ₺ (tuz, test kiti). Sadece boş tankta." % TankSim.SALT_COST
 	_btn(mv, "Fotoğraf çek ve paylaş", _photo.bind(body, aq), not Game.photos_today.has(aq.tank_id))
 	_btn(mv, "Karantina: %s" % ("AÇIK" if t.get("quarantine", false) else "KAPALI"), _toggle_quarantine.bind(body, aq))
-	_btn(mv, "Taşı", _move_furniture.bind(aq.furniture_uid))
-	_btn(mv, "Sat (%d ₺)" % (int(FurnitureDB.item(Game.furniture_by_uid(aq.furniture_uid).get("type", "akvaryum_beyaz")).price) / 2), _sell_furniture.bind(aq.furniture_uid), t.fish.is_empty())
+	if aq.rack_level >= 0:
+		_btn(mv, "Rafı taşı", _move_furniture.bind(aq.furniture_uid))
+		_btn(mv, "Akvaryumu raftan kaldır (%d ₺)" % (Game.RACK_TANK_PRICE / 2), _remove_rack_tank.bind(aq), t.fish.is_empty())
+	else:
+		_btn(mv, "Taşı", _move_furniture.bind(aq.furniture_uid))
+		_btn(mv, "Sat (%d ₺)" % (int(FurnitureDB.item(Game.furniture_by_uid(aq.furniture_uid).get("type", "akvaryum_beyaz")).price) / 2), _sell_furniture.bind(aq.furniture_uid), t.fish.is_empty())
 
 
 func _toggle_quarantine(body: VBoxContainer, aq: Aquarium) -> void:
@@ -794,7 +813,7 @@ func _fill_move(body: VBoxContainer, aq: Aquarium, sp: String) -> void:
 		any = true
 		var row := _row(body)
 		var warn: String = TankSim.check_add(t, sp)
-		var l := _lbl("Tank %d%s (%d/%d yer)%s" % [t.id + 1, " • karantina" if t.get("quarantine", false) else "", TankSim.space_used(t), TankSim.CAPACITY, ("  ⚠ " + warn) if warn != "" else ""], 19, C_WARN if warn != "" else Color(0.93, 0.95, 0.96))
+		var l := _lbl("Tank %d%s (%d/%d yer)%s" % [t.id + 1, " • karantina" if t.get("quarantine", false) else "", TankSim.space_used(t), TankSim.capacity(t), ("  ⚠ " + warn) if warn != "" else ""], 19, C_WARN if warn != "" else Color(0.93, 0.95, 0.96))
 		l.custom_minimum_size.x = 560
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		row.add_child(l)
@@ -1068,7 +1087,7 @@ func _fill_products(body: VBoxContainer, target_tank: int) -> void:
 func _buy_fish(body: VBoxContainer, sp: String, qty: int, target_tank: int) -> void:
 	var tank: Dictionary = Game.tanks[target_tank]
 	var s: Dictionary = FishDB.get_species(sp)
-	if TankSim.space_used(tank) + TankSim.space_of(sp) * qty > TankSim.CAPACITY:
+	if TankSim.space_used(tank) + TankSim.space_of(sp) * qty > TankSim.capacity(tank):
 		Game.notify.emit("Tankta yer yok.", "bad")
 		return
 	var warn: String = TankSim.check_add(tank, sp)
@@ -1109,7 +1128,7 @@ func _fill_fish(body: VBoxContainer, target_tank: int) -> void:
 	trow.add_child(_lbl("Hedef tank:", 21))
 	for id in open_tanks:
 		var tk: Dictionary = Game.tanks[id]
-		_btn(trow, "T%d%s (%.0f°C, %d/%d)" % [id + 1, " (tuzlu)" if tk.salt else "", tk.temp, TankSim.space_used(tk), TankSim.CAPACITY], _fill_phone.bind(body, "fish", id), id != target_tank)
+		_btn(trow, "T%d%s (%.0f°C, %d/%d)" % [id + 1, " (tuzlu)" if tk.salt else "", tk.temp, TankSim.space_used(tk), TankSim.capacity(tk)], _fill_phone.bind(body, "fish", id), id != target_tank)
 	var tank: Dictionary = Game.tanks[target_tank]
 	var salt: bool = bool(tank.salt)
 	var terra: bool = tank.get("kind", "") == "teraryum"
@@ -1131,7 +1150,7 @@ func _fill_fish(body: VBoxContainer, target_tank: int) -> void:
 			warn = "Su sıcaklığı (%.0f°C) bu türe uygun değil%s." % [temp_now, "" if tank.heater_on else ", ısıtıcı yok"]
 		for qty in [1, 5]:
 			var cost: int = Game.buy_price(sp) * qty
-			var space: bool = TankSim.space_used(tank) + TankSim.space_of(sp) * qty <= TankSim.CAPACITY
+			var space: bool = TankSim.space_used(tank) + TankSim.space_of(sp) * qty <= TankSim.capacity(tank)
 			_btn(row, "×%d (%d ₺)" % [qty, cost], _buy_fish.bind(body, sp, qty, target_tank), Game.money >= cost and space)
 		if warn != "":
 			var wl := _lbl("   ⚠ " + warn, 17, C_WARN)

@@ -288,6 +288,25 @@ static func tube(points: Array, radii: Array, sides: int = 10) -> ArrayMesh:
 
 # ------------------------------------------------------------------ YARDIMCI
 
+## Bir model sahnesindeki tüm meshlerin, kök düğüme göre birleşik sınır kutusu.
+static func model_aabb(root: Node3D) -> AABB:
+	var box := AABB()
+	var first := true
+	for c in root.find_children("*", "MeshInstance3D", true, false):
+		var mi: MeshInstance3D = c
+		if not mi.visible:
+			continue
+		var xf := Transform3D.IDENTITY
+		var p: Node = mi
+		while p != root and p != null:
+			xf = (p as Node3D).transform * xf
+			p = p.get_parent()
+		var b: AABB = xf * mi.get_aabb()
+		box = b if first else box.merge(b)
+		first = false
+	return box
+
+
 static func mat(color: Color, rough: float = 0.6, metal: float = 0.0) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = color

@@ -60,7 +60,7 @@ static func move_fish(src: Dictionary, dst: Dictionary, species: String, count: 
 			break
 		if f.species != species or not f.alive:
 			continue
-		if space_used(dst) + space_of(species) > CAPACITY:
+		if space_used(dst) + space_of(species) > capacity(dst):
 			break
 		src.fish.erase(f)
 		dst.fish.append(f)
@@ -69,6 +69,11 @@ static func move_fish(src: Dictionary, dst: Dictionary, species: String, count: 
 
 
 ## Bir balığın kapladığı yer birimi (büyük balık daha çok)
+## Tankın yer kapasitesi (küçük raf akvaryumlarında daha az)
+static func capacity(tank: Dictionary) -> int:
+	return int(tank.get("cap", CAPACITY))
+
+
 static func space_of(species: String) -> int:
 	return max(1, int(round(float(FishDB.get_species(species).length) / 0.07)))
 
@@ -124,8 +129,8 @@ static func check_add(tank: Dictionary, species: String) -> String:
 		return "Teraryuma sadece kaplumbağa konur." if terra else "%s bir teraryum ister." % FishDB.display_name(species)
 	if bool(tank.get("salt", false)) != FishDB.is_salt(species):
 		return "%s %s ister, bu tank %s." % [FishDB.display_name(species), "tuzlu su" if FishDB.is_salt(species) else "tatlı su", "tuzlu" if tank.get("salt", false) else "tatlı su"]
-	if space_used(tank) + space_of(species) > CAPACITY:
-		return "Tankta yer yok (%d/%d yer dolu, %s %d yer kaplar)." % [space_used(tank), CAPACITY, FishDB.display_name(species), space_of(species)]
+	if space_used(tank) + space_of(species) > capacity(tank):
+		return "Tankta yer yok (%d/%d yer dolu, %s %d yer kaplar)." % [space_used(tank), capacity(tank), FishDB.display_name(species), space_of(species)]
 	for other in species_in(tank):
 		var r: String = FishDB.conflict_reason(species, other)
 		if r != "":
@@ -238,7 +243,7 @@ static func step(tank: Dictionary, minutes: float, rng: RandomNumberGenerator) -
 		if f.health > 70.0 and f.growth > 0.5 and FishDB.BREED.has(f.species):
 			adults[f.species] = adults.get(f.species, 0) + 1
 	for sp in adults:
-		if adults[sp] < 2 or space_used(tank) + space_of(sp) > CAPACITY or tank.dirt > 50.0:
+		if adults[sp] < 2 or space_used(tank) + space_of(sp) > capacity(tank) or tank.dirt > 50.0:
 			continue
 		if rng.randf() < float(FishDB.BREED[sp]) * minutes * (1.3 if tank.get("decor", []).size() >= 4 else 1.0):
 			var fry := new_fish(sp, 0.05, 90.0)
@@ -277,15 +282,45 @@ static func _count_species(arr: Array, sp: String) -> int:
 
 
 ## Yem verir. Fazla yem suyu kirletir. Gerçekleşen kirlenme artışını döner.
-static func feed(tank: Dictionary) -> float:
+## food: "tropikal" / "soguk" / "" (tür ayrımı yok). Uygun olmayan yemi yiyen balıklar
+## daha az doyar: tokluk artışı, yemi seven balıkların oranıyla orantılıdır (en az %50).
+static func feed(tank: Dictionary, food: String = "") -> float:
+	var gain: float = 40.0 * food_match(tank, food)
 	var before: float = tank.food
-	tank.food = min(100.0, tank.food + 40.0)
-	var overflow: float = before + 40.0 - 100.0
+	tank.food = min(100.0, tank.food + gain)
+	var overflow: float = before + gain - 100.0
 	if overflow > 0.0:
 		var extra: float = overflow * 0.25
 		tank.dirt = min(100.0, tank.dirt + extra)
 		return extra
 	return 0.0
+
+
+## Yemin tanktaki balıklara uygunluğu: 1.0 hepsi sever, 0.5 hiçbiri sevmez.
+static func food_match(tank: Dictionary, food: String) -> float:
+	var fish: Array = living(tank)
+	if food == "" or fish.is_empty():
+		return 1.0
+	var ok := 0
+	for f in fish:
+		var want: String = FishDB.food_type(f.species)
+		if want == "hepsi" or want == food:
+			ok += 1
+	return 0.5 + 0.5 * float(ok) / fish.size()
+
+
+## Tank için en uygun yem ürünü (depodakiler arasından). Yoksa "".
+static func best_food(tank: Dictionary, stock: Dictionary) -> String:
+	var best := ""
+	var best_m := -1.0
+	for pid in ProductDB.food_ids():
+		if int(stock.get(pid, 0)) <= 0:
+			continue
+		var m: float = food_match(tank, ProductDB.get_product(pid).food)
+		if m > best_m:
+			best_m = m
+			best = pid
+	return best
 
 
 ## Boş tankı tuzlu ya da tatlı suya çevirir. Başarılıysa "" döner.
