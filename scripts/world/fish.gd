@@ -1,0 +1,541 @@
+class_name Fish
+extends Node3D
+
+const VISUAL_SCALE := 1.35 ## Küçük balıkların ekranda seçilebilmesi için hafif büyütme
+## Tek bir balığın görseli ve hareketi. Veri Game.tanks içindedir; bu sadece görünüş.
+
+var uid: int = 0
+var species: String = ""
+var aquarium: Node3D
+var bounds: AABB              ## Akvaryumun yerel uzayında yüzme alanı
+var velocity: Vector3 = Vector3.ZERO
+var health: float = 100.0
+var alive: bool = true
+var sick: float = 0.0
+var growth: float = 1.0
+
+var _data: Dictionary
+var _target: Vector3
+var _retarget: float = 0.0
+var _speed: float = 0.05
+var _mat: ShaderMaterial
+var _visual: Node3D
+var _rng := RandomNumberGenerator.new()
+var _phase: float = 0.0
+var _burst: float = 0.0
+
+
+func setup(fish_data: Dictionary, aq: Node3D, swim_bounds: AABB) -> void:
+	uid = int(fish_data.uid)
+	species = fish_data.species
+	aquarium = aq
+	bounds = swim_bounds
+	_data = FishDB.get_species(species)
+	_rng.seed = uid * 7919
+	_phase = _rng.randf() * TAU
+	_speed = float(_data.speed) * float(_data.length) * 1.4 + 0.02
+	_build_visual()
+	position = _random_point()
+	_target = _random_point()
+	velocity = Vector3(_rng.randf_range(-1, 1), 0, _rng.randf_range(-1, 1)).normalized() * _speed
+	apply_state(fish_data)
+
+
+var turtle: bool = false
+var _rest: float = 0.0
+var _to_island: bool = false
+var _legs: Array = []
+var _head: Node3D
+
+
+func _build_visual() -> void:
+	if FishDB.is_turtle(species):
+		_build_turtle()
+		return
+	if FishDB.is_land(species) and FishDB.LAND_MODELS.has(species):
+		_build_walker()
+		return
+	var model: Dictionary = _model_template(species)
+	if not model.is_empty():
+		var mi := MeshInstance3D.new()
+		mi.mesh = model.mesh
+		mi.transform = model.xf
+		_mat = model.mat.duplicate()
+		_mat.set_shader_parameter("phase", _phase)
+		mi.material_override = _mat
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(mi)
+		_visual = mi
+		return
+	var pm := MeshInstance3D.new()
+	pm.mesh = MeshKit.fish_mesh(species)
+	_mat = MeshKit.shader_mat("res://shaders/fish.gdshader", {
+		"body_color": _data.body, "belly_color": _data.belly, "accent_color": _data.accent,
+		"fin_color": _data.fin, "fin_alpha": _data.fin_alpha, "pattern": _data.pattern,
+		"fish_len": _data.length, "phase": _phase,
+	})
+	pm.material_override = _mat
+	pm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(pm)
+	_visual = pm
+
+
+## Prosedürel kaplumbağa: kubbe kabuk, karın, baş, dört yüzgeç-bacak, kuyruk. -Z'ye bakar.
+func _build_turtle() -> void:
+	turtle = true
+	var L: float = float(_data.length)
+	var root := Node3D.new()
+	add_child(root)
+	var skin := MeshKit.mat(Color(0.22, 0.28, 0.14), 0.6)
+	var shell := MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = L * 0.5
+	sm.height = L * 0.5
+	sm.is_hemisphere = true
+	sm.radial_segments = 24
+	sm.rings = 8
+	shell.mesh = sm
+	shell.scale = Vector3(0.82, 0.75, 1.0)
+	shell.material_override = MeshKit.shader_mat("res://shaders/shell.gdshader")
+	root.add_child(shell)
+	var belly := MeshInstance3D.new()
+	var bm := SphereMesh.new()
+	bm.radius = L * 0.47
+	bm.height = L * 0.14
+	belly.mesh = bm
+	belly.scale = Vector3(0.82, 1.0, 1.0)
+	belly.material_override = MeshKit.mat(Color(0.75, 0.68, 0.35), 0.6)
+	root.add_child(belly)
+	_head = Node3D.new()
+	_head.position = Vector3(0, L * 0.06, -L * 0.52)
+	root.add_child(_head)
+	var head := MeshInstance3D.new()
+	var hm := SphereMesh.new()
+	hm.radius = L * 0.11
+	hm.height = L * 0.2
+	head.mesh = hm
+	head.scale = Vector3(0.9, 0.85, 1.3)
+	head.material_override = skin
+	_head.add_child(head)
+	for side in [-1.0, 1.0]:
+		var eye := MeshKit.cylinder(_head, L * 0.02, L * 0.01, Vector3(side * L * 0.075, L * 0.03, -L * 0.07), MeshKit.mat(Color(0.05, 0.05, 0.03), 0.2), 8)
+		eye.rotation_degrees.z = 90
+		# Sarı yanak çizgisi
+		MeshKit.box(_head, Vector3(L * 0.012, L * 0.03, L * 0.14), Vector3(side * L * 0.095, -L * 0.01, 0), MeshKit.mat(Color(0.9, 0.8, 0.2), 0.5))
+	for corner in [[-1.0, -1.0], [1.0, -1.0], [-1.0, 1.0], [1.0, 1.0]]:
+		var pivot := Node3D.new()
+		pivot.position = Vector3(corner[0] * L * 0.36, 0.0, corner[1] * L * 0.3)
+		root.add_child(pivot)
+		var leg := MeshInstance3D.new()
+		var lm := CapsuleMesh.new()
+		lm.radius = L * 0.06
+		lm.height = L * (0.3 if corner[1] < 0 else 0.22)
+		leg.mesh = lm
+		leg.material_override = skin
+		leg.rotation_degrees = Vector3(0, 0, 90)
+		leg.scale = Vector3(1.0, 1.0, 0.45)
+		leg.position = Vector3(corner[0] * L * 0.1, 0, 0)
+		pivot.add_child(leg)
+		_legs.append([pivot, corner[0], corner[1]])
+	var tail := MeshKit.cylinder(root, L * 0.025, L * 0.12, Vector3(0, 0, L * 0.5), skin, 8)
+	tail.rotation_degrees.x = 90
+	for c in root.find_children("*", "MeshInstance3D", true, false):
+		(c as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_visual = root
+
+
+# ------------------------------------------------------------------ Kara hayvanları
+
+var walker: bool = false
+var _ap: AnimationPlayer
+var _walk_name: String = ""
+var _idle_name: String = ""
+var _pause: float = 0.0
+
+
+## Hamster / civciv / örümcek: hazır animasyonlu model, zeminde yürür. -Z'ye bakar, ayakları y=0'da.
+func _build_walker() -> void:
+	walker = true
+	var cfg: Array = FishDB.LAND_MODELS[species]
+	var m: Node3D = (load(cfg[0]) as PackedScene).instantiate()
+	var box: AABB = MeshKit.model_aabb(m)
+	# Deri giydirilmiş modellerde gerçek boyut iskeletten: mesh kutusu çok küçük kalabiliyor (muhabbet kuşu)
+	for skn in m.find_children("*", "Skeleton3D", true, false):
+		var sk: Skeleton3D = skn
+		var sxf := Transform3D.IDENTITY
+		var q0: Node = sk
+		while q0 != m and q0 != null:
+			sxf = (q0 as Node3D).transform * sxf
+			q0 = q0.get_parent()
+		var bb := AABB(sxf * sk.get_bone_global_rest(0).origin, Vector3.ZERO)
+		for bi in sk.get_bone_count():
+			bb = bb.expand(sxf * sk.get_bone_global_rest(bi).origin)
+		if bb.size.length() > box.size.length() * 2.0:
+			box = bb.grow(bb.size.length() * 0.08)
+		break
+	var fwd: Vector3 = cfg[1]
+	var along: float = abs(box.size.dot(fwd.abs()))
+	var k: float = float(_data.length) / max(along, 0.0001)
+	var holder := Node3D.new()
+	# Modelin baş yönünü -Z'ye çevir
+	if fwd.is_equal_approx(Vector3(0, 0, 1)):
+		holder.rotation.y = PI
+	elif fwd.is_equal_approx(Vector3(-1, 0, 0)):
+		holder.rotation.y = -PI * 0.5
+	elif fwd.is_equal_approx(Vector3(1, 0, 0)):
+		holder.rotation.y = PI * 0.5
+	var center := Vector3(box.get_center().x, box.position.y, box.get_center().z)
+	# Deri giydirilmiş modellerde mesh kutusu bacakları kapsamayabilir (örümcek):
+	# zemine oturtmak için kemiklerin en alt noktasını da hesaba kat.
+	for skn in m.find_children("*", "Skeleton3D", true, false):
+		var sk: Skeleton3D = skn
+		var xf := Transform3D.IDENTITY
+		var q: Node = sk
+		while q != m and q != null:
+			xf = (q as Node3D).transform * xf
+			q = q.get_parent()
+		for bi in sk.get_bone_count():
+			center.y = min(center.y, (xf * sk.get_bone_global_rest(bi).origin).y)
+		break
+	m.scale = Vector3.ONE * k
+	m.position = -center * k
+	holder.add_child(m)
+	add_child(holder)
+	for c in m.find_children("*", "MeshInstance3D", true, false):
+		(c as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	for a in m.find_children("*", "AnimationPlayer", true, false):
+		_ap = a
+		break
+	_walk_name = cfg[2]
+	_idle_name = cfg[3]
+	if _ap:
+		for n in [_walk_name, _idle_name]:
+			if _ap.has_animation(n):
+				_ap.get_animation(n).loop_mode = Animation.LOOP_LINEAR
+		if _ap.has_animation(_idle_name):
+			_ap.play(_idle_name)
+			_ap.seek(_rng.randf() * _ap.current_animation_length, true)
+	_visual = holder
+	_pause = _rng.randf_range(0.5, 3.0)
+
+
+func _walker_process(delta: float) -> void:
+	var ground: float = bounds.position.y
+	if not alive:
+		# Ölü hayvan yan yatar
+		position.y = ground
+		if _ap and _ap.is_playing():
+			_ap.pause()
+		var lie := Basis(Vector3.FORWARD, PI * 0.5)
+		transform.basis = Basis(Quaternion(transform.basis.orthonormalized()).slerp(Quaternion(lie), clamp(delta * 3.0, 0.0, 1.0))).scaled(scale)
+		return
+	var feed_point: Vector3 = aquarium.get_food_point() if aquarium and aquarium.has_method("get_food_point") else Vector3.INF
+	var spd: float = _speed * clamp(health / 100.0, 0.3, 1.0)
+	if feed_point != Vector3.INF:
+		_target = feed_point
+		_pause = 0.0
+		spd *= 1.6
+	if _pause > 0.0:
+		_pause -= delta
+		velocity = velocity.lerp(Vector3.ZERO, clamp(delta * 6.0, 0.0, 1.0))
+		if _pause <= 0.0:
+			_target = _random_point()
+	else:
+		var to := _target - position
+		to.y = 0.0
+		if to.length() < 0.03:
+			_pause = _rng.randf_range(1.5, 6.0) if feed_point == Vector3.INF else 0.5
+		else:
+			var desired: Vector3 = to.normalized() * spd
+			# Birbirinin içine girmesinler
+			for other in aquarium.fish_nodes():
+				if other == self or not is_instance_valid(other) or not other.alive:
+					continue
+				var off: Vector3 = position - other.position
+				off.y = 0.0
+				var d: float = off.length()
+				var min_d: float = (radius() + other.radius()) * 1.1
+				if d < min_d and d > 0.0001:
+					desired += off / d * spd * 2.0 * (1.0 - d / min_d)
+			velocity = velocity.lerp(desired, clamp(delta * 4.0, 0.0, 1.0))
+	position += velocity * delta
+	position = position.clamp(Vector3(_lo().x, ground, _lo().z), Vector3(_hi().x, ground, _hi().z))
+	position.y = ground
+	var flat := Vector3(velocity.x, 0, velocity.z)
+	var moving: bool = flat.length() > spd * 0.25
+	if moving:
+		var want := Basis.looking_at(flat.normalized(), Vector3.UP)
+		var q := Quaternion(transform.basis.orthonormalized()).slerp(Quaternion(want), clamp(delta * 6.0, 0.0, 1.0))
+		transform.basis = Basis(q).scaled(scale)
+	if _ap:
+		var want_anim: String = _walk_name if moving else _idle_name
+		if _ap.has_animation(want_anim) and _ap.current_animation != want_anim:
+			_ap.play(want_anim, 0.2)
+		_ap.speed_scale = clamp(flat.length() / max(_speed, 0.001), 0.6, 2.0) if moving else 1.0
+
+
+func _turtle_process(delta: float) -> void:
+	var t := Time.get_ticks_msec() * 0.001
+	var paddle: float = 0.0 if _rest > 0.0 else 1.0
+	for l in _legs:
+		var pivot: Node3D = l[0]
+		pivot.rotation.y = sin(t * 3.0 + l[1] * l[2] * 1.5) * 0.6 * paddle * l[1]
+	if _head:
+		_head.rotation.y = sin(t * 0.7 + _phase) * 0.35
+	if _rest > 0.0:
+		_rest -= delta
+		if _rest <= 0.0:
+			_to_island = false
+			_target = _random_point()
+		return
+	var spd: float = _speed * clamp(health / 100.0, 0.3, 1.0)
+	_retarget -= delta
+	var feed_point: Vector3 = aquarium.get_food_point() if aquarium else Vector3.INF
+	if feed_point != Vector3.INF:
+		_target = feed_point
+		_to_island = false
+	elif _retarget <= 0.0:
+		_retarget = _rng.randf_range(4.0, 9.0)
+		if aquarium and aquarium.has_method("island_point") and aquarium.terrarium and _rng.randf() < 0.35:
+			_to_island = true
+			_target = aquarium.island_point() + Vector3(0, 0, _rng.randf_range(-0.1, 0.1))
+		else:
+			_to_island = false
+			_target = _random_point()
+			_target.y = lerp(_lo().y, _hi().y, _rng.randf_range(0.0, 0.6))
+	var to: Vector3 = _target - position
+	if _to_island and to.length() < 0.04:
+		_rest = _rng.randf_range(6.0, 14.0)
+		velocity = Vector3.ZERO
+		return
+	velocity = velocity.lerp(to.normalized() * spd, clamp(delta * 1.5, 0.0, 1.0))
+	position += velocity * delta
+	if not _to_island:
+		position = position.clamp(_lo() - Vector3.ONE * 0.02, _hi() + Vector3.ONE * 0.02)
+	var flat := Vector3(velocity.x, velocity.y * 0.3, velocity.z)
+	if flat.length() > 0.002:
+		var want := Basis.looking_at(flat.normalized(), Vector3.UP)
+		var q := Quaternion(transform.basis.orthonormalized()).slerp(Quaternion(want), clamp(delta * 2.0, 0.0, 1.0))
+		transform.basis = Basis(q).scaled(scale)
+
+
+static var _templates: Dictionary = {}
+
+## Gerçek modeli bir kez yükler: mesh, yönlendirme/ölçek dönüşümü ve yüzme materyali.
+## Model, burnu -Z'ye bakacak ve boyu tür uzunluğuna eşit olacak şekilde yerleştirilir.
+static func _model_template(sp: String) -> Dictionary:
+	if _templates.has(sp):
+		return _templates[sp]
+	var path: String = FishDB.model_path(sp)
+	if path == "":
+		_templates[sp] = {}
+		return {}
+	var data: Dictionary = FishDB.get_species(sp)
+	var root: Node3D = (load(path) as PackedScene).instantiate()
+	var src: MeshInstance3D = null
+	for c in root.find_children("*", "MeshInstance3D", true, false):
+		src = c
+		break
+	if src == null:
+		root.free()
+		_templates[sp] = {}
+		return {}
+	# Mesh'in sahne köküne göre dönüşümü
+	var rel := Transform3D.IDENTITY
+	var cur: Node = src
+	while cur != root and cur != null:
+		if cur is Node3D:
+			rel = (cur as Node3D).transform * rel
+		cur = cur.get_parent()
+	var mesh: Mesh = src.mesh
+	var src_mat: Material = src.get_active_material(0)
+	root.free()
+	var fwd: Vector3 = data.model_fwd
+	# Modelin baş yönünü -Z'ye çeviren dönüş
+	var orient := Basis.IDENTITY
+	if fwd.is_equal_approx(Vector3(0, 0, 1)):
+		orient = Basis(Vector3.UP, PI)
+	elif fwd.is_equal_approx(Vector3(1, 0, 0)):
+		orient = Basis(Vector3.UP, PI * 0.5)
+	elif fwd.is_equal_approx(Vector3(-1, 0, 0)):
+		orient = Basis(Vector3.UP, -PI * 0.5)
+	var aabb: AABB = rel * mesh.get_aabb()
+	var along: float = abs(aabb.size.dot(fwd.abs()))
+	var k: float = float(data.length) / max(along, 0.0001)
+	var xf := Transform3D(orient.scaled(Vector3.ONE * k), Vector3.ZERO) * Transform3D(Basis.IDENTITY, -aabb.get_center()) * rel
+	# Shader için eksenler mesh uzayında
+	var inv: Basis = rel.basis.inverse()
+	var tail_mesh: Vector3 = (inv * -fwd).normalized()
+	var side_model: Vector3 = Vector3.UP.cross(fwd).normalized()
+	var side_mesh: Vector3 = (inv * side_model).normalized()
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://shaders/fish_tex.gdshader")
+	var tex: Texture2D = null
+	var col := Color.WHITE
+	var rough := 0.45
+	if src_mat is BaseMaterial3D:
+		tex = (src_mat as BaseMaterial3D).albedo_texture
+		col = (src_mat as BaseMaterial3D).albedo_color
+		rough = clamp((src_mat as BaseMaterial3D).roughness, 0.25, 0.8)
+	mat.set_shader_parameter("albedo_tex", tex)
+	mat.set_shader_parameter("has_tex", tex != null)
+	mat.set_shader_parameter("albedo_color", col)
+	mat.set_shader_parameter("roughness", rough)
+	mat.set_shader_parameter("tail_axis", tail_mesh)
+	mat.set_shader_parameter("side_axis", side_mesh)
+	mat.set_shader_parameter("center", mesh.get_aabb().get_center())
+	mat.set_shader_parameter("half_len", along * 0.5 / max(rel.basis.get_scale().x, 0.0001))
+	mat.set_shader_parameter("upright", 1.0 if data.upright else 0.0)
+	var t := {"mesh": mesh, "xf": xf, "mat": mat}
+	_templates[sp] = t
+	return t
+
+
+func apply_state(fish_data: Dictionary) -> void:
+	if _mat:
+		_mat.set_shader_parameter("rare", 1.0 if fish_data.get("rare", false) else 0.0)
+	health = float(fish_data.health)
+	alive = bool(fish_data.alive)
+	growth = float(fish_data.get("growth", 1.0))
+	var sc: float = lerp(0.45, 1.0, clamp(growth, 0.0, 1.0)) * (1.0 if walker else VISUAL_SCALE)
+	if _visual:
+		scale = Vector3.ONE * sc
+
+
+## Cama vurulunca ürküp arkaya kaçar
+func scare() -> void:
+	if _burst > 0.2 or not alive:
+		return
+	_burst = 0.8
+	_target = Vector3(_lo().x + _rng.randf() * (_hi().x - _lo().x), _lo().y + _rng.randf() * (_hi().y - _lo().y) * 0.5, _lo().z)
+	_retarget = 2.0
+
+
+func set_sick(level: float) -> void:
+	sick = level
+	if _mat:
+		_mat.set_shader_parameter("sick", level)
+
+
+## Balığın "kişisel alan" yarıçapı (boyuna göre)
+func radius() -> float:
+	return float(_data.length) * scale.x * 0.45
+
+
+func _margin() -> Vector3:
+	var half: float = float(_data.length) * scale.x * 0.5
+	var m := Vector3(half, half * 0.5, half) + Vector3.ONE * 0.04
+	return m.min(bounds.size * 0.45)
+
+
+func _lo() -> Vector3:
+	return bounds.position + _margin()
+
+
+func _hi() -> Vector3:
+	return bounds.end - _margin()
+
+
+func _random_point() -> Vector3:
+	var p := _lo()
+	var s := _hi() - _lo()
+	var y_bias: float = _rng.randf()
+	# Sürü balıkları ortada, diğerleri her yerde
+	if float(_data.schooling) > 0.7:
+		y_bias = _rng.randf_range(0.3, 0.8)
+	return Vector3(p.x + _rng.randf() * s.x, p.y + y_bias * s.y, p.z + _rng.randf() * s.z)
+
+
+func _process(delta: float) -> void:
+	if walker:
+		_walker_process(delta)
+		return
+	if turtle and alive:
+		_turtle_process(delta)
+		return
+	if not alive:
+		_process_dead(delta)
+		return
+	var vigor: float = clamp(health / 100.0, 0.25, 1.0)
+	var spd: float = _speed * vigor
+	_retarget -= delta
+	var feed_point: Vector3 = aquarium.get_food_point() if aquarium and aquarium.has_method("get_food_point") else Vector3.INF
+	if feed_point != Vector3.INF:
+		_target = feed_point + Vector3(_rng.randf_range(-0.08, 0.08), -0.02, _rng.randf_range(-0.05, 0.05))
+		spd *= 2.2
+	elif _retarget <= 0.0 or position.distance_to(_target) < 0.05:
+		_target = _random_point()
+		_retarget = _rng.randf_range(2.0, 6.0)
+		if _rng.randf() < 0.15:
+			_burst = 0.6
+	if _burst > 0.0:
+		_burst -= delta
+		spd *= 2.5
+
+	var desired: Vector3 = (_target - position).normalized() * spd
+	# Sürü davranışı + kişisel alan: hiçbir balık diğerinin içine girmez
+	var school: float = float(_data.schooling)
+	var my_r: float = radius()
+	var center := Vector3.ZERO
+	var align := Vector3.ZERO
+	var sep := Vector3.ZERO
+	var n := 0
+	if aquarium:
+		for other in aquarium.fish_nodes():
+			if other == self or not is_instance_valid(other) or not other.alive:
+				continue
+			var off: Vector3 = position - other.position
+			var d: float = off.length()
+			var min_d: float = (my_r + other.radius()) * 1.15
+			if d < min_d:
+				var push: float = (1.0 - d / min_d)
+				sep += (off / max(d, 0.001) if d > 0.001 else Vector3(_rng.randf_range(-1, 1), 0, _rng.randf_range(-1, 1)).normalized()) * push
+			if school > 0.0 and other.species == species and d < 0.3:
+				center += other.position
+				align += other.velocity
+				n += 1
+	if n > 0 and feed_point == Vector3.INF:
+		center /= n
+		desired += ((center - position) * 0.35 + align / n * 0.8) * school
+	if sep != Vector3.ZERO:
+		desired += sep * spd * 4.0
+		# İç içe geçmiş balıkları anında biraz ayır
+		position += sep * min(my_r, 0.03) * delta * 6.0
+	# Duvarlardan uzak dur (büyük balıklar için daha geniş pay)
+	var lo: Vector3 = _lo()
+	var hi: Vector3 = _hi()
+	for axis in 3:
+		if position[axis] < lo[axis]:
+			desired[axis] += spd * 2.0
+		elif position[axis] > hi[axis]:
+			desired[axis] -= spd * 2.0
+	desired.y *= 0.6
+	if desired.length() > spd * 1.5:
+		desired = desired.normalized() * spd * 1.5
+	velocity = velocity.lerp(desired, clamp(delta * 2.0, 0.0, 1.0))
+	position += velocity * delta
+	position = position.clamp(_lo() - Vector3.ONE * 0.03, _hi() + Vector3.ONE * 0.03)
+
+	if velocity.length() > 0.002:
+		var flat := velocity
+		flat.y = clamp(flat.y, -flat.length() * 0.4, flat.length() * 0.4)
+		var want := Basis.looking_at(flat.normalized(), Vector3.UP)
+		var q := Quaternion(transform.basis.orthonormalized()).slerp(Quaternion(want), clamp(delta * 4.0, 0.0, 1.0))
+		transform.basis = Basis(q).scaled(scale)
+	if _mat:
+		_mat.set_shader_parameter("swim", clamp(velocity.length() / max(_speed, 0.001), 0.35, 2.5))
+		_mat.set_shader_parameter("health", clamp(health / 100.0, 0.15, 1.0))
+
+
+func _process_dead(delta: float) -> void:
+	if _mat:
+		_mat.set_shader_parameter("health", 0.0)
+		_mat.set_shader_parameter("swim", 0.0)
+	var top: float = bounds.end.y + 0.02
+	position.y = move_toward(position.y, top, delta * 0.03)
+	position.y += sin(Time.get_ticks_msec() * 0.001 + _phase) * 0.0005
+	var flat := Vector3(velocity.x, 0, velocity.z)
+	var dir: Vector3 = flat.normalized() if flat.length() > 0.001 else Vector3.FORWARD
+	var want := Basis.looking_at(dir, Vector3.UP) * Basis(Vector3.FORWARD, PI * 0.85)
+	var q := Quaternion(transform.basis.orthonormalized()).slerp(Quaternion(want.orthonormalized()), clamp(delta * 1.5, 0.0, 1.0))
+	transform.basis = Basis(q).scaled(scale)
