@@ -3,6 +3,7 @@ extends SceneTree
 ##   godot --path . --rendering-method gl_compatibility -s res://tools/screenshot.gd -- <çıktı_klasörü>
 
 var _frame := 0
+const SHOT_EVERY := 24
 var _main: Node
 var _game: Node
 ## ad, oyuncu konumu, bakış (yaw), eğim (pitch), kurulmuş dükkân mı
@@ -45,7 +46,7 @@ func _process(_d: float) -> bool:
 		root.add_child(_main)
 	if _frame == 10:
 		_main.hud.close_panel()
-	if _frame > 10 and _frame % 90 == 0:
+	if _frame > 10 and _frame % SHOT_EVERY == 0:
 		if _idx > 0 and _idx <= _shots.size():
 			root.get_viewport().get_texture().get_image().save_png("%s/%s.png" % [_out, _shots[_idx - 1][0]])
 		if _idx >= _shots.size():
