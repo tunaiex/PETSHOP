@@ -39,6 +39,17 @@ func _onizle() -> void:
 	var m: Node3D = FurnitureDB.instance_model(tip)
 	if m == null and info.has("product_model"):
 		m = ProductDB.instance_path(info.product_model, str(info.get("part", "")), float(info.get("model_h", 1.0)))
+	if m == null and info.has("rack"):
+		# Akvaryum rafları: oyundaki gibi modelin kendisi (döndürülüp ortalanmış)
+		var rc: Dictionary = info.rack
+		if ResourceLoader.exists(str(rc.get("model", ""))):
+			var rm: Node3D = (load(rc.model) as PackedScene).instantiate()
+			var box: AABB = MeshKit.model_aabb(rm)
+			rm.position = -Vector3(box.get_center().x, box.position.y, box.get_center().z)
+			var holder := Node3D.new()
+			holder.rotation_degrees.y = float(rc.get("rot", 90.0))
+			holder.add_child(rm)
+			m = holder
 	if m == null:
 		# Modeli olmayan eşyalar (akvaryum, kafes...): kaplama alanı kadar yarı saydam kutu
 		var mi := MeshInstance3D.new()
