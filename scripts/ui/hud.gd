@@ -1266,7 +1266,6 @@ func _fill_fish(body: VBoxContainer, target_tank: int) -> void:
 		["Örümcek (kuru teraryum)", FishDB.ids_in_habitat("kuru")],
 		["Hamster (hamster kafesi)", FishDB.ids_in_habitat("hamster")],
 		["Civciv (civciv kafesi)", FishDB.ids_in_habitat("civciv")],
-		["Kuşlar (kuş kafesi)", FishDB.ids_in_habitat("kus")],
 	]
 	for g in groups:
 		_section(body, g[0])

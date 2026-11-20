@@ -420,6 +420,14 @@ func _test_shop_systems(game: Node) -> void:
 	check(game.remove_shelf_tank(int(wsh.uid), 2) != "", "Balıklı raf akvaryumu kaldırılamaz")
 	stk.fish.clear()
 	check(game.remove_shelf_tank(int(wsh.uid), 2) == "" and game.shelf_capacity(wsh) == 40, "Raf akvaryumu kaldırılır")
+	# 18 bölmeli akvaryum duvarı hazır dolu gelir
+	var tw: Dictionary = game.add_furniture("turk_akvaryum_rafi", 0.0, 1.0, 0.0)
+	var all_ready: bool = tw.tanks.size() == 18
+	for id in tw.tanks:
+		var tt: Dictionary = game.tanks[int(id)]
+		all_ready = all_ready and tt.unlocked and tt.light and str(tt.gravel) != "" and float(tt.cycle) >= 100.0
+	check(all_ready, "18 bölmeli akvaryum duvarı suyla dolu gelir")
+	check(TankSim.check_add(game.tanks[int(tw.tanks[0])], "neon") == "", "Dolu bölmeye hemen balık konabilir")
 	# Akvaryum rafı
 	var rk: Dictionary = game.add_furniture("tank_rafi", 0.0, -4.4, 0.0)
 	check(rk.tanks.size() == 3, "Raf 3 kat tank kaydı açar")

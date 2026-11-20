@@ -202,9 +202,16 @@ func add_furniture(type: String, x: float, z: float, rot: float) -> Dictionary:
 	if FurnitureDB.is_rack(type):
 		# Raf katları boş gelir: tanklar kilitli açılır, oyuncu katlara akvaryum alır.
 		var ids: Array = []
+		var filled: bool = bool(FurnitureDB.item(type).get("rack", {}).get("prefilled", false))
 		for i in rack_slots(type):
-			var t := TankSim.new_tank(tanks.size(), false, 25.0, false)
+			var t := TankSim.new_tank(tanks.size(), filled, 25.0, false)
 			t["cap"] = rack_cap(type)
+			if filled:
+				# Hazır dolu bölme: kum, ışık, filtre ve olgun su
+				t.light = true
+				t.gravel = "natural"
+				t.filter = 1
+				t.cycle = 100.0
 			tanks.append(t)
 			ids.append(t.id)
 		e["tanks"] = ids
