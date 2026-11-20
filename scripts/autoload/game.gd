@@ -139,7 +139,12 @@ func count_furniture(type: String) -> int:
 func add_furniture(type: String, x: float, z: float, rot: float) -> Dictionary:
 	var e := {"uid": _fuid, "type": type, "x": x, "z": z, "rot": rot}
 	_fuid += 1
-	if FurnitureDB.is_tank(type):
+	if FurnitureDB.is_pen(type):
+		var info: Dictionary = FurnitureDB.item(type)
+		var pen := TankSim.new_pen(tanks.size(), str(info.pen), int(info.pen_cap))
+		tanks.append(pen)
+		e["tank"] = pen.id
+	elif FurnitureDB.is_tank(type):
 		var t := TankSim.new_tank(tanks.size(), true, 25.0, false)
 		if type == "teraryum":
 			t["kind"] = "teraryum"
@@ -336,6 +341,58 @@ func add_delivery(pid: String, n: int) -> void:
 	boxes_changed.emit()
 
 
+## Canlı hayvan siparişi: hepsi tek bir poşet / taşıma kutusu olarak kapıya gelir.
+## Oyuncu kutuyu alıp uygun tanka/kafese koyar. Nadir çıkan sayısını döner.
+func order_animals(sp: String, qty: int) -> int:
+	var fish: Array = []
+	var rare := 0
+	for i in qty:
+		var nf: Dictionary = TankSim.supplier_fish(sp, rng)
+		if nf.get("rare", false):
+			rare += 1
+		fish.append(nf)
+	boxes.append({"uid": _buid, "species": sp, "fish": fish, "n": qty})
+	_buid += 1
+	boxes_changed.emit()
+	return rare
+
+
+func is_animal_box(b: Dictionary) -> bool:
+	return b.has("species")
+
+
+## Elindeki canlıları tanka/kafese bırakır. Hata metni ya da "" döner.
+## Yer yetmezse sığanlar konur, kalanlar elde kalır.
+func release_to_tank(tank_id: int) -> String:
+	if carrying.is_empty() or not is_animal_box(carrying):
+		return "Elinde canlı yok."
+	var t: Dictionary = tanks[tank_id]
+	var sp: String = carrying.species
+	var err: String = TankSim.check_add(t, sp)
+	var home_ok: bool = TankSim.habitat_of(t) == FishDB.habitat(sp) and bool(t.get("salt", false)) == FishDB.is_salt(sp)
+	if not home_ok:
+		return err
+	if err.begins_with("Tankta yer yok"):
+		err = ""
+	var moved := 0
+	for f in carrying.fish.duplicate():
+		if TankSim.space_used(t) + TankSim.space_of(sp) > TankSim.capacity(t):
+			break
+		t.fish.append(f)
+		carrying.fish.erase(f)
+		moved += 1
+	if moved == 0:
+		return "Yer yok (%d/%d)." % [TankSim.space_used(t), TankSim.capacity(t)]
+	carrying.n = carrying.fish.size()
+	if carrying.fish.is_empty():
+		carrying = {}
+	carry_changed.emit()
+	tank_changed.emit(tank_id)
+	if err != "":
+		notify.emit("Dikkat: " + err, "warn")
+	return ""
+
+
 func pick_box(uid: int) -> bool:
 	if not carrying.is_empty():
 		notify.emit("Elinde zaten bir koli var.", "bad")
@@ -354,6 +411,9 @@ func pick_box(uid: int) -> bool:
 func carry_to_shelf(shelf_uid: int) -> int:
 	if carrying.is_empty():
 		return 0
+	if is_animal_box(carrying):
+		notify.emit("Canlılar rafa dizilmez, bir tanka/kafese koy.", "bad")
+		return 0
 	var e := furniture_by_uid(shelf_uid)
 	var cap: int = int(FurnitureDB.item(e.type).get("capacity", 20))
 	var move: int = min(int(carrying.n), cap - shelf_total(e))
@@ -371,6 +431,9 @@ func carry_to_shelf(shelf_uid: int) -> int:
 
 func carry_to_depot() -> void:
 	if carrying.is_empty():
+		return
+	if is_animal_box(carrying):
+		notify.emit("Canlılar depoya konmaz! Uygun bir tanka/kafese bakıp bırak.", "bad")
 		return
 	add_stock(carrying.pid, int(carrying.n))
 	carrying = {}
@@ -664,7 +727,15 @@ func from_dict(d: Dictionary) -> bool:
 	employees = {"kasiyer": bool(em.get("kasiyer", false)), "bakimci": bool(em.get("bakimci", false))}
 	boxes = []
 	for b in d.get("boxes", []):
-		boxes.append({"uid": int(b.uid), "pid": str(b.pid), "n": int(b.n)})
+		if b.has("species"):
+			var fl: Array = []
+			for f in b.fish:
+				f.uid = int(f.uid)
+				TankSim.set_uid_floor(f.uid)
+				fl.append(f)
+			boxes.append({"uid": int(b.uid), "species": str(b.species), "fish": fl, "n": fl.size()})
+		else:
+			boxes.append({"uid": int(b.uid), "pid": str(b.pid), "n": int(b.n)})
 	carrying = {}
 	_buid = int(d.get("buid", boxes.size() + 1))
 	regulars = d.get("regulars", [])

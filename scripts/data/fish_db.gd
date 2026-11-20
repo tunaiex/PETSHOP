@@ -198,6 +198,27 @@ const SPECIES := {
 		"aggression": 0.3, "long_fins": false, "small": false, "schooling": 0.0, "speed": 0.25,
 		"desc": "Yerli su kaplumbağası. Teraryum, ısı lambası ve bol temiz su ister. Çok kirletir, uzun yaşar.",
 	},
+	"orumcek": {
+		"name": "Tarantula", "latin": "Brachypelma hamorii", "habitat": "kuru",
+		"buy": 120, "value": 320, "length": 0.11,
+		"temp_min": 20.0, "temp_max": 30.0, "dirt_rate": 0.3, "hardiness": 0.9,
+		"aggression": 0.7, "long_fins": false, "small": false, "schooling": 0.0, "speed": 0.25,
+		"desc": "Sakin ve dayanıklı. Kuru teraryuma çevrilmiş boş bir camda yaşar, suya konmaz.",
+	},
+	"hamster": {
+		"name": "Suriye Hamsteri", "latin": "Mesocricetus auratus", "habitat": "hamster",
+		"buy": 60, "value": 160, "length": 0.15,
+		"temp_min": 18.0, "temp_max": 28.0, "dirt_rate": 1.4, "hardiness": 0.8,
+		"aggression": 0.1, "long_fins": false, "small": false, "schooling": 0.0, "speed": 0.6,
+		"desc": "Çocukların favorisi. Sadece hamster kafesinde yaşar; talaşı sık değiştirilmeli.",
+	},
+	"civciv": {
+		"name": "Civciv", "latin": "Gallus gallus domesticus", "habitat": "civciv",
+		"buy": 15, "value": 45, "length": 0.09,
+		"temp_min": 18.0, "temp_max": 32.0, "dirt_rate": 0.9, "hardiness": 0.6,
+		"aggression": 0.0, "long_fins": false, "small": true, "schooling": 0.6, "speed": 0.45,
+		"desc": "Cıvıl cıvıl. Civciv kafesinde toplu yaşar, ucuzdur ama çok satar.",
+	},
 	"kedi": {
 		"name": "Kedi Balığı", "latin": "Ictalurus punctatus",
 		"buy": 60, "value": 150, "length": 0.18,
@@ -249,6 +270,33 @@ static func get_species(id: String) -> Dictionary:
 
 
 ## Bu türün gerçek 3D modeli (yoksa "").
+## Kara hayvanlarının modelleri ve modelin baş yönü
+const LAND_MODELS := {
+	"hamster": ["res://assets/models/animals/hamster.glb", Vector3(-1, 0, 0), "HamsterALL_Walk", "HamsterALL_Idle"],
+	"civciv": ["res://assets/models/animals/civciv.glb", Vector3(0, 0, 1), "Take 001", "Take 001"],
+	"orumcek": ["res://assets/models/animals/orumcek.glb", Vector3(0, 0, 1), "Spider_Armature|walk_ani_vor", "Spider_Armature|warte_pose"],
+}
+
+
+## Türün yaşam alanı: "su" (akvaryum), "turtle" (teraryum), "kuru" (kuru teraryum),
+## "hamster" (hamster kafesi), "civciv" (civciv kafesi)
+static func habitat(id: String) -> String:
+	return str(get_species(id).get("habitat", "su"))
+
+
+## Suda değil karada yaşayan, yürüyen hayvan mı?
+static func is_land(id: String) -> bool:
+	return habitat(id) in ["kuru", "hamster", "civciv"]
+
+
+static func habitat_name(h: String) -> String:
+	return {"su": "akvaryum", "turtle": "kaplumbağa teraryumu", "kuru": "kuru teraryum", "hamster": "hamster kafesi", "civciv": "civciv kafesi"}.get(h, h)
+
+
+static func ids_in_habitat(h: String) -> Array:
+	return ids().filter(func(i): return habitat(i) == h)
+
+
 static func model_path(id: String) -> String:
 	var p := "res://assets/models/fish/%s.glb" % id
 	return p if ResourceLoader.exists(p) else ""
@@ -257,8 +305,11 @@ static func model_path(id: String) -> String:
 ## Türün en iyi beslendiği yem çeşidi: "soguk" (Japon balığı yemi) ya da "tropikal".
 ## Kaplumbağalar ikisini de yer ("hepsi").
 static func food_type(id: String) -> String:
-	if is_turtle(id):
-		return "hepsi"
+	match habitat(id):
+		"turtle", "kuru":
+			return "hepsi"
+		"hamster", "civciv":
+			return "kafes"
 	return "soguk" if id in ["japon", "koi", "alabalik"] else "tropikal"
 
 
@@ -279,7 +330,7 @@ static func display_name(id: String) -> String:
 
 
 static func salt_ids(salt: bool) -> Array:
-	return ids().filter(func(i): return is_salt(i) == salt and not is_turtle(i))
+	return ids().filter(func(i): return is_salt(i) == salt and habitat(i) == "su")
 
 
 static func turtle_ids() -> Array:

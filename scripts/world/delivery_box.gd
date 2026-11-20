@@ -23,6 +23,9 @@ func setup(d: Dictionary) -> void:
 
 ## Koli görünümü (yerdeki ve eldeki için ortak)
 static func build_mesh(parent: Node3D, d: Dictionary) -> void:
+	if d.has("species"):
+		parent.add_child(AnimalBag.new().setup(str(d.species), int(d.get("n", 1))))
+		return
 	var card := MeshKit.mat(Color(0.72, 0.55, 0.36), 0.85)
 	MeshKit.box(parent, Vector3(0.45, 0.34, 0.38), Vector3(0, 0.17, 0), card)
 	MeshKit.box(parent, Vector3(0.452, 0.012, 0.06), Vector3(0, 0.341, 0), MeshKit.mat(Color(0.85, 0.75, 0.5), 0.4))
@@ -40,10 +43,14 @@ static func build_mesh(parent: Node3D, d: Dictionary) -> void:
 
 
 func get_prompt() -> String:
+	if data.has("species"):
+		return "Kargo: %s ×%d (%s) — al" % [FishDB.display_name(data.species), int(data.n), "poşet" if AnimalBag.is_bag_species(data.species) else "taşıma kutusu"]
 	var p: Dictionary = ProductDB.get_product(data.pid)
 	return "Koli: %s ×%d (al)" % [p.get("name", "?"), int(data.n)]
 
 
 func interact(_player: Node) -> void:
-	if Game.pick_box(int(data.uid)):
+	if data.has("species") and Game.pick_box(int(data.uid)):
+		Game.notify.emit("Canlıları aldın. Uygun bir %s bakıp ETKİLEŞ: içine bırak." % FishDB.habitat_name(FishDB.habitat(data.species)), "info")
+	elif Game.pick_box(int(data.uid)):
 		Game.notify.emit("Koliyi aldın. Bir rafa bakıp ETKİLEŞ: rafa diz. Ya da DEPOYA KOY.", "info")

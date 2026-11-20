@@ -657,7 +657,13 @@ func sync_furniture() -> void:
 
 func spawn(e: Dictionary) -> Node3D:
 	var n: Node3D
-	if FurnitureDB.is_tank(e.type):
+	if FurnitureDB.is_pen(e.type):
+		var pn := Aquarium.new()
+		pn.furniture_uid = int(e.uid)
+		_furn_root.add_child(pn)
+		pn.setup_pen(int(e.tank), str(FurnitureDB.item(e.type).pen))
+		n = pn
+	elif FurnitureDB.is_tank(e.type):
 		var aq := Aquarium.new()
 		aq.furniture_uid = int(e.uid)
 		_furn_root.add_child(aq)

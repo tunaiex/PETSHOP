@@ -14,6 +14,11 @@ const PRODUCTS := {
 		"color": Color(0.75, 0.1, 0.12), "shape": "can", "model": "yem_japon", "food": "soguk",
 		"desc": "Pul yem. Japon balığı, koi ve alabalık gibi soğuk su balıkları için.",
 	},
+	"kafes_yemi": {
+		"name": "Hamster & Civciv Yemi", "buy": 22, "price": 55, "use": true,
+		"color": Color(0.85, 0.65, 0.2), "shape": "bag", "food": "kafes",
+		"desc": "Tohum karışımı. Hamster ve civcivler için.",
+	},
 	"su_duzenleyici": {
 		"name": "Su Düzenleyici", "buy": 25, "price": 60, "use": true,
 		"color": Color(0.15, 0.45, 0.8), "shape": "bottle",

@@ -52,6 +52,9 @@ func _build_visual() -> void:
 	if FishDB.is_turtle(species):
 		_build_turtle()
 		return
+	if FishDB.is_land(species) and FishDB.LAND_MODELS.has(species):
+		_build_walker()
+		return
 	var model: Dictionary = _model_template(species)
 	if not model.is_empty():
 		var mi := MeshInstance3D.new()
@@ -139,6 +142,109 @@ func _build_turtle() -> void:
 	for c in root.find_children("*", "MeshInstance3D", true, false):
 		(c as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_visual = root
+
+
+# ------------------------------------------------------------------ Kara hayvanları
+
+var walker: bool = false
+var _ap: AnimationPlayer
+var _walk_name: String = ""
+var _idle_name: String = ""
+var _pause: float = 0.0
+
+
+## Hamster / civciv / örümcek: hazır animasyonlu model, zeminde yürür. -Z'ye bakar, ayakları y=0'da.
+func _build_walker() -> void:
+	walker = true
+	var cfg: Array = FishDB.LAND_MODELS[species]
+	var m: Node3D = (load(cfg[0]) as PackedScene).instantiate()
+	var box: AABB = MeshKit.model_aabb(m)
+	var fwd: Vector3 = cfg[1]
+	var along: float = abs(box.size.dot(fwd.abs()))
+	var k: float = float(_data.length) / max(along, 0.0001)
+	var holder := Node3D.new()
+	# Modelin baş yönünü -Z'ye çevir
+	if fwd.is_equal_approx(Vector3(0, 0, 1)):
+		holder.rotation.y = PI
+	elif fwd.is_equal_approx(Vector3(-1, 0, 0)):
+		holder.rotation.y = -PI * 0.5
+	elif fwd.is_equal_approx(Vector3(1, 0, 0)):
+		holder.rotation.y = PI * 0.5
+	m.scale = Vector3.ONE * k
+	m.position = -Vector3(box.get_center().x, box.position.y, box.get_center().z) * k
+	holder.add_child(m)
+	add_child(holder)
+	for c in m.find_children("*", "MeshInstance3D", true, false):
+		(c as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	for a in m.find_children("*", "AnimationPlayer", true, false):
+		_ap = a
+		break
+	_walk_name = cfg[2]
+	_idle_name = cfg[3]
+	if _ap:
+		for n in [_walk_name, _idle_name]:
+			if _ap.has_animation(n):
+				_ap.get_animation(n).loop_mode = Animation.LOOP_LINEAR
+		if _ap.has_animation(_idle_name):
+			_ap.play(_idle_name)
+			_ap.seek(_rng.randf() * _ap.current_animation_length, true)
+	_visual = holder
+	_pause = _rng.randf_range(0.5, 3.0)
+
+
+func _walker_process(delta: float) -> void:
+	var ground: float = bounds.position.y
+	if not alive:
+		# Ölü hayvan yan yatar
+		position.y = ground
+		if _ap and _ap.is_playing():
+			_ap.pause()
+		var lie := Basis(Vector3.FORWARD, PI * 0.5)
+		transform.basis = Basis(Quaternion(transform.basis.orthonormalized()).slerp(Quaternion(lie), clamp(delta * 3.0, 0.0, 1.0))).scaled(scale)
+		return
+	var feed_point: Vector3 = aquarium.get_food_point() if aquarium and aquarium.has_method("get_food_point") else Vector3.INF
+	var spd: float = _speed * clamp(health / 100.0, 0.3, 1.0)
+	if feed_point != Vector3.INF:
+		_target = feed_point
+		_pause = 0.0
+		spd *= 1.6
+	if _pause > 0.0:
+		_pause -= delta
+		velocity = velocity.lerp(Vector3.ZERO, clamp(delta * 6.0, 0.0, 1.0))
+		if _pause <= 0.0:
+			_target = _random_point()
+	else:
+		var to := _target - position
+		to.y = 0.0
+		if to.length() < 0.03:
+			_pause = _rng.randf_range(1.5, 6.0) if feed_point == Vector3.INF else 0.5
+		else:
+			var desired: Vector3 = to.normalized() * spd
+			# Birbirinin içine girmesinler
+			for other in aquarium.fish_nodes():
+				if other == self or not is_instance_valid(other) or not other.alive:
+					continue
+				var off: Vector3 = position - other.position
+				off.y = 0.0
+				var d: float = off.length()
+				var min_d: float = (radius() + other.radius()) * 1.1
+				if d < min_d and d > 0.0001:
+					desired += off / d * spd * 2.0 * (1.0 - d / min_d)
+			velocity = velocity.lerp(desired, clamp(delta * 4.0, 0.0, 1.0))
+	position += velocity * delta
+	position = position.clamp(Vector3(_lo().x, ground, _lo().z), Vector3(_hi().x, ground, _hi().z))
+	position.y = ground
+	var flat := Vector3(velocity.x, 0, velocity.z)
+	var moving: bool = flat.length() > spd * 0.25
+	if moving:
+		var want := Basis.looking_at(flat.normalized(), Vector3.UP)
+		var q := Quaternion(transform.basis.orthonormalized()).slerp(Quaternion(want), clamp(delta * 6.0, 0.0, 1.0))
+		transform.basis = Basis(q).scaled(scale)
+	if _ap:
+		var want_anim: String = _walk_name if moving else _idle_name
+		if _ap.has_animation(want_anim) and _ap.current_animation != want_anim:
+			_ap.play(want_anim, 0.2)
+		_ap.speed_scale = clamp(flat.length() / max(_speed, 0.001), 0.6, 2.0) if moving else 1.0
 
 
 func _turtle_process(delta: float) -> void:
@@ -264,7 +370,7 @@ func apply_state(fish_data: Dictionary) -> void:
 	health = float(fish_data.health)
 	alive = bool(fish_data.alive)
 	growth = float(fish_data.get("growth", 1.0))
-	var sc: float = lerp(0.45, 1.0, clamp(growth, 0.0, 1.0)) * VISUAL_SCALE
+	var sc: float = lerp(0.45, 1.0, clamp(growth, 0.0, 1.0)) * (1.0 if walker else VISUAL_SCALE)
 	if _visual:
 		scale = Vector3.ONE * sc
 
@@ -314,6 +420,9 @@ func _random_point() -> Vector3:
 
 
 func _process(delta: float) -> void:
+	if walker:
+		_walker_process(delta)
+		return
 	if turtle and alive:
 		_turtle_process(delta)
 		return

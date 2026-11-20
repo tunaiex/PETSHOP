@@ -29,7 +29,7 @@ var _food_point: Vector3
 var _label: Label3D
 var _sign: Label3D
 var _content: Node3D
-var _light: SpotLight3D
+var _light: Light3D
 var _built_unlocked: bool = false
 var _sync_timer: float = 0.0
 var _tw: float = TW
@@ -39,6 +39,11 @@ var _y0: float = STAND_H + 0.025
 var _water_h: float = TH - 0.06
 ## Raf akvaryumu ise kat numarası (0 alt kat), değilse -1
 var rack_level: int = -1
+## "hamster" / "civciv": suyu olmayan hayvan kafesi. "" ise akvaryum.
+var pen: String = ""
+const PEN_MODEL_CHICK := "res://assets/models/props/civciv_kafesi.glb"
+const CHICK_D := 1.05      ## civciv kafesi çapı
+const CHICK_FLOOR := 0.07  ## kafes tabanı yüksekliği
 var _rack_size: Vector2 = Vector2.ZERO
 
 
@@ -72,6 +77,27 @@ func setup_rack(id: int, level: int, y0: float, rack_size: Vector2) -> void:
 	setup(id)
 
 
+## Hamster / civciv kafesi kurulumu
+func setup_pen(id: int, kind: String) -> void:
+	pen = kind
+	if kind == "hamster":
+		_tw = RACK_TW
+		_th = RACK_TH
+		_td = RACK_TD
+		_y0 = 0.78
+	else:
+		_tw = CHICK_D * 0.62
+		_td = CHICK_D * 0.62
+		_th = 0.42
+		_y0 = CHICK_FLOOR
+	_water_h = 0.06
+	setup(id)
+
+
+func _is_dry() -> bool:
+	return pen != "" or TankSim.is_dry(data())
+
+
 func data() -> Dictionary:
 	return Game.tanks[tank_id]
 
@@ -84,6 +110,13 @@ func _on_tank_changed(id: int) -> void:
 # ------------------------------------------------------------------ İnşa
 
 func _build_static() -> void:
+	if pen == "hamster":
+		_build_hamster_stand()
+		_build_rack_tank()
+		return
+	if pen == "civciv":
+		_build_chick_cage()
+		return
 	if rack_level >= 0:
 		_build_rack_tank()
 		return
@@ -244,6 +277,195 @@ func _build_rack_tank() -> void:
 	add_child(body)
 
 
+## Hamster kafesinin altındaki ahşap sehpa
+func _build_hamster_stand() -> void:
+	var wood := MeshKit.shader_mat("res://shaders/wood_floor.gdshader", {"wood_a": Color(0.62, 0.45, 0.28), "wood_b": Color(0.5, 0.35, 0.2), "plank": Vector2(4.0, 0.5)})
+	var top_y: float = _y0 - 0.012
+	MeshKit.box(self, Vector3(_tw + 0.1, 0.04, _td + 0.12), Vector3(0, top_y - 0.02, 0), wood)
+	for x in [-1.0, 1.0]:
+		for z in [-1.0, 1.0]:
+			MeshKit.box(self, Vector3(0.05, top_y - 0.04, 0.05), Vector3(x * (_tw * 0.5 - 0.0), (top_y - 0.04) * 0.5, z * (_td * 0.5 - 0.0)), wood)
+	MeshKit.box(self, Vector3(_tw, 0.025, _td), Vector3(0, 0.18, 0), wood)
+	var body := StaticBody3D.new()
+	var cs := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(_tw + 0.1, top_y, _td + 0.12)
+	cs.shape = shape
+	cs.position.y = top_y * 0.5
+	body.add_child(cs)
+	body.set_meta("interact", self)
+	add_child(body)
+	# Altta yedek talaş paketleri
+	var bag := MeshKit.mat(Color(0.9, 0.82, 0.55), 0.8)
+	for i in 2:
+		var b := MeshKit.box(self, Vector3(0.22, 0.26, 0.14), Vector3(-0.2 + i * 0.26, 0.32, 0), bag)
+		b.rotation_degrees.y = 8 - i * 14
+
+
+## Yuvarlak tel civciv kafesi: oyuncunun modeli (ahşap taban + kapak) + hafif tel örgü
+func _build_chick_cage() -> void:
+	var h := 0.5
+	if ResourceLoader.exists(PEN_MODEL_CHICK):
+		var m: Node3D = (load(PEN_MODEL_CHICK) as PackedScene).instantiate()
+		var box: AABB = MeshKit.model_aabb(m)
+		var k: float = CHICK_D / max(box.size.x, box.size.z)
+		m.scale = Vector3.ONE * k
+		m.position = -Vector3(box.get_center().x, box.position.y, box.get_center().z) * k
+		add_child(m)
+		h = box.size.y * k
+	var net := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = CHICK_D * 0.5 - 0.02
+	cm.bottom_radius = CHICK_D * 0.5 - 0.02
+	cm.height = h - CHICK_FLOOR - 0.03
+	cm.radial_segments = 40
+	cm.cap_top = false
+	cm.cap_bottom = false
+	net.mesh = cm
+	net.material_override = MeshKit.shader_mat("res://shaders/wire_net.gdshader")
+	net.position.y = CHICK_FLOOR + cm.height * 0.5
+	net.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(net)
+	_glass_mat = null
+	_label = Label3D.new()
+	_label.font_size = 22
+	_label.pixel_size = 0.001
+	_label.outline_size = 5
+	_label.outline_modulate = Color(0, 0, 0, 0.8)
+	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_label.position = Vector3(0, h + 0.12, 0)
+	add_child(_label)
+	var body := StaticBody3D.new()
+	var cs := CollisionShape3D.new()
+	var shape := CylinderShape3D.new()
+	shape.radius = CHICK_D * 0.5
+	shape.height = h + 0.05
+	cs.shape = shape
+	cs.position.y = shape.height * 0.5
+	body.add_child(cs)
+	body.set_meta("interact", self)
+	add_child(body)
+
+
+## Suyu olmayan bölmelerin içi: talaş / toprak zemin, eşyalar, ışık
+func _rebuild_dry_content(d: Dictionary) -> void:
+	var y0 := _y0
+	var gh := 0.03
+	_gravel_mat = MeshKit.shader_mat("res://shaders/gravel.gdshader")
+	if pen != "":
+		# Talaş
+		_gravel_mat.set_shader_parameter("color_a", Color(0.93, 0.82, 0.58))
+		_gravel_mat.set_shader_parameter("color_b", Color(0.82, 0.66, 0.4))
+		_gravel_mat.set_shader_parameter("scale", 60.0)
+	else:
+		# Toprak
+		_gravel_mat.set_shader_parameter("color_a", Color(0.36, 0.26, 0.17))
+		_gravel_mat.set_shader_parameter("color_b", Color(0.25, 0.18, 0.12))
+		_gravel_mat.set_shader_parameter("scale", 40.0)
+	if pen == "civciv":
+		var floor_mi := MeshInstance3D.new()
+		var fm := CylinderMesh.new()
+		fm.top_radius = CHICK_D * 0.5 - 0.03
+		fm.bottom_radius = fm.top_radius
+		fm.height = gh
+		floor_mi.mesh = fm
+		floor_mi.material_override = _gravel_mat
+		floor_mi.position.y = y0 + gh * 0.5
+		_content.add_child(floor_mi)
+	else:
+		MeshKit.box(_content, Vector3(_tw - 0.016, gh, _td - 0.016), Vector3(0, y0 + gh * 0.5, 0), _gravel_mat)
+	var yf: float = y0 + gh
+	match pen:
+		"hamster":
+			_build_hamster_props(yf)
+		"civciv":
+			_build_chick_props(yf)
+		_:
+			_build_decor(RandomNumberGenerator.new())
+	# Işık (hamster kafesinde LED, kuru teraryumda lamba alınmışsa)
+	if pen == "" and d.get("light", false) or pen == "hamster":
+		_light = SpotLight3D.new()
+		_light.position = Vector3(0, y0 + _th - 0.02, 0)
+		_light.rotation_degrees = Vector3(-90, 0, 0)
+		_light.spot_range = _th + 0.3
+		_light.spot_angle = 70.0
+		_light.light_energy = 1.6
+		_light.light_color = Color(1.0, 0.95, 0.85)
+		_light.shadow_enabled = false
+		_light.visible = not Game.power_out
+		_content.add_child(_light)
+	_build_food_particles()
+
+
+func _build_hamster_props(yf: float) -> void:
+	var white := MeshKit.mat(Color(0.92, 0.92, 0.9), 0.4)
+	var blue := MeshKit.mat(Color(0.3, 0.6, 0.9), 0.35)
+	var red := MeshKit.mat(Color(0.85, 0.25, 0.2), 0.45)
+	# Çark (sağ arka)
+	var wheel := Node3D.new()
+	wheel.position = Vector3(_tw * 0.5 - 0.14, yf + 0.13, -_td * 0.5 + 0.12)
+	_content.add_child(wheel)
+	var ring := MeshInstance3D.new()
+	var tm := TorusMesh.new()
+	tm.inner_radius = 0.105
+	tm.outer_radius = 0.12
+	tm.rings = 24
+	ring.mesh = tm
+	ring.material_override = blue
+	ring.rotation_degrees.x = 90
+	wheel.add_child(ring)
+	var back := MeshKit.cylinder(wheel, 0.115, 0.01, Vector3(0, 0, -0.04), blue, 24)
+	back.rotation_degrees.x = 90
+	MeshKit.box(wheel, Vector3(0.03, 0.14, 0.03), Vector3(0, -0.07, -0.05), white)
+	# Ev (sol)
+	var house := Node3D.new()
+	house.position = Vector3(-_tw * 0.5 + 0.13, yf, -0.05)
+	_content.add_child(house)
+	MeshKit.box(house, Vector3(0.16, 0.1, 0.14), Vector3(0, 0.05, 0), MeshKit.mat(Color(0.95, 0.85, 0.6), 0.6))
+	var roof := MeshKit.box(house, Vector3(0.1, 0.012, 0.16), Vector3(-0.035, 0.12, 0), red)
+	roof.rotation_degrees.z = 32
+	var roof2 := MeshKit.box(house, Vector3(0.1, 0.012, 0.16), Vector3(0.035, 0.12, 0), red)
+	roof2.rotation_degrees.z = -32
+	MeshKit.box(house, Vector3(0.05, 0.05, 0.004), Vector3(0, 0.03, 0.071), MeshKit.mat(Color(0.15, 0.1, 0.06), 0.9))
+	# Suluk (arka cama asılı)
+	MeshKit.cylinder(_content, 0.025, 0.14, Vector3(0.05, yf + 0.2, -_td * 0.5 + 0.03), MeshKit.mat(Color(0.7, 0.85, 1.0), 0.1), 12)
+	var spout := MeshKit.cylinder(_content, 0.005, 0.06, Vector3(0.05, yf + 0.11, -_td * 0.5 + 0.045), white, 6)
+	spout.rotation_degrees.x = 25
+	# Yem kabı
+	MeshKit.cylinder(_content, 0.045, 0.025, Vector3(-0.05, yf + 0.012, 0.1), red, 16)
+	MeshKit.cylinder(_content, 0.038, 0.012, Vector3(-0.05, yf + 0.022, 0.1), MeshKit.mat(Color(0.7, 0.55, 0.25), 0.9), 16)
+
+
+func _build_chick_props(yf: float) -> void:
+	var red := MeshKit.mat(Color(0.8, 0.2, 0.18), 0.45)
+	# Yemlik ve suluk
+	MeshKit.cylinder(_content, 0.07, 0.03, Vector3(-0.18, yf + 0.015, 0.05), red, 18)
+	MeshKit.cylinder(_content, 0.05, 0.1, Vector3(-0.18, yf + 0.08, 0.05), MeshKit.mat(Color(0.9, 0.9, 0.85, 1.0), 0.3), 14)
+	MeshKit.cylinder(_content, 0.07, 0.025, Vector3(0.2, yf + 0.012, -0.1), MeshKit.mat(Color(0.25, 0.5, 0.85), 0.3), 18)
+	# Isı lambası (kapağın altında kırmızı ampul)
+	var bulb_mat := StandardMaterial3D.new()
+	bulb_mat.albedo_color = Color(1.0, 0.35, 0.2)
+	bulb_mat.emission_enabled = true
+	bulb_mat.emission = Color(1.0, 0.3, 0.15)
+	bulb_mat.emission_energy_multiplier = 3.0
+	var bulb := MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = 0.045
+	sm.height = 0.09
+	bulb.mesh = sm
+	bulb.material_override = bulb_mat
+	bulb.position = Vector3(0, _y0 + _th, 0)
+	_content.add_child(bulb)
+	var heat := OmniLight3D.new()
+	heat.position = bulb.position - Vector3(0, 0.06, 0)
+	heat.light_color = Color(1.0, 0.55, 0.3)
+	heat.light_energy = 1.2
+	heat.omni_range = 0.7
+	heat.visible = not Game.power_out
+	_content.add_child(heat)
+	_light = heat
+
+
 var furniture_uid: int = 0
 var _equip_sig: String = ""
 
@@ -251,7 +473,7 @@ var _equip_sig: String = ""
 ## Ekipman/dekor değişince görünümün yeniden kurulması gerekir.
 func _signature() -> String:
 	var d: Dictionary = data()
-	return "%s|%s|%s|%s|%s|%s|%s" % [d.get("salt", false), d.get("gravel", ""), d.get("light", false), d.get("air", false), d.get("heater_on", false), d.filter, ",".join(PackedStringArray(d.get("decor", [])))]
+	return "%s|%s|%s|%s|%s|%s|%s|%s" % [d.get("kind", ""), d.get("salt", false), d.get("gravel", ""), d.get("light", false), d.get("air", false), d.get("heater_on", false), d.filter, ",".join(PackedStringArray(d.get("decor", [])))]
 
 
 func _gravel_h() -> float:
@@ -268,6 +490,12 @@ func _rebuild_content() -> void:
 	_built_unlocked = d.unlocked
 	_built_salt = bool(d.get("salt", false))
 	_equip_sig = _signature()
+	if _is_dry():
+		_water_mat = null
+		_surface_mat = null
+		_rebuild_dry_content(d)
+		sync()
+		return
 	var y0 := _y0
 	var gh := _gravel_h()
 	var rng := RandomNumberGenerator.new()
@@ -560,6 +788,10 @@ func _build_particles() -> void:
 # ------------------------------------------------------------------ Eşitleme
 
 func swim_bounds() -> AABB:
+	if _is_dry():
+		var floor_y: float = _y0 + 0.03
+		var m := 0.05
+		return AABB(Vector3(-_tw * 0.5 + m, floor_y, -_td * 0.5 + m), Vector3(_tw - 2 * m, 0.08, _td - 2 * m))
 	var lo := Vector3(-_tw * 0.5 + 0.07, _y0 + _gravel_h() + 0.06, -_td * 0.5 + 0.07)
 	var hi := Vector3(_tw * 0.5 - 0.07 - (ISLAND_W if terrarium else 0.0), _y0 + _water_h - 0.04, _td * 0.5 - 0.07)
 	return AABB(lo, hi - lo)
@@ -589,10 +821,13 @@ func sync() -> void:
 			_fish[uid].queue_free()
 			_fish.erase(uid)
 	var dirt: float = d.dirt
-	_water_mat.set_shader_parameter("dirt", dirt)
-	_surface_mat.set_shader_parameter("dirt", dirt)
-	_gravel_mat.set_shader_parameter("dirt", dirt)
-	_glass_mat.set_shader_parameter("algae", clamp((dirt - 40.0) / 60.0, 0.0, 1.0))
+	if _water_mat:
+		_water_mat.set_shader_parameter("dirt", dirt)
+		_surface_mat.set_shader_parameter("dirt", dirt)
+	if _gravel_mat:
+		_gravel_mat.set_shader_parameter("dirt", dirt)
+	if _glass_mat:
+		_glass_mat.set_shader_parameter("algae", clamp((dirt - 40.0) / 60.0, 0.0, 1.0) * (0.0 if _is_dry() else 1.0))
 	_update_label()
 
 
@@ -606,6 +841,10 @@ func _update_label() -> void:
 		lines.append("%s ×%d" % [FishDB.display_name(sp), counts[sp]])
 	if counts.is_empty():
 		lines.append("(boş)")
+	if pen != "":
+		lines[0] = "%s %d" % ["HAMSTER" if pen == "hamster" else "CİVCİV", tank_id + 1]
+		_label.text = "  •  ".join(lines) if pen == "hamster" else "\n".join(lines)
+		return
 	if rack_level >= 0:
 		lines[0] = "TANK %d%s %.1f°C" % [tank_id + 1, " TUZLU" if d.get("salt", false) else "", d.temp]
 		_label.text = "  •  ".join(lines)
@@ -646,6 +885,8 @@ func play_feed() -> void:
 	if not _food_particles:
 		return
 	_food_point = Vector3(randf_range(-0.3, 0.3) * _tw / TW, _y0 + _water_h - 0.06, randf_range(-0.05, 0.1))
+	if _is_dry():
+		_food_point.y = _y0 + 0.035
 	_food_particles.position = _food_point + Vector3(0, 0.05, 0)
 	_food_particles.restart()
 	_food_particles.emitting = true
@@ -663,12 +904,28 @@ func look_target() -> Vector3:
 
 func get_prompt() -> String:
 	var d := data()
+	if Game.is_animal_box(Game.carrying):
+		return "Tank %d: %s ×%d içine bırak" % [tank_id + 1, FishDB.display_name(Game.carrying.species), int(Game.carrying.n)]
+	if pen != "":
+		return "%s %d: İncele" % ["Hamster kafesi" if pen == "hamster" else "Civciv kafesi", tank_id + 1]
 	if TankSim.living(d).is_empty() and str(d.get("gravel", "")) == "":
 		return "Tank %d: Kur (kum, filtre, ısıtıcı, lamba...)" % (tank_id + 1)
 	return "Tank %d: İncele" % (tank_id + 1)
 
 
 func interact(player: Node) -> void:
+	if Game.is_animal_box(Game.carrying):
+		var sp: String = Game.carrying.species
+		var n0: int = int(Game.carrying.n)
+		var err: String = Game.release_to_tank(tank_id)
+		if err != "":
+			Game.notify.emit(err, "bad")
+			Sfx.play("bad")
+			return
+		var left: int = int(Game.carrying.get("n", 0)) if Game.is_animal_box(Game.carrying) else 0
+		Game.notify.emit("%d %s bırakıldı%s." % [n0 - left, FishDB.display_name(sp), (", %d tanesi sığmadı" % left) if left > 0 else ""], "good")
+		Sfx.play("splash" if not TankSim.is_dry(data()) else "click")
+		return
 	player.hud.open_tank(self)
 
 

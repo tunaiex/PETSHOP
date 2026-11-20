@@ -54,6 +54,9 @@ static func supplier_fish(species: String, rng: RandomNumberGenerator) -> Dictio
 
 ## Balıkları bir tanktan diğerine taşır. Taşınan adet.
 static func move_fish(src: Dictionary, dst: Dictionary, species: String, count: int) -> int:
+	# Hayvan sadece kendi yaşam alanına taşınabilir (balık kafese, hamster akvaryuma gitmez)
+	if habitat_of(dst) != FishDB.habitat(species):
+		return 0
 	var moved := 0
 	for f in src.fish.duplicate():
 		if moved >= count:
@@ -124,9 +127,12 @@ static func species_in(tank: Dictionary) -> Array:
 
 ## Bu türü tanka koymak sorun yaratır mı? Sorun metni ya da "".
 static func check_add(tank: Dictionary, species: String) -> String:
-	var terra: bool = tank.get("kind", "") == "teraryum"
-	if terra != FishDB.is_turtle(species):
-		return "Teraryuma sadece kaplumbağa konur." if terra else "%s bir teraryum ister." % FishDB.display_name(species)
+	var hab: String = habitat_of(tank)
+	var want: String = FishDB.habitat(species)
+	if hab != want:
+		if hab == "su":
+			return "%s akvaryuma konmaz, %s ister." % [FishDB.display_name(species), FishDB.habitat_name(want)]
+		return "Buraya (%s) sadece %s konur; %s %s ister." % [FishDB.habitat_name(hab), _habitat_animals(hab), FishDB.display_name(species), FishDB.habitat_name(want)]
 	if bool(tank.get("salt", false)) != FishDB.is_salt(species):
 		return "%s %s ister, bu tank %s." % [FishDB.display_name(species), "tuzlu su" if FishDB.is_salt(species) else "tatlı su", "tuzlu" if tank.get("salt", false) else "tatlı su"]
 	if space_used(tank) + space_of(species) > capacity(tank):
@@ -138,6 +144,41 @@ static func check_add(tank: Dictionary, species: String) -> String:
 	return ""
 
 
+## Tankın kabul ettiği yaşam alanı (FishDB.habitat ile karşılaştırılır)
+static func habitat_of(tank: Dictionary) -> String:
+	match str(tank.get("kind", "")):
+		"teraryum":
+			return "turtle"
+		"kuru":
+			return "kuru"
+		"hamster":
+			return "hamster"
+		"civciv":
+			return "civciv"
+	return "su"
+
+
+## Suyu olmayan (kafes / kuru teraryum) bölme mi?
+static func is_dry(tank: Dictionary) -> bool:
+	return habitat_of(tank) in ["kuru", "hamster", "civciv"]
+
+
+static func _habitat_animals(h: String) -> String:
+	return {"turtle": "kaplumbağa", "kuru": "örümcek", "hamster": "hamster", "civciv": "civciv"}.get(h, "balık")
+
+
+## Hamster / civciv kafesi kaydı: suyu yok, talaşlı, ışıklı.
+static func new_pen(id: int, kind: String, cap: int) -> Dictionary:
+	var t := new_tank(id, true, ROOM_TEMP, false)
+	t.kind = kind
+	t.cap = cap
+	t.light = true
+	t.cycle = 100.0
+	t.heater_on = false
+	t.gravel = "talas"
+	return t
+
+
 ## Simülasyonu ilerletir. Olay metinleri dizisi döner.
 static func step(tank: Dictionary, minutes: float, rng: RandomNumberGenerator) -> Array:
 	var events: Array = []
@@ -147,6 +188,7 @@ static func step(tank: Dictionary, minutes: float, rng: RandomNumberGenerator) -
 	var dead: int = tank.fish.size() - alive.size()
 
 	# Sıcaklık ısıtıcı hedefine yaklaşır (ısıtıcı oda sıcaklığının altına soğutamaz).
+	var dry: bool = is_dry(tank)
 	var target: float = max(tank.heater, ROOM_TEMP) if (tank.get("heater_on", true) and power_on) else ROOM_TEMP
 	tank.temp = move_toward(tank.temp, target, 0.05 * minutes)
 
@@ -154,7 +196,7 @@ static func step(tank: Dictionary, minutes: float, rng: RandomNumberGenerator) -
 	var bioload: float = 0.0
 	for f in alive:
 		bioload += float(FishDB.get_species(f.species).dirt_rate) * lerp(0.5, 1.0, f.growth)
-	var eff: float = FILTER_EFF[clamp(int(tank.filter), 0, 3)] if power_on else 0.0
+	var eff: float = FILTER_EFF[clamp(int(tank.filter), 0, 3)] if power_on and not dry else 0.0
 	tank.dirt = clamp(tank.dirt + (bioload * 0.012 * (1.0 - eff) + dead * 0.15) * minutes, 0.0, 100.0)
 
 	# Suyun olgunlaşması (yararlı bakteriler). Filtre hızlandırır.
@@ -167,7 +209,9 @@ static func step(tank: Dictionary, minutes: float, rng: RandomNumberGenerator) -
 		tank.food = clamp(tank.food - 0.15 * minutes, 0.0, 100.0)
 
 	# Hastalık
-	if not tank.sick and tank.dirt > 60.0 and alive.size() > 0:
+	if dry:
+		tank.cycle = 100.0
+	if not dry and not tank.sick and tank.dirt > 60.0 and alive.size() > 0:
 		if rng.randf() < 0.002 * minutes * (tank.dirt - 60.0) / 40.0:
 			tank.sick = true
 			tank.sick_level = 0.1
@@ -195,7 +239,7 @@ static func step(tank: Dictionary, minutes: float, rng: RandomNumberGenerator) -
 			stress += 0.4
 		if float(tank.get("cycle", 100.0)) < 60.0:
 			stress += (60.0 - float(tank.cycle)) / 60.0 * 0.06
-		if (not tank.get("air", true) or not power_on) and alive.size() > 6:
+		if not dry and (not tank.get("air", true) or not power_on) and alive.size() > 6:
 			stress += 0.02 * (alive.size() - 6) / 6.0
 		for other in present:
 			if other == f.species and other != "beta":

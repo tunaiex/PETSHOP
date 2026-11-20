@@ -26,6 +26,16 @@ const ITEMS := {
 		"size": Vector2(1.1, 0.86), "height": 2.15, "levels": 3,
 		"desc": "Üst üste 3 ışıklı akvaryum alır. Her kata akvaryumu ayrıca alıp koyarsın (LED lamba dahil, 8 yer).",
 	},
+	"hamster_kafesi": {
+		"name": "Hamster kafesi", "price": 650, "cat": "kafes",
+		"size": Vector2(1.0, 0.58), "height": 1.4, "pen": "hamster", "pen_cap": 8,
+		"desc": "Ahşap sehpa üstünde camlı hamster yuvası: talaş, çark, ev, suluk. Sadece hamster konur.",
+	},
+	"civciv_kafesi": {
+		"name": "Civciv kafesi", "price": 480, "cat": "kafes",
+		"size": Vector2(1.1, 1.1), "height": 0.65, "pen": "civciv", "pen_cap": 14,
+		"desc": "Yuvarlak tel kafes, ısı lambalı. Sadece civciv konur.",
+	},
 	"kasa": {
 		"name": "Kasa tezgâhı", "price": 700, "cat": "magaza", "max": 1,
 		"size": Vector2(2.64, 0.74), "height": 1.05,
@@ -73,7 +83,7 @@ const ITEMS := {
 	},
 }
 
-const CATEGORIES := [["akvaryum", "Akvaryumlar"], ["magaza", "Kasa"], ["raf", "Raflar"], ["dekor", "Dekor"]]
+const CATEGORIES := [["akvaryum", "Akvaryumlar"], ["kafes", "Kafesler"], ["magaza", "Kasa"], ["raf", "Raflar"], ["dekor", "Dekor"]]
 
 ## Akvaryum ekipmanı
 const EQUIPMENT := {
@@ -114,6 +124,11 @@ static func decor_for(salt: bool) -> Array:
 
 static func is_tank(id: String) -> bool:
 	return id.begins_with("akvaryum") or id == "teraryum"
+
+
+## Hamster / civciv kafesi (Game.tanks içinde suyu olmayan bölme)
+static func is_pen(id: String) -> bool:
+	return item(id).has("pen")
 
 
 static func is_rack(id: String) -> bool:

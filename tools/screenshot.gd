@@ -24,6 +24,11 @@ var _shots := [
 	["raf_yakin", Vector3(-5.3, 0.05, 1.0), 90.0, -8.0, true],
 	["yem_rafi", Vector3(4.6, 0.05, -1.6), -90.0, -14.0, true],
 	["yem_elde", Vector3(-5.3, 0.05, 1.0), 90.0, -8.0, true, "yem"],
+	["hamster", Vector3(1.5, 0.05, -0.75), 0.0, -32.0, true],
+	["civciv", Vector3(-2.2, 0.05, 2.75), 0.0, -48.0, true],
+	["orumcek", Vector3(-5.6, 0.05, 1.0), 90.0, 12.0, true],
+	["kargo", Vector3(2.4, 0.05, 2.2), 180.0, -30.0, true],
+	["kargo_elde", Vector3(1.5, 0.05, -0.75), 0.0, -20.0, true, "kargo"],
 ]
 var _idx := 0
 var _out := "user://shots"
@@ -71,6 +76,11 @@ func _process(_d: float) -> bool:
 				_game.carry_to_depot()
 				_game.minute = 19 * 60 + 25
 				_game.time_changed.emit(int(_game.minute))
+			"kargo":
+				for b in _game.boxes:
+					if b.has("species") and b.species == "hamster":
+						_game.pick_box(int(b.uid))
+						break
 			"yem":
 				_main.player.hands.hold_food("yem_japon")
 				_main.player.hands._anim = 1000.0
@@ -140,22 +150,35 @@ func _build() -> void:
 	g.tanks[int(a.tank)].fish[0]["rare_name"] = "Altın"
 	# 3 katlı akvaryum rafı: üç kat da dolu
 	var rk: Dictionary = g.add_furniture("tank_rafi", -6.5, 1.0, 90.0)
-	var rack_fish := [{"neon": 8}, {"japon": 3}, {"palyaco": 2, "mandarin": 1}]
+	var rack_fish := [{"neon": 8}, {"japon": 3}, {"orumcek": 2}]
 	for lv in 3:
 		g.buy_rack_tank(int(rk.uid), lv)
 		var rt: Dictionary = g.tanks[int(rk.tanks[lv])]
-		rt.salt = lv == 2
-		rt.gravel = "white" if lv == 2 else "natural"
+		rt.salt = false
+		if lv == 2:
+			rt.kind = "kuru"
+			rt.gravel = "toprak"
+		rt.gravel = "natural"
 		rt.heater_on = lv != 1
 		rt.heater = 21.0 if lv == 1 else 26.0
 		rt.temp = rt.heater
 		rt.filter = 1
 		rt.air = lv == 0
 		rt.cycle = 100.0
-		rt.decor = [["bitki", "kaya", "bitki"], ["kaya", "amfora"], ["resif", "deniz_yildizi"]][lv]
+		rt.decor = [["bitki", "kaya", "bitki"], ["kaya", "amfora"], ["kok", "kaya"]][lv]
 		for sp in rack_fish[lv]:
 			for i in rack_fish[lv][sp]:
 				rt.fish.append(TankSim.new_fish(sp, 0.85))
+	# Hamster ve civciv kafesleri
+	var hk: Dictionary = g.add_furniture("hamster_kafesi", 1.5, -1.9, 0.0)
+	for i in 3:
+		g.tanks[int(hk.tank)].fish.append(TankSim.new_fish("hamster", 0.9))
+	var ck: Dictionary = g.add_furniture("civciv_kafesi", -2.2, 1.7, 0.0)
+	for i in 7:
+		g.tanks[int(ck.tank)].fish.append(TankSim.new_fish("civciv", 0.9))
+	g.order_animals("neon", 6)
+	g.order_animals("hamster", 2)
+	g.order_animals("palyaco", 2)
 	g.weather = "gunesli"
 	for t in g.tanks:
 		g.tank_changed.emit(t.id)
