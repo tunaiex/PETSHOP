@@ -24,7 +24,11 @@ func setup(uid: int, t: String, m: Node) -> void:
 		"paspas":
 			MeshKit.box(self, Vector3(info.size.x, 0.012, info.size.y), Vector3(0, 0.006, 0), MeshKit.mat(Color(0.2, 0.22, 0.24), 0.95))
 		_:
-			_build_plant(info)
+			var sm: Node3D = FurnitureDB.instance_model(type)
+			if sm:
+				add_child(sm)
+			else:
+				_build_plant(info)
 	if not info.get("walkable", false):
 		var body := StaticBody3D.new()
 		var cs := CollisionShape3D.new()
@@ -48,7 +52,28 @@ func _prop(id: String) -> Node3D:
 	return (load(path) as PackedScene).instantiate()
 
 
+## Kasa üstü cihazlar (tezgâha göre yerel konum, Y dönüşü) — mağaza paketinin yerleşiminden
+const COUNTER_PROPS := [
+	["cash_register_smart", Vector3(0.45, 0.9, -0.1), 180.0],
+	["barcode_scanner_smart", Vector3(0.2, 0.9, 0.05), 180.0],
+	["payment_terminal_smart", Vector3(0.6, 0.9, 0.25), 0.0],
+	["receipt_printer_smart", Vector3(0.75, 0.9, -0.25), 180.0],
+]
+
+
 func _build_counter() -> void:
+	var store_counter: Node3D = FurnitureDB.instance_model("kasa")
+	if store_counter:
+		add_child(store_counter)
+		for pr in COUNTER_PROPS:
+			var path := FurnitureDB.STORE_MODEL % pr[0]
+			if ResourceLoader.exists(path):
+				var n: Node3D = (load(path) as PackedScene).instantiate()
+				FurnitureDB.hide_collision_meshes(n)
+				n.position = pr[1]
+				n.rotation_degrees.y = pr[2]
+				add_child(n)
+		return
 	var counter := _prop("kasa_tezgahi")
 	if counter:
 		# Model 0..2.62 x, -0.66..0.03 z aralığında; ortala. Müşteri yüzü modelde +Z.
@@ -116,12 +141,22 @@ func _build_plant(info: Dictionary) -> void:
 
 ## Kasada sırası gelen müşterinin durduğu yer (yazar kasanın önü)
 func register_point() -> Vector3:
-	return to_global(Vector3(-0.5, 0, 1.05))
+	return to_global(Vector3(0.45, 0, 0.8))
 
 
-## Sıradaki i. müşterinin yeri: kasadan dışarı doğru bir çizgi
+## Müşterinin kasada baktığı nokta
+func register_face() -> Vector3:
+	return to_global(Vector3(0.45, 0, 0))
+
+
+## Kasiyerin durduğu yer (tezgâhın arkası)
+func cashier_point() -> Vector3:
+	return to_global(Vector3(0.45, 0, -0.75))
+
+
+## Sıradaki i. müşterinin yeri: tezgâh boyunca bir çizgi
 func queue_point(i: int) -> Vector3:
-	return to_global(Vector3(-0.5 + 0.35 * (i % 2), 0, 1.05 + 0.85 * (i + 1)))
+	return to_global(Vector3(0.45 - 0.75 * (i + 1), 0, 0.85 + 0.12 * (i % 2)))
 
 
 func get_prompt() -> String:

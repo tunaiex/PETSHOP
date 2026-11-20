@@ -27,7 +27,7 @@ func _ready() -> void:
 	shop.hud = hud
 	# Oyuna dışarıda, kaldırımda, dükkâna bakarak başlanır.
 	player = Player.new()
-	player.position = Vector3(0, 0.05, Shop.D * 0.5 + 3.0)
+	player.position = Shop.DOOR + Vector3(0, 0.05, 3.2)
 	player.rotation.y = 0.0
 	player.hud = hud
 	add_child(player)
@@ -118,7 +118,7 @@ func sync_employees() -> void:
 			var e := Employee.new()
 			add_child(e)
 			e.setup(role, self, shop)
-			e.global_position = shop.counter.to_global(Vector3(-0.5, 0, -0.9)) if (role == "kasiyer" and shop.counter) else Vector3(-1.0, 0, 2.5)
+			e.global_position = shop.counter.cashier_point() if (role == "kasiyer" and shop.counter) else Vector3(-1.2, 0, 2.6)
 			employees[role] = e
 		elif not want and have:
 			employees[role].queue_free()
@@ -257,7 +257,7 @@ func resolve_complaint(c: Customer, refund: bool) -> void:
 
 
 func someone_near_door() -> bool:
-	var door := Vector3(0, 0, Shop.D * 0.5)
+	var door := Shop.DOOR
 	if player and player.global_position.distance_to(door) < 2.6:
 		return true
 	for c in customers:

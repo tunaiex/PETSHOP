@@ -38,16 +38,86 @@ const ITEMS := {
 	},
 	"kasa": {
 		"name": "Kasa tezgâhı", "price": 700, "cat": "magaza", "max": 1,
-		"size": Vector2(2.64, 0.74), "height": 1.05,
-		"desc": "Yazar kasalı tezgâh. Kasa olmadan satış yapılamaz!",
+		"size": Vector2(1.8, 0.7), "height": 0.9, "model": "checkout_counter",
+		"desc": "Yazar kasalı, barkod okuyuculu tezgâh. Kasa olmadan satış yapılamaz!",
+	},
+	# Mağaza rafları (Retail Store paketi). shelf: katların üst yüzeyi, kat genişliği/derinliği,
+	# yüz sayısı (reyon iki yüzlü) ve soğuk dolap olup olmadığı.
+	"duvar_rafi_m": {
+		"name": "Duvar rafı (5 kat)", "price": 320, "cat": "raf", "model": "shelf_wall",
+		"size": Vector2(1.2, 0.45), "height": 2.0, "capacity": 40,
+		"shelf": {"levels": [0.125, 0.475, 0.825, 1.175, 1.525], "width": 1.14, "depth": 0.4, "z": 0.0, "sides": 1},
+		"desc": "Duvar boyu 5 katlı raf, 40 ürün.",
+	},
+	"reyon": {
+		"name": "Çift yüzlü reyon", "price": 420, "cat": "raf", "model": "gondola_double",
+		"size": Vector2(1.26, 0.9), "height": 1.6, "capacity": 48,
+		"shelf": {"levels": [0.125, 0.475, 0.825, 1.175], "width": 1.14, "depth": 0.4, "z": 0.22, "sides": 2},
+		"desc": "Ortaya konan iki yüzlü reyon: iki tarafına da ürün dizilir. 48 ürün.",
+	},
+	"reyon_basi": {
+		"name": "Reyon başı", "price": 260, "cat": "raf", "model": "gondola_endcap",
+		"size": Vector2(0.9, 0.6), "height": 1.7, "capacity": 16,
+		"shelf": {"levels": [0.125, 0.475, 0.825, 1.175], "width": 0.84, "depth": 0.4, "z": 0.05, "sides": 1},
+		"desc": "Reyonun ucuna konan vitrin rafı. Kampanya ürünleri için ideal.",
+	},
+	"sergi_masasi": {
+		"name": "Sergi masası", "price": 180, "cat": "raf", "model": "display_table",
+		"size": Vector2(1.2, 0.8), "height": 0.75, "capacity": 12,
+		"shelf": {"levels": [0.75], "width": 1.1, "depth": 0.6, "z": 0.0, "sides": 1},
+		"desc": "Üstüne ürün sergilenen alçak masa.",
+	},
+	"buzdolabi": {
+		"name": "Camlı buzdolabı (2 kapı)", "price": 900, "cat": "raf", "model": "fridge_glass_2door",
+		"size": Vector2(1.25, 0.75), "height": 2.0, "capacity": 24,
+		"shelf": {"levels": [0.36, 0.76, 1.16, 1.56], "width": 1.1, "depth": 0.45, "z": 0.0, "sides": 1, "cold": true},
+		"desc": "Soğuk ve donuk ürünler için. Normal ürün konmaz.",
+	},
+	"dondurucu_dik": {
+		"name": "Camlı dondurucu", "price": 650, "cat": "raf", "model": "upright_freezer_glass",
+		"size": Vector2(0.75, 0.8), "height": 2.0, "capacity": 12,
+		"shelf": {"levels": [0.36, 0.76, 1.16, 1.56], "width": 0.6, "depth": 0.45, "z": 0.0, "sides": 1, "cold": true},
+		"desc": "Dik dondurucu. Donuk yemler buraya.",
+	},
+	"icecek_dolabi": {
+		"name": "Küçük soğutucu", "price": 300, "cat": "raf", "model": "drinks_cooler",
+		"size": Vector2(0.45, 0.45), "height": 0.9, "capacity": 4,
+		"shelf": {"levels": [0.2, 0.5], "width": 0.32, "depth": 0.3, "z": 0.0, "sides": 1, "cold": true},
+		"desc": "Tezgâh boyu küçük soğutucu.",
+	},
+	"sandik_dondurucu": {
+		"name": "Sandık dondurucu", "price": 550, "cat": "raf", "model": "chest_freezer",
+		"size": Vector2(1.5, 0.7), "height": 0.85, "capacity": 12,
+		"shelf": {"levels": [0.55], "width": 1.3, "depth": 0.5, "z": 0.0, "sides": 1, "cold": true},
+		"desc": "Üstten açılan dondurucu.",
+	},
+	"kose_rafi": {
+		"name": "Köşe rafı", "price": 220, "cat": "dekor", "model": "shelf_corner",
+		"size": Vector2(0.9, 0.9), "height": 2.0,
+		"desc": "İki duvarın birleştiği köşeye.",
+	},
+	"kasa_onu_raf": {
+		"name": "Kasa önü standı", "price": 120, "cat": "dekor", "model": "checkout_impulse_rack",
+		"size": Vector2(0.6, 0.3), "height": 1.2,
+		"desc": "Kasa önü küçük stand.",
+	},
+	"delikli_pano": {
+		"name": "Delikli duvar panosu", "price": 150, "cat": "dekor", "model": "pegboard_wall",
+		"size": Vector2(1.2, 0.2), "height": 1.8,
+		"desc": "Duvara asılan delikli pano.",
+	},
+	"sepet_standi": {
+		"name": "Alışveriş sepeti standı", "price": 90, "cat": "dekor", "model": "basket_stand_a", "appeal": 1,
+		"size": Vector2(0.52, 0.4), "height": 0.75,
+		"desc": "Müşteriler sepet alsın (+itibar).",
 	},
 	"kavisli_raf": {
-		"name": "Kavisli ürün rafı", "price": 380, "cat": "raf",
+		"name": "Kavisli ürün rafı", "price": 380, "cat": "raf", "hidden": true,
 		"size": Vector2(2.4, 0.46), "height": 1.9, "capacity": 24,
 		"desc": "3 katlı, 24 ürünlük şık raf.",
 	},
 	"duvar_rafi": {
-		"name": "Metal duvar rafı", "price": 260, "cat": "raf",
+		"name": "Metal duvar rafı", "price": 260, "cat": "raf", "hidden": true,
 		"size": Vector2(1.02, 0.42), "height": 2.15, "capacity": 20,
 		"desc": "4 katlı dar raf, 20 ürün. Duvar kenarına uygun.",
 	},
@@ -115,7 +185,33 @@ static func item(id: String) -> Dictionary:
 
 
 static func in_category(cat: String) -> Array:
-	return ITEMS.keys().filter(func(k): return ITEMS[k].cat == cat)
+	return ITEMS.keys().filter(func(k): return ITEMS[k].cat == cat and not ITEMS[k].get("hidden", false))
+
+
+const STORE_MODEL := "res://assets/models/store/fixtures/%s.glb"
+
+
+## Mağaza paketindeki eşya modeli (çarpışma kopyaları gizli). Yoksa null.
+static func instance_model(id: String) -> Node3D:
+	var m: String = str(item(id).get("model", ""))
+	if m == "" or not ResourceLoader.exists(STORE_MODEL % m):
+		return null
+	var n: Node3D = (load(STORE_MODEL % m) as PackedScene).instantiate()
+	hide_collision_meshes(n)
+	return n
+
+
+## Paketteki "_colN" çarpışma kopyalarını görünmez yapar.
+static func hide_collision_meshes(n: Node) -> void:
+	for c in n.find_children("*", "MeshInstance3D", true, false):
+		if "_col" in str(c.name) or str(c.name).ends_with("-col") or "convcolonly" in str(c.name):
+			c.visible = false
+
+
+## Bu rafa bu ürün konabilir mi? (soğuk ürün sadece soğutucuya, normal ürün soğutucuya konmaz)
+static func shelf_accepts(type: String, pid: String) -> bool:
+	var cold: bool = bool(item(type).get("shelf", {}).get("cold", false))
+	return cold == bool(ProductDB.get_product(pid).get("cold", false))
 
 
 static func decor_for(salt: bool) -> Array:
@@ -136,7 +232,7 @@ static func is_rack(id: String) -> bool:
 
 
 static func is_shelf(id: String) -> bool:
-	return id == "kavisli_raf" or id == "duvar_rafi"
+	return id == "kavisli_raf" or id == "duvar_rafi" or item(id).has("shelf")
 
 
 ## Eşyanın zemindeki dört köşesi (dünya XZ düzleminde)

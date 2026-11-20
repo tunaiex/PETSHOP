@@ -11,12 +11,24 @@ var _items: Node3D
 ## Her katın üst yüzey yüksekliği, kat genişliği, kat derinlik merkezi
 var _rows: Array = []
 var _width: float = 2.0
+var _sides: int = 1          ## 2: reyon gibi iki yüzlü (arka yüz -Z)
+var _depth_z: float = 0.02   ## ürün sırasının raf merkezine uzaklığı (ön yüz)
+var _shelf_depth: float = 0.4
 
 
 func setup(uid: int, type: String) -> void:
 	furniture_uid = uid
 	kind = type
-	if kind == "duvar_rafi" and ResourceLoader.exists(WALL_MODEL):
+	var cfg: Dictionary = FurnitureDB.item(kind).get("shelf", {})
+	var model: Node3D = FurnitureDB.instance_model(kind)
+	if model and not cfg.is_empty():
+		add_child(model)
+		_width = float(cfg.width)
+		_rows = cfg.levels
+		_sides = int(cfg.get("sides", 1))
+		_depth_z = float(cfg.get("z", 0.0))
+		_shelf_depth = float(cfg.get("depth", 0.4))
+	elif kind == "duvar_rafi" and ResourceLoader.exists(WALL_MODEL):
 		_build_wall_model()
 	else:
 		_build_curved()
@@ -90,7 +102,8 @@ func refresh() -> void:
 	if e.is_empty():
 		return
 	var cap: int = int(FurnitureDB.item(kind).get("capacity", 20))
-	var per_row: int = int(ceil(float(cap) / _rows.size()))
+	var rows_total: int = _rows.size() * _sides
+	var per_row: int = int(ceil(float(cap) / rows_total))
 	var slot := 0
 	var ids: Array = ProductDB.ids()
 	for pid in ids:
@@ -99,16 +112,27 @@ func refresh() -> void:
 		for k in n:
 			var row: int = slot / per_row
 			var col: int = slot % per_row
-			if row >= _rows.size():
+			if row >= rows_total:
 				break
+			# Önce ön yüzün katları (yukarıdan aşağı göz hizası önce), sonra arka yüz
+			var side: int = row / _rows.size()
+			var lvl: int = row % _rows.size()
+			var lvl_order: Array = _level_order()
+			var y: float = _rows[lvl_order[lvl]]
 			var x: float = -_width * 0.5 + (col + 0.5) * _width / per_row
-			_product_mesh(_items, p, Vector3(x, _rows[row], 0.02), pid)
+			var z: float = _depth_z if side == 0 else -_depth_z
+			var mesh_parent := Node3D.new()
+			mesh_parent.position = Vector3(x if side == 0 else -x, y, z)
+			if side == 1:
+				mesh_parent.rotation.y = PI
+			_items.add_child(mesh_parent)
+			_product_mesh(mesh_parent, p, Vector3.ZERO, pid)
 			slot += 1
 
 
 func _product_mesh(parent: Node3D, p: Dictionary, pos: Vector3, pid: String = "") -> void:
 	if p.has("model"):
-		var model: Node3D = ProductDB.instance_model(pid, 0.15)
+		var model: Node3D = ProductDB.instance_model(pid, float(p.get("h", 0.15)))
 		if model:
 			model.position = pos
 			model.rotation_degrees.y = randf_range(-12.0, 12.0)
@@ -133,6 +157,13 @@ func _product_mesh(parent: Node3D, p: Dictionary, pos: Vector3, pid: String = ""
 		_:
 			MeshKit.box(parent, Vector3(0.13, 0.19, 0.1), pos + Vector3(0, 0.095, 0), m)
 			MeshKit.box(parent, Vector3(0.132, 0.05, 0.102), pos + Vector3(0, 0.14, 0), label)
+
+
+## Ürünlerin dolma sırası: göz hizasındaki kat önce
+func _level_order() -> Array:
+	var idx: Array = range(_rows.size())
+	idx.sort_custom(func(a, b): return abs(float(_rows[a]) - 1.15) < abs(float(_rows[b]) - 1.15))
+	return idx
 
 
 ## Müşterinin rafa bakarken durduğu yer

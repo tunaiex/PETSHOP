@@ -348,7 +348,7 @@ static func food_match(tank: Dictionary, food: String) -> float:
 	var ok := 0
 	for f in fish:
 		var want: String = FishDB.food_type(f.species)
-		if want == "hepsi" or want == food:
+		if want == "hepsi" or want == food or (food == "hepsi" and want != "kafes"):
 			ok += 1
 	return 0.5 + 0.5 * float(ok) / fish.size()
 

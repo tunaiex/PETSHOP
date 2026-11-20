@@ -996,6 +996,8 @@ func _fill_shelf(body: VBoxContainer, sh: Shelf) -> void:
 	var cap: int = int(FurnitureDB.item(sh.kind).capacity)
 	body.add_child(_lbl("Rafta %d / %d ürün. Ürünler depodan gelir, müşteriler sadece raftakini alır." % [Game.shelf_total(e), cap], 19, Color(0.8, 0.85, 0.87)))
 	for pid in ProductDB.ids():
+		if not FurnitureDB.shelf_accepts(sh.kind, pid) and int(e.shelf.get(pid, 0)) == 0:
+			continue
 		var p: Dictionary = ProductDB.get_product(pid)
 		var row := _row(body)
 		var n := _lbl(p.name, 20)
@@ -1119,26 +1121,7 @@ func _fill_shop_settings(body: VBoxContainer) -> void:
 	le.max_length = 24
 	le.custom_minimum_size = Vector2(420, 44)
 	row.add_child(le)
-	_btn(row, "Tabelayı yaz", func(): _set_setting(body, "name", le.text.strip_edges().to_upper() if le.text.strip_edges() != "" else "AKVARYUM DÜKKÂNI"))
-	_section(body, "Duvar rengi")
-	var wf := _flow(body)
-	for i in Game.WALL_COLORS.size():
-		var b := _btn(wf, Game.WALL_COLORS[i][0], _set_setting.bind(body, "wall", i), int(Game.settings.wall) != i)
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = Game.WALL_COLORS[i][1].darkened(0.35)
-		sb.set_corner_radius_all(10)
-		sb.set_content_margin_all(10)
-		b.add_theme_stylebox_override("normal", sb)
-	_section(body, "Zemin")
-	var ff := _flow(body)
-	for i in Game.FLOOR_TYPES.size():
-		_btn(ff, Game.FLOOR_TYPES[i][0], _set_setting.bind(body, "floor", i), int(Game.settings.floor) != i)
-	_section(body, "Dükkânı büyüt")
-	if Game.shop_level < Game.MAX_LEVEL:
-		body.add_child(_lbl("Sol duvarı yıkıp dükkânı 4 m genişlet. Kira günde +150 ₺ artar. (Sadece sabah, kapalıyken)", 18, Color(0.8, 0.85, 0.87)))
-		_btn(body, "Genişlet (%s ₺)" % Aquarium._fmt(Game.EXPAND_COST[Game.shop_level]), _expand_shop.bind(body), Game.money >= Game.EXPAND_COST[Game.shop_level] and Game.phase == "prep")
-	else:
-		body.add_child(_lbl("Dükkân en büyük boyutta.", 19, C_GOOD))
+	_btn(row, "Tabelayı yaz", func(): _set_setting(body, "name", le.text.strip_edges().to_upper() if le.text.strip_edges() != "" else "PETSHOP"))
 	_section(body, "Ayarlar")
 	_btn(body, "Kepçe mini oyunu: %s" % ("AÇIK" if Game.settings.get("catch_game", true) else "KAPALI"), _set_setting.bind(body, "catch_game", not Game.settings.get("catch_game", true)))
 

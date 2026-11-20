@@ -452,14 +452,14 @@ func _process(delta: float) -> void:
 				_next_browse()
 		State.QUEUE:
 			if not moving and shop.counter:
-				_face(shop.counter.to_global(Vector3(-0.5, 0, 0)))
+				_face(shop.counter.register_face())
 				wait_time -= delta * Game.time_scale * 0.5
 				if wait_time <= 0.0:
 					_give_up()
 		State.REGISTER:
 			if not moving:
 				if shop.counter:
-					_face(shop.counter.to_global(Vector3(-0.5, 0, 0)))
+					_face(shop.counter.register_face())
 				if haggle == null:
 					wait_time -= delta * Game.time_scale
 					var frac: float = wait_time / wait_max

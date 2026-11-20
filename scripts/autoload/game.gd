@@ -24,7 +24,7 @@ const RENT_GROWTH := 25 ## Kira her gün artar (enflasyon!)
 const START_MONEY := 4000
 const SALARY := {"kasiyer": 180, "bakimci": 140}
 const EXPAND_COST := [6000, 9000]
-const MAX_LEVEL := 2
+const MAX_LEVEL := 0 ## Mağaza binası sabit: genişletme yok
 const BOX_SIZE := 10
 const BRANCH_COST := 25000
 const LOANS := [[5000, 10, 600], [15000, 10, 1750]] ## tutar, gün, günlük taksit
@@ -59,7 +59,7 @@ var furniture: Array = []    ## {"uid","type","x","z","rot", "tank"?, "shelf"?}
 var _fuid: int = 1
 
 # --- Dükkân
-var settings: Dictionary = {"wall": 0, "floor": 0, "name": "AKVARYUM DÜKKÂNI", "catch_game": true}
+var settings: Dictionary = {"wall": 0, "floor": 0, "name": "PETSHOP", "catch_game": true}
 var shop_level: int = 0
 var employees: Dictionary = {"kasiyer": false, "bakimci": false}
 var boxes: Array = []        ## Kapıya gelen koliler {"uid","pid","n"}
@@ -104,7 +104,7 @@ func new_game() -> void:
 	tanks.clear()
 	furniture.clear()
 	_fuid = 1
-	settings = {"wall": 0, "floor": 0, "name": "AKVARYUM DÜKKÂNI", "catch_game": true}
+	settings = {"wall": 0, "floor": 0, "name": "PETSHOP", "catch_game": true}
 	shop_level = 0
 	employees = {"kasiyer": false, "bakimci": false}
 	boxes = []
@@ -119,7 +119,24 @@ func new_game() -> void:
 	loan = {}
 	branches = 0
 	_reset_stats()
+	for f in STARTER_LAYOUT:
+		add_furniture(f[0], f[1], f[2], f[3])
 	roll_day()
+
+
+## Hazır dükkân: rafları, dolapları ve kasası yerinde ama bomboş gelir (ürünleri oyuncu dizer).
+const STARTER_LAYOUT := [
+	["duvar_rafi_m", -4.5, 1.58, 90.0], ["duvar_rafi_m", -4.5, 0.38, 90.0], ["duvar_rafi_m", -4.5, -0.82, 90.0],
+	["kose_rafi", -4.28, -1.88, 90.0],
+	["reyon", -2.4, 1.2, 90.0], ["reyon", -2.4, 0.0, 90.0], ["reyon_basi", -2.4, 2.1, 0.0],
+	["reyon", 0.0, 1.2, 90.0], ["reyon", 0.0, 0.0, 90.0], ["reyon_basi", 0.0, 2.1, 0.0],
+	["buzdolabi", -3.2, -1.95, 0.0], ["buzdolabi", -1.95, -1.95, 0.0],
+	["dondurucu_dik", -0.95, -1.92, 0.0], ["dondurucu_dik", -0.2, -1.92, 0.0],
+	["icecek_dolabi", 1.95, -2.1, 0.0], ["sandik_dondurucu", 1.8, 0.0, 0.0],
+	["sergi_masasi", 4.32, -0.52, 90.0], ["duvar_rafi_m", 4.5, -1.73, 270.0],
+	["kasa", 3.6, 2.4, 270.0], ["kasa_onu_raf", 3.6, 1.2, 270.0], ["delikli_pano", 4.72, 2.4, 270.0],
+	["sepet_standi", -0.3, 3.1, 180.0],
+]
 
 
 # ---------------------------------------------------------------- Mobilya
@@ -249,7 +266,7 @@ func shelf_total(e: Dictionary) -> int:
 ## Depodan rafa ürün koyar. Gerçekten taşınan adedi döner.
 func stock_shelf(uid: int, pid: String, n: int) -> int:
 	var e := furniture_by_uid(uid)
-	if e.is_empty() or not e.has("shelf"):
+	if e.is_empty() or not e.has("shelf") or not FurnitureDB.shelf_accepts(e.type, pid):
 		return 0
 	var cap: int = int(FurnitureDB.item(e.type).get("capacity", 20))
 	var move: int = min(n, int(stock.get(pid, 0)), cap - shelf_total(e))
@@ -323,7 +340,7 @@ func buy_price(id: String) -> int:
 
 
 func room_min_x() -> float:
-	return -7.0 - 4.0 * shop_level
+	return Shop.ROOM.position.x
 
 
 func has_furniture(type: String) -> bool:
@@ -415,6 +432,9 @@ func carry_to_shelf(shelf_uid: int) -> int:
 		notify.emit("Canlılar rafa dizilmez, bir tanka/kafese koy.", "bad")
 		return 0
 	var e := furniture_by_uid(shelf_uid)
+	if not FurnitureDB.shelf_accepts(e.type, carrying.pid):
+		notify.emit("Bu ürün buraya konmaz (%s)." % ("soğutucuya sadece donuk/soğuk ürün" if FurnitureDB.item(e.type).get("shelf", {}).get("cold", false) else "soğuk ürün soğutucuda durmalı"), "bad")
+		return 0
 	var cap: int = int(FurnitureDB.item(e.type).get("capacity", 20))
 	var move: int = min(int(carrying.n), cap - shelf_total(e))
 	if move <= 0:
@@ -673,7 +693,7 @@ func next_day() -> void:
 
 func to_dict() -> Dictionary:
 	return {
-		"version": 2, "money": money, "day": day, "reputation": reputation,
+		"version": 3, "money": money, "day": day, "reputation": reputation,
 		"debt_days": debt_days, "stock": stock, "tanks": tanks,
 		"furniture": furniture, "fuid": _fuid,
 		"settings": settings, "shop_level": shop_level, "employees": employees,
@@ -684,7 +704,7 @@ func to_dict() -> Dictionary:
 
 
 func from_dict(d: Dictionary) -> bool:
-	if int(d.get("version", 0)) != 2:
+	if int(d.get("version", 0)) != 3:
 		return false
 	money = int(d.money)
 	day = int(d.day)

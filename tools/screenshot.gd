@@ -7,28 +7,19 @@ var _main: Node
 var _game: Node
 ## ad, oyuncu konumu, bakış (yaw), eğim (pitch), kurulmuş dükkân mı
 var _shots := [
-	["bos_disari", Vector3(0, 0.05, 8.0), 0.0, -2.0, false],
-	["cadde", Vector3(-2.0, 0.05, 15.5), -8.0, 10.0, false],
-	["genel", Vector3(5.6, 0.05, 4.5), 42.0, -10.0, true],
-	["tank_tatli", Vector3(-3.5, 0.05, -3.25), 0.0, -16.0, true],
-	["tank_deniz", Vector3(0.0, 0.05, -3.25), 0.0, -16.0, true],
-	["teraryum", Vector3(-1.2, 0.05, 0.2), 30.0, -22.0, true],
-	["koliler", Vector3(2.4, 0.05, 2.2), 180.0, -30.0, true],
-	["kasa", Vector3(2.2, 0.05, 4.4), -55.0, -10.0, true],
-	["kepce", Vector3(2.2, 0.05, 4.4), -55.0, -10.0, true, "kepce"],
-	["telefon", Vector3(2.2, 0.05, 4.4), -55.0, -10.0, true, "telefon"],
-	["koli_elde", Vector3(3.0, 0.05, 0.5), -90.0, -10.0, true, "koli"],
-	["aksam_disari", Vector3(0, 0.05, 8.0), 0.0, 2.0, true, "aksam"],
-	["yerlestirme", Vector3(-1.5, 0.05, 1.2), 90.0, -28.0, true, "yerlestir"],
-	["akvaryum_rafi", Vector3(-4.0, 0.05, 1.0), 90.0, 4.0, true],
-	["raf_yakin", Vector3(-5.3, 0.05, 1.0), 90.0, -8.0, true],
-	["yem_rafi", Vector3(4.6, 0.05, -1.6), -90.0, -14.0, true],
-	["yem_elde", Vector3(-5.3, 0.05, 1.0), 90.0, -8.0, true, "yem"],
-	["hamster", Vector3(1.5, 0.05, -0.75), 0.0, -32.0, true],
-	["civciv", Vector3(-2.2, 0.05, 2.75), 0.0, -48.0, true],
-	["orumcek", Vector3(-5.6, 0.05, 1.0), 90.0, 12.0, true],
-	["kargo", Vector3(2.4, 0.05, 2.2), 180.0, -30.0, true],
-	["kargo_elde", Vector3(1.5, 0.05, -0.75), 0.0, -20.0, true, "kargo"],
+	["bos_disari", Vector3(1.2, 0.05, 9.0), 0.0, 2.0, false],
+	["bos_ici", Vector3(3.0, 0.05, 3.1), 50.0, -8.0, false],
+	["genel", Vector3(4.3, 0.05, 3.2), 48.0, -14.0, true],
+	["raflar", Vector3(-1.2, 0.05, 1.6), 90.0, -10.0, true],
+	["buzdolabi", Vector3(-2.0, 0.05, -0.6), 0.0, -6.0, true],
+	["kasa", Vector3(1.6, 0.05, 2.9), -90.0, -18.0, true],
+	["akvaryumlar", Vector3(1.4, 0.05, 1.7), 140.0, -16.0, true],
+	["hamster", Vector3(1.8, 0.05, 2.6), 0.0, -34.0, true],
+	["civciv", Vector3(-3.6, 0.05, 1.6), 180.0, -48.0, true],
+	["kargo", Vector3(-0.6, 0.05, 6.0), 180.0, -30.0, true],
+	["aksam_disari", Vector3(1.2, 0.05, 9.0), 0.0, 4.0, true, "aksam"],
+	["telefon", Vector3(3.0, 0.05, 3.1), 50.0, -8.0, true, "telefon"],
+	["yem_elde", Vector3(-1.2, 0.05, 1.6), 90.0, -10.0, true, "yem"],
 ]
 var _idx := 0
 var _out := "user://shots"
@@ -101,86 +92,63 @@ func _build() -> void:
 	_built = true
 	var g := _game
 	g.money = 20000
-	g.add_furniture("kasa", 4.5, 2.6, 0.0)
-	var a: Dictionary = g.add_furniture("akvaryum_ceviz", -3.5, -4.6, 0.0)
-	var b: Dictionary = g.add_furniture("akvaryum_ceviz", 0.0, -4.6, 0.0)
-	var c: Dictionary = g.add_furniture("akvaryum_ceviz", 3.5, -4.6, 0.0)
-	var d: Dictionary = g.add_furniture("akvaryum_beyaz", -6.45, -1.4, 90.0)
-	var r1: Dictionary = g.add_furniture("kavisli_raf", 6.72, -1.6, -90.0)
-	var r2: Dictionary = g.add_furniture("duvar_rafi", 6.75, 1.0, -90.0)
-	g.add_furniture("saksi_agave", -6.3, 4.3, 0.0)
-	g.add_furniture("saksi_egrelti", -6.2, 2.4, 0.0)
-	var ter: Dictionary = g.add_furniture("teraryum", -2.0, -1.4, 30.0)
-	g.add_furniture("jenerator", 6.4, 4.2, -90.0)
-	g.add_furniture("kamera", -6.6, -4.6, 45.0)
-	g.employees = {"kasiyer": true, "bakimci": true}
-	g.add_delivery("yem", 25)
-	g.add_delivery("kum", 10)
-	g.add_furniture("saksi_calilik", -3.6, 4.4, 0.0)
-	g.add_furniture("paspas", 0.0, 3.9, 0.0)
-	var setups := [
-		[a, false, 25.0, true, ["kaya", "bitki", "bitki", "kok", "kilic_bitki", "bitki"], {"neon": 6, "lepistes": 4}],
-		[b, true, 26.0, true, ["resif", "resif", "deniz_yildizi", "kabuk", "kestane"], {"palyaco": 3, "cerrah": 2, "mandarin": 1, "denizati": 1}],
-		[c, false, 21.0, false, ["kaya", "amfora", "bitki", "kirik_kaya"], {"japon": 3, "koi": 1}],
-		[d, false, 27.0, true, ["kok", "bitki", "bitki", "kilic_bitki", "kaya"], {"melek": 4}],
-		[ter, false, 26.0, true, ["kaya"], {"kaplumbaga": 3}],
-	]
-	for st in setups:
-		var t: Dictionary = g.tanks[int(st[0].tank)]
-		t.salt = st[1]
-		t.heater = st[2]
-		t.temp = st[2]
-		t.heater_on = st[3]
-		t.gravel = "white" if st[1] else "natural"
-		t.light = true
-		t.air = true
-		t.filter = 2
-		t.cycle = 100.0
-		t.dirt = 5.0
-		t.decor = st[4]
-		for sp in st[5]:
-			for i in st[5][sp]:
-				t.fish.append(TankSim.new_fish(sp, 0.85))
-	for pid in ProductDB.ids():
-		g.add_stock(pid, 20)
-	for pid in ["yem", "yem_japon", "su_duzenleyici", "ilac", "kum", "dekor", "filtre"]:
-		g.stock_shelf(int(r1.uid), pid, 4)
-		g.stock_shelf(int(r2.uid), pid, 3)
-	g.tanks[int(a.tank)].fish[0]["rare"] = true
-	g.tanks[int(a.tank)].fish[0]["rare_name"] = "Altın"
-	# 3 katlı akvaryum rafı: üç kat da dolu
-	var rk: Dictionary = g.add_furniture("tank_rafi", -6.5, 1.0, 90.0)
-	var rack_fish := [{"neon": 8}, {"japon": 3}, {"orumcek": 2}]
+	# Sağdaki reyonları kaldırıp yerine akvaryum ve 3 katlı raf
+	for f in g.furniture.duplicate():
+		if (f.type == "reyon" or f.type == "reyon_basi") and abs(float(f.x)) < 0.1:
+			g.furniture.erase(f)
+	var a: Dictionary = g.add_furniture("akvaryum_ceviz", 0.0, 0.75, 90.0)
+	var rk: Dictionary = g.add_furniture("tank_rafi", 0.0, -0.75, 90.0)
+	var hk: Dictionary = g.add_furniture("hamster_kafesi", 1.8, 1.3, 0.0)
+	var ck: Dictionary = g.add_furniture("civciv_kafesi", -3.6, 2.9, 0.0)
+	g.employees = {"kasiyer": true, "bakimci": false}
+	var t: Dictionary = g.tanks[int(a.tank)]
+	t.gravel = "natural"
+	t.light = true
+	t.air = true
+	t.filter = 2
+	t.heater_on = true
+	t.heater = 25.0
+	t.temp = 25.0
+	t.cycle = 100.0
+	t.decor = ["kaya", "bitki", "bitki", "kok", "kilic_bitki", "bitki"]
+	for sp in {"neon": 6, "lepistes": 4, "melek": 2}:
+		for i in {"neon": 6, "lepistes": 4, "melek": 2}[sp]:
+			t.fish.append(TankSim.new_fish(sp, 0.85))
+	var rack_fish := [{"japon": 3}, {"palyaco": 2}, {"orumcek": 2}]
 	for lv in 3:
 		g.buy_rack_tank(int(rk.uid), lv)
 		var rt: Dictionary = g.tanks[int(rk.tanks[lv])]
-		rt.salt = false
+		rt.salt = lv == 1
+		rt.gravel = "white" if lv == 1 else "natural"
 		if lv == 2:
 			rt.kind = "kuru"
 			rt.gravel = "toprak"
-		rt.gravel = "natural"
-		rt.heater_on = lv != 1
-		rt.heater = 21.0 if lv == 1 else 26.0
-		rt.temp = rt.heater
+		rt.heater_on = lv == 1
+		rt.heater = 26.0
+		rt.temp = 21.0 if lv == 0 else 26.0
 		rt.filter = 1
-		rt.air = lv == 0
 		rt.cycle = 100.0
-		rt.decor = [["bitki", "kaya", "bitki"], ["kaya", "amfora"], ["kok", "kaya"]][lv]
+		rt.decor = [["bitki", "kaya"], ["resif", "deniz_yildizi"], ["kok", "kaya"]][lv]
 		for sp in rack_fish[lv]:
 			for i in rack_fish[lv][sp]:
 				rt.fish.append(TankSim.new_fish(sp, 0.85))
-	# Hamster ve civciv kafesleri
-	var hk: Dictionary = g.add_furniture("hamster_kafesi", 1.5, -1.9, 0.0)
 	for i in 3:
 		g.tanks[int(hk.tank)].fish.append(TankSim.new_fish("hamster", 0.9))
-	var ck: Dictionary = g.add_furniture("civciv_kafesi", -2.2, 1.7, 0.0)
 	for i in 7:
 		g.tanks[int(ck.tank)].fish.append(TankSim.new_fish("civciv", 0.9))
+	for pid in ProductDB.ids():
+		g.add_stock(pid, 60)
+	# Rafları doldur (soğuk ürün soğutuculara)
+	for f in g.furniture:
+		if f.has("shelf"):
+			for pid in ProductDB.ids():
+				g.stock_shelf(int(f.uid), pid, 6)
 	g.order_animals("neon", 6)
 	g.order_animals("hamster", 2)
-	g.order_animals("palyaco", 2)
+	g.add_delivery("kedi_kumu", 10)
 	g.weather = "gunesli"
-	for t in g.tanks:
-		g.tank_changed.emit(t.id)
+	for tk in g.tanks:
+		g.tank_changed.emit(tk.id)
+	g.furniture_changed.emit()
 	g.open_shop()
 	_main.sync_employees()

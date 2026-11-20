@@ -50,7 +50,7 @@ func setup(r: String, m: Node, s: Shop) -> void:
 
 func _station() -> Vector3:
 	if shop.counter:
-		return shop.counter.to_global(Vector3(-0.5, 0, -0.9))
+		return shop.counter.cashier_point()
 	return Vector3(3, 0, 3)
 
 

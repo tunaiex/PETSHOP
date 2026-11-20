@@ -53,7 +53,12 @@ func _process(_delta: float) -> bool:
 		"boot":
 			if _frame < 6:
 				return false
-			check(_main.shop.aquariums.is_empty() and _main.shop.counter == null, "Oyun boş dükkânla başlar")
+			check(_main.shop.aquariums.is_empty() and _main.shop.counter != null, "Oyun hazır kasalı dükkânla başlar")
+			var empty_shelves := true
+			for shx in _main.shop.shelves:
+				if game.shelf_total(shx.entry()) > 0:
+					empty_shelves = false
+			check(_main.shop.shelves.size() >= 10 and empty_shelves, "Hazır raflar bomboş gelir (%d raf)" % _main.shop.shelves.size())
 			check(_main.player.global_position.z > 5.0, "Oyuncu dışarıda başlar")
 			_main.hud.close_panel()
 			_build_shop(game)
@@ -146,7 +151,7 @@ func _test_furniture() -> void:
 	var a := FurnitureDB.corners("kasa", Vector2.ZERO, 0.0)
 	var b := FurnitureDB.corners("kasa", Vector2(0, 0.5), 0.0)
 	var c := FurnitureDB.corners("kasa", Vector2(0, 3.0), 0.0)
-	var d := FurnitureDB.corners("kasa", Vector2(1.5, 0.0), 90.0)
+	var d := FurnitureDB.corners("kasa", Vector2(1.0, 0.0), 90.0)
 	check(FurnitureDB.polys_overlap(a, b), "Çakışan eşyalar algılanır")
 	check(not FurnitureDB.polys_overlap(a, c), "Uzak eşyalar çakışmaz")
 	check(FurnitureDB.polys_overlap(a, d), "Döndürülmüş eşya çakışması algılanır")
@@ -293,7 +298,7 @@ func _test_save(game: Node) -> void:
 	check(game.tanks[0].fish.size() == n, "Balıklar kaydedildi")
 	check(abs(float(game.tanks[0].dirt) - 33.0) < 0.01, "Su durumu kaydedildi")
 	check(typeof(game.tanks[0].fish[0].uid) == TYPE_INT, "UID tam sayı olarak yüklendi")
-	check(game.furniture.size() == 1 and abs(game.furniture[0].rot - 45.0) < 0.01, "Mobilya konumu kaydedildi")
+	check(abs(float(game.furniture_by_uid(int(e.uid)).rot) - 45.0) < 0.01, "Mobilya konumu kaydedildi")
 	check(game.sell_furniture(int(e.uid)) != "", "Dolu tank satılamaz")
 	game.tanks[0].fish.clear()
 	var m0: int = game.money
@@ -303,43 +308,46 @@ func _test_save(game: Node) -> void:
 ## Entegrasyon testi için dükkânı kurar: kasa, 2 akvaryum (tam donanım), raf.
 func _build_shop(game: Node) -> void:
 	var b = _main.builder
+	# Hazır yerleşimi kaldır: test kendi düzenini kurar
+	game.furniture.clear()
+	game.furniture_changed.emit()
 	# Yerleştirme kuralları
 	b.start_new("kasa")
-	b.pos = Vector2(4.5, 2.5)
-	b.rot = 0.0
+	b.pos = Vector2(3.6, 2.4)
+	b.rot = 270.0
 	b._validate()
 	check(b.valid, "Kasa boş alana konabilir")
-	b.pos = Vector2(0.0, 4.4)
+	b.pos = Vector2(1.2, 3.0)
 	b._validate()
 	check(not b.valid, "Kapının önüne eşya konamaz")
-	b.pos = Vector2(7.5, 0.0)
+	b.pos = Vector2(5.6, 0.0)
 	b._validate()
 	check(not b.valid, "Duvarın dışına eşya konamaz")
 	b.cancel()
 	var money0: int = game.money
-	game.add_furniture("kasa", 4.5, 2.5, 0.0)
-	var t1: Dictionary = game.add_furniture("akvaryum_ceviz", -3.0, -4.4, 0.0)
-	var t2: Dictionary = game.add_furniture("akvaryum_beyaz", -6.45, 0.0, 90.0)
-	var sh: Dictionary = game.add_furniture("kavisli_raf", 6.7, -1.5, -90.0)
+	game.add_furniture("kasa", 3.6, 2.4, 270.0)
+	var t1: Dictionary = game.add_furniture("akvaryum_ceviz", -2.6, -1.95, 0.0)
+	var t2: Dictionary = game.add_furniture("akvaryum_beyaz", -4.35, 0.6, 90.0)
+	var sh: Dictionary = game.add_furniture("duvar_rafi_m", 4.5, -1.0, 270.0)
 	b.start_new("akvaryum_beyaz")
-	b.pos = Vector2(-3.0, -4.4)
+	b.pos = Vector2(-2.6, -1.95)
 	b._validate()
 	check(not b.valid, "Eşyalar üst üste konamaz")
 	b.cancel()
 	check(game.money == money0, "Doğrudan ekleme para harcamaz (test)")
 	b.start_new("saksi_agave")
-	b.pos = Vector2(-6.2, 4.2)
+	b.pos = Vector2(-4.2, 3.0)
 	b.rot = 30.0
 	b._validate()
 	var n0: int = game.furniture.size()
 	check(b.confirm() and game.money == money0 - 120 and game.furniture.size() == n0 + 1, "Yerleştirince eşya parası ödenir")
 	var plant: Dictionary = game.furniture[-1]
 	b.start_move(int(plant.uid))
-	b.pos = Vector2(-6.2, 3.0)
+	b.pos = Vector2(-4.2, 2.0)
 	b._validate()
-	check(b.confirm() and abs(float(plant.z) - 3.0) < 0.01 and game.money == money0 - 120, "Eşya ücretsiz taşınır")
+	check(b.confirm() and abs(float(plant.z) - 2.0) < 0.01 and game.money == money0 - 120, "Eşya ücretsiz taşınır")
 	b.start_new("kasa")
-	b.pos = Vector2(2.0, -2.0)
+	b.pos = Vector2(0.0, 0.5)
 	b._validate()
 	check(not b.confirm(), "İkinci kasa alınamaz")
 	b.cancel()
@@ -368,7 +376,7 @@ func _build_shop(game: Node) -> void:
 	check(game.stock_shelf(int(sh.uid), "filtre", 4) == 4, "Rafa ikinci ürün dizilir")
 	check(game.stock_shelf(int(sh.uid), "ilac", 3) == 0, "Depoda olmayan ürün dizilemez")
 	# 3 katlı akvaryum rafı: orta kata akvaryum alınır, içine 3 neon
-	var rk: Dictionary = game.add_furniture("tank_rafi", 1.2, -4.45, 0.0)
+	var rk: Dictionary = game.add_furniture("tank_rafi", 0.6, -1.85, 0.0)
 	check(game.buy_rack_tank(int(rk.uid), 1) == "", "Raf katına akvaryum alınır (sahne)")
 	var rt: Dictionary = game.tanks[int(rk.tanks[1])]
 	rt.gravel = "natural"
@@ -422,9 +430,7 @@ func _test_shop_systems(game: Node) -> void:
 	var base: int = game.daily_expenses().total
 	game.employees.kasiyer = true
 	check(game.daily_expenses().total == base + game.SALARY.kasiyer, "Maaş giderlere eklenir")
-	game.shop_level = 1
-	check(game.room_min_x() < -10.0, "Genişleyen dükkân sola büyür")
-	check(game.daily_expenses().rent > 300, "Büyük dükkânın kirası yüksek")
+	check(game.MAX_LEVEL == 0 and game.room_min_x() < -4.0, "Mağaza binası sabit (genişletme yok)")
 	# Fiyatlar ve hava
 	check(game.buy_price("neon") > 0 and game.price_mult.size() > 10, "Günlük fiyatlar hesaplanır")
 	check(["gunesli", "bulutlu", "yagmurlu"].has(game.weather), "Hava durumu belirlenir")
@@ -461,7 +467,7 @@ func _test_shop_systems(game: Node) -> void:
 	game.save_game()
 	game.settings.name = "x"
 	game.load_game()
-	check(game.settings.name == "NEMO PETSHOP" and game.shop_level == 1 and game.employees.kasiyer, "Dükkân ayarları kaydedilir")
+	check(game.settings.name == "NEMO PETSHOP" and game.employees.kasiyer, "Dükkân ayarları kaydedilir")
 	game.delete_save()
 
 

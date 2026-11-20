@@ -19,6 +19,31 @@ const PRODUCTS := {
 		"color": Color(0.85, 0.65, 0.2), "shape": "bag", "food": "kafes",
 		"desc": "Tohum karışımı. Hamster ve civcivler için.",
 	},
+	"kedi_konservesi": {
+		"name": "Kedi Konservesi", "buy": 14, "price": 35, "use": false,
+		"color": Color(0.9, 0.5, 0.2), "shape": "can", "model": "cat_food_can", "h": -1.0,
+		"desc": "Yaş kedi maması. Kedi sahipleri severek alır.",
+	},
+	"kopek_mamasi": {
+		"name": "Köpek Maması 3 kg", "buy": 90, "price": 190, "use": false,
+		"color": Color(0.6, 0.35, 0.2), "shape": "bag", "model": "dog_food_bag", "h": -1.0,
+		"desc": "Kuru köpek maması. Pahalı ama çok satar.",
+	},
+	"kedi_kumu": {
+		"name": "Kedi Kumu 5 L", "buy": 45, "price": 105, "use": false,
+		"color": Color(0.5, 0.6, 0.75), "shape": "bag", "model": "cat_litter_bag", "h": -1.0,
+		"desc": "Topaklanan kedi kumu.",
+	},
+	"kus_yemi": {
+		"name": "Kuş Yemi", "buy": 20, "price": 50, "use": false,
+		"color": Color(0.85, 0.7, 0.3), "shape": "bag", "model": "bird_seed_bag", "h": -1.0,
+		"desc": "Muhabbet kuşu ve kanarya için tohum karışımı.",
+	},
+	"donuk_artemia": {
+		"name": "Donuk Artemia", "buy": 30, "price": 75, "use": true, "cold": true,
+		"color": Color(0.85, 0.3, 0.35), "shape": "box", "food": "hepsi",
+		"desc": "Dondurulmuş canlı yem. Bütün balıklar bayılır. Sadece soğutucuda saklanır.",
+	},
 	"su_duzenleyici": {
 		"name": "Su Düzenleyici", "buy": 25, "price": 60, "use": true,
 		"color": Color(0.15, 0.45, 0.8), "shape": "bottle",
@@ -73,7 +98,8 @@ static func instance_model(pid: String, height: float) -> Node3D:
 		var b: AABB = xf * mi.get_aabb()
 		box = b if first else box.merge(b)
 		first = false
-	var k: float = height / max(box.size.y, 0.001)
+	# height < 0: modelin gerçek boyu (raf aralığına sığsın diye en fazla 30 cm)
+	var k: float = height / max(box.size.y, 0.001) if height > 0.0 else min(1.0, 0.3 / max(box.size.y, 0.001))
 	var wrap := Node3D.new()
 	n.scale = Vector3.ONE * k
 	n.position = -Vector3(box.get_center().x, box.position.y, box.get_center().z) * k
