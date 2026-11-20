@@ -8,13 +8,10 @@ var _main: Node
 var _game: Node
 ## ad, oyuncu konumu, bakış (yaw), eğim (pitch), kurulmuş dükkân mı
 var _shots := [
-	["bos_disari", Vector3(1.2, 0.05, 13.0), 0.0, 2.0, false],
-	["genel", Vector3(6.2, 0.05, 4.2), 52.0, -12.0, true],
-	["raflar", Vector3(-5.2, 0.05, 1.8), 90.0, -6.0, true],
-	["akvaryumlar", Vector3(4.6, 0.05, 2.8), 145.0, -16.0, true],
+	["genel", Vector3(5.6, 0.05, 4.0), 55.0, -10.0, true],
+	["sol_duvar", Vector3(-3.5, 0.05, 1.0), 75.0, -6.0, true],
+	["arka_duvar", Vector3(-1.0, 0.05, 2.6), 0.0, -4.0, true],
 	["kasa", Vector3(3.6, 0.05, 3.6), -90.0, -14.0, true],
-	["kopek", Vector3(1.6, 0.05, 2.6), 30.0, -25.0, true],
-	["aksam_disari", Vector3(1.2, 0.05, 13.0), 0.0, 4.0, true, "aksam"],
 ]
 var _idx := 0
 var _out := "user://shots"
@@ -133,6 +130,21 @@ func _build() -> void:
 					stt.fish.append(TankSim.new_fish("neon", 0.85))
 			for pid in ProductDB.ids():
 				g.stock_shelf(int(f.uid), pid, 4)
+	# Akvaryum duvarlarına balık
+	var sps := ["lepistes", "neon", "moli", "zebra", "melek", "japon", "palyaco", "beta"]
+	var k := 0
+	for f in g.furniture:
+		if f.type == "akvaryum_kabin":
+			for id in f.tanks:
+				var tk: Dictionary = g.tanks[int(id)]
+				var sp: String = sps[k % sps.size()]
+				k += 1
+				if sp == "palyaco":
+					continue
+				tk.heater_on = sp != "japon"
+				tk.temp = 21.0 if sp == "japon" else 25.0
+				for i in (3 if sp in ["melek", "beta"] else 7):
+					tk.fish.append(TankSim.new_fish(sp, 0.8))
 	g.order_animals("neon", 6)
 	g.add_delivery("kedi_kumu", 10)
 	g.weather = "gunesli"

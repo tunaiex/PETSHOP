@@ -43,6 +43,15 @@ const ITEMS := {
 			"style": {"bg": Color(0.04, 0.2, 0.75), "led": Color(1.0, 0.35, 0.85), "sponge": true}},
 		"desc": "Akvaryumcu dükkânlarındaki gibi: 3 kat, her katta 2 uzun tank (6 tank). Mavi fon, pembe bitki lambası, sünger filtre. Suyla dolu gelir. Yan yana dizerek duvar yap.",
 	},
+	"akvaryum_kabin": {
+		"name": "Siyah kabinli akvaryum duvarı", "price": 3600, "cat": "akvaryum",
+		"size": Vector2(2.44, 0.62), "height": 2.4,
+		"rack": {"frame": "kabin", "levels": [0.52, 1.15, 1.78], "bays": [-0.6, 0.6], "z": 0.0,
+			"tank": Vector3(1.1, 0.45, 0.5), "slot_price": 300, "slot_cap": 10, "prefilled": true,
+			"fill": {"gravel": "white", "decor": ["bitki", "kok", "bitki", "kaya"]},
+			"style": {"bg": Color(0.05, 0.3, 1.0), "led": Color(0.95, 0.97, 1.0), "sponge": true, "no_spot": true, "bg_glow": true}},
+		"desc": "Mağaza duvarı boyunca dizilen siyah kabinli akvaryum sistemi: altta dolap, 3 kat, 6 tank. Beyaz kum, bitkiler, mavi fon, beyaz ışık. Suyla dolu gelir.",
+	},
 	"balikci_duvari_beyaz": {
 		"name": "Balıkçı akvaryum duvarı (beyaz, beyaz ışık)", "price": 3200, "cat": "akvaryum",
 		"size": Vector2(2.44, 0.62), "height": 2.15,
@@ -296,7 +305,7 @@ static func decor_for(salt: bool) -> Array:
 
 
 static func is_tank(id: String) -> bool:
-	return id.begins_with("akvaryum") or id == "teraryum"
+	return (id.begins_with("akvaryum") or id == "teraryum") and not item(id).has("rack") and not item(id).has("pen")
 
 
 ## Hamster / civciv kafesi (Game.tanks içinde suyu olmayan bölme)

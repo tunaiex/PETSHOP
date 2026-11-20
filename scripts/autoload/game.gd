@@ -213,6 +213,11 @@ func add_furniture(type: String, x: float, z: float, rot: float) -> Dictionary:
 				t.filter = 1
 				t.cycle = 100.0
 				t.air = true
+				var fill: Dictionary = FurnitureDB.item(type).get("rack", {}).get("fill", {})
+				if fill.has("gravel"):
+					t.gravel = fill.gravel
+				if fill.has("decor"):
+					t.decor = fill.decor.duplicate()
 			tanks.append(t)
 			ids.append(t.id)
 		e["tanks"] = ids

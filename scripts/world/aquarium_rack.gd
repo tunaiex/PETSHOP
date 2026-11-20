@@ -74,6 +74,9 @@ func _build_frame() -> void:
 
 ## Balıkçı tipi raf: kolonlar, kat tablaları, her katın altında ışık bandı (kodla çizilir)
 func _build_shop_frame() -> void:
+	if str(cfg.frame) == "kabin":
+		_build_cabinet_frame()
+		return
 	var white: bool = str(cfg.frame) == "beyaz"
 	var col: Color = Color(0.93, 0.93, 0.92) if white else Color(0.08, 0.08, 0.09)
 	var frame := MeshKit.mat(col, 0.5 if white else 0.35, 0.0 if white else 0.6)
@@ -109,6 +112,49 @@ func _build_shop_frame() -> void:
 			t.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	# Taban süpürgeliği
 	MeshKit.box(self, Vector3(size.x, float(lv[0]) - 0.04, size.y - 0.04), Vector3(0, (float(lv[0]) - 0.04) * 0.5, 0), frame)
+
+
+## Siyah kabinli akvaryum duvarı: altta kapaklı dolap, kapalı yanlar ve arka, katlar arasında kalın
+## siyah bantlar (ışık bandı), üstte kornişli kapak. Fotoğraftaki mağaza akvaryum sistemleri gibi.
+func _build_cabinet_frame() -> void:
+	var black := MeshKit.mat(Color(0.035, 0.035, 0.04), 0.3, 0.2)
+	var seam := MeshKit.mat(Color(0.12, 0.12, 0.13), 0.4)
+	var lv: Array = levels()
+	var th: float = tank_size().y
+	var top: float = float(lv[-1]) + th + 0.2
+	var w: float = size.x
+	var d: float = size.y
+	# Yan paneller ve arka
+	for sx in [-1.0, 1.0]:
+		MeshKit.box(self, Vector3(0.03, top, d), Vector3(sx * (w * 0.5 - 0.015), top * 0.5, 0), black)
+	MeshKit.box(self, Vector3(w, top, 0.02), Vector3(0, top * 0.5, -d * 0.5 + 0.01), black)
+	# Ortadaki dikme
+	for i in range(1, bays().size()):
+		var bx: float = (float(bays()[i - 1]) + float(bays()[i])) * 0.5
+		MeshKit.box(self, Vector3(0.04, top, 0.06), Vector3(bx, top * 0.5, d * 0.5 - 0.03), black)
+	# Alt dolap ve kapakları
+	var base_h: float = float(lv[0]) - 0.02
+	MeshKit.box(self, Vector3(w, base_h, d), Vector3(0, base_h * 0.5, 0), black)
+	var doors: int = bays().size() * 2
+	for i in range(1, doors):
+		var x: float = -w * 0.5 + w * float(i) / doors
+		MeshKit.box(self, Vector3(0.006, base_h - 0.08, 0.004), Vector3(x, base_h * 0.5, d * 0.5 + 0.002), seam)
+	# Kat tablaları + üstlerindeki kalın bant (bir alt tankın ışık kapağı gibi)
+	var light := StandardMaterial3D.new()
+	light.albedo_color = Color(0.95, 0.97, 1.0)
+	light.emission_enabled = true
+	light.emission = Color(0.9, 0.95, 1.0)
+	light.emission_energy_multiplier = 2.5
+	for li in lv.size():
+		var y: float = float(lv[li])
+		MeshKit.box(self, Vector3(w, 0.03, d), Vector3(0, y - 0.015, 0), black)
+		var band_y: float = (float(lv[li + 1]) if li + 1 < lv.size() else top) - 0.075
+		var band := MeshKit.box(self, Vector3(w, 0.15, 0.04), Vector3(0, band_y, d * 0.5 - 0.02), black)
+		band.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+		# Bandın altından tanka vuran ince ışık şeridi
+		var strip := MeshKit.box(self, Vector3(w - 0.1, 0.008, 0.06), Vector3(0, band_y - 0.08, d * 0.5 - 0.08), light)
+		strip.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	MeshKit.box(self, Vector3(w + 0.02, 0.03, d + 0.02), Vector3(0, top, 0), black)
 
 
 ## Zemin ile alt kat arası: yürünemez gövde (bölmelerin üstünü akvaryum/boş bölme gövdeleri kaplar).

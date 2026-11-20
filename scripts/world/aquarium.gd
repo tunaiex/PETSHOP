@@ -266,6 +266,11 @@ func _build_rack_tank() -> void:
 	# Arka fon
 	var bg := StandardMaterial3D.new()
 	bg.albedo_color = rack_style.get("bg", Color(0.02, 0.05, 0.07))
+	if rack_style.get("bg_glow", false):
+		# Arkadan aydınlatılmış mavi fon (fotoğraflardaki parlak mavi)
+		bg.emission_enabled = true
+		bg.emission = bg.albedo_color
+		bg.emission_energy_multiplier = 0.9
 	bg.roughness = 0.9
 	MeshKit.box(self, Vector3(_tw - 0.01, _th - 0.01, 0.004), Vector3(0, y0 + _th * 0.5, -_td * 0.5 - 0.004), bg)
 
@@ -675,29 +680,31 @@ func _rebuild_content() -> void:
 		led.emission = Color(0.85, 0.95, 1.0)
 		led.emission_energy_multiplier = 3.0
 		MeshKit.box(_content, Vector3(_tw - 0.12, 0.004, 0.05), Vector3(0, y0 + _th - 0.002, 0), led)
-		_light = SpotLight3D.new()
-		_light.position = Vector3(0, y0 + _th - 0.02, 0)
-		_light.rotation_degrees = Vector3(-90, 0, 0)
-		_light.spot_range = 1.2 if rack_level < 0 else _th + 0.25
-		_light.spot_angle = 65.0
-		_light.light_energy = 2.2
-		_light.light_color = rack_style.get("led", Color(0.85, 0.95, 1.0)).lerp(Color.WHITE, 0.15)
-		if rack_style.has("led"):
-			_light.light_energy = 3.0
-		_light.shadow_enabled = false
-		_light.visible = not Game.power_out
-		_content.add_child(_light)
-		# Suya süzülen ışık hüzmeleri
-		for k in 3:
-			var shaft := MeshInstance3D.new()
-			var qm := QuadMesh.new()
-			qm.size = Vector2(0.38 * _tw / TW, _water_h - _gravel_h())
-			shaft.mesh = qm
-			shaft.material_override = MeshKit.shader_mat("res://shaders/lightshaft.gdshader", {"seed": float(tank_id * 7 + k * 3), "strength": 0.16 if not _built_salt else 0.2})
-			shaft.position = Vector3((-0.38 + k * 0.38) * _tw / TW, y0 + _gravel_h() + (_water_h - _gravel_h()) * 0.5, -0.05 + k * 0.05)
-			shaft.rotation_degrees = Vector3(0, 12.0 * (k - 1), 8.0 * (k - 1))
-			shaft.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			_content.add_child(shaft)
+		# Çok tanklı duvarlarda tank başına ayrı ışık yok (telefonda performans): parlak şerit + mavi fon yeter
+		if not rack_style.get("no_spot", false):
+			_light = SpotLight3D.new()
+			_light.position = Vector3(0, y0 + _th - 0.02, 0)
+			_light.rotation_degrees = Vector3(-90, 0, 0)
+			_light.spot_range = 1.2 if rack_level < 0 else _th + 0.25
+			_light.spot_angle = 65.0
+			_light.light_energy = 2.2
+			_light.light_color = rack_style.get("led", Color(0.85, 0.95, 1.0)).lerp(Color.WHITE, 0.15)
+			if rack_style.has("led"):
+				_light.light_energy = 3.0
+			_light.shadow_enabled = false
+			_light.visible = not Game.power_out
+			_content.add_child(_light)
+			# Suya süzülen ışık hüzmeleri
+			for k in 3:
+				var shaft := MeshInstance3D.new()
+				var qm := QuadMesh.new()
+				qm.size = Vector2(0.38 * _tw / TW, _water_h - _gravel_h())
+				shaft.mesh = qm
+				shaft.material_override = MeshKit.shader_mat("res://shaders/lightshaft.gdshader", {"seed": float(tank_id * 7 + k * 3), "strength": 0.16 if not _built_salt else 0.2})
+				shaft.position = Vector3((-0.38 + k * 0.38) * _tw / TW, y0 + _gravel_h() + (_water_h - _gravel_h()) * 0.5, -0.05 + k * 0.05)
+				shaft.rotation_degrees = Vector3(0, 12.0 * (k - 1), 8.0 * (k - 1))
+				shaft.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				_content.add_child(shaft)
 	_gravel_mat.set_shader_parameter("caustic_strength", 0.35 if d.get("light", false) else 0.0)
 
 	# Görünür ekipman: ısıtıcı (sol arka), filtre (sağ arka)

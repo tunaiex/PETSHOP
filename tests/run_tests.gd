@@ -53,12 +53,18 @@ func _process(_delta: float) -> bool:
 		"boot":
 			if _frame < 6:
 				return false
-			check(_main.shop.aquariums.is_empty() and _main.shop.counter != null, "Oyun hazır kasalı dükkânla başlar")
+			check(_main.shop.counter != null, "Oyun hazır kasalı dükkânla başlar")
 			var empty_shelves := true
 			for shx in _main.shop.shelves:
 				if game.shelf_total(shx.entry()) > 0:
 					empty_shelves = false
-			check(_main.shop.shelves.size() >= 10 and empty_shelves, "Hazır raflar bomboş gelir (%d raf)" % _main.shop.shelves.size())
+			check(empty_shelves, "Hazır raflar bomboş gelir")
+			var walls: int = game.furniture.filter(func(f): return f.type == "akvaryum_kabin").size()
+			var no_fish := true
+			for aqx in _main.shop.aquariums:
+				if not game.tanks[aqx.tank_id].fish.is_empty():
+					no_fish = false
+			check(walls == 9 and _main.shop.aquariums.size() == 54 and no_fish, "Duvarlarda 9 akvaryum duvarı, 54 dolu ama balıksız tank (%d)" % _main.shop.aquariums.size())
 			check(_main.player.global_position.z > 5.0, "Oyuncu dışarıda başlar")
 			_main.hud.close_panel()
 			_build_shop(game)
@@ -286,21 +292,22 @@ func _test_meshes() -> void:
 func _test_save(game: Node) -> void:
 	game.new_game()
 	var e: Dictionary = game.add_furniture("akvaryum_beyaz", 1.0, 1.0, 45.0)
-	game.tanks[0].fish.append(TankSim.new_fish("neon"))
+	var tid: int = int(e.tank)
+	game.tanks[tid].fish.append(TankSim.new_fish("neon"))
 	game.money = 4321
-	game.tanks[0].dirt = 33.0
-	var n: int = game.tanks[0].fish.size()
+	game.tanks[tid].dirt = 33.0
+	var n: int = game.tanks[tid].fish.size()
 	game.save_game()
 	game.money = 0
-	game.tanks[0].fish.clear()
+	game.tanks[tid].fish.clear()
 	check(game.load_game(), "Kayıt yüklendi")
 	check(game.money == 4321, "Para kaydedildi")
-	check(game.tanks[0].fish.size() == n, "Balıklar kaydedildi")
-	check(abs(float(game.tanks[0].dirt) - 33.0) < 0.01, "Su durumu kaydedildi")
-	check(typeof(game.tanks[0].fish[0].uid) == TYPE_INT, "UID tam sayı olarak yüklendi")
+	check(game.tanks[tid].fish.size() == n, "Balıklar kaydedildi")
+	check(abs(float(game.tanks[tid].dirt) - 33.0) < 0.01, "Su durumu kaydedildi")
+	check(typeof(game.tanks[tid].fish[0].uid) == TYPE_INT, "UID tam sayı olarak yüklendi")
 	check(abs(float(game.furniture_by_uid(int(e.uid)).rot) - 45.0) < 0.01, "Mobilya konumu kaydedildi")
 	check(game.sell_furniture(int(e.uid)) != "", "Dolu tank satılamaz")
-	game.tanks[0].fish.clear()
+	game.tanks[tid].fish.clear()
 	var m0: int = game.money
 	check(game.sell_furniture(int(e.uid)) == "" and game.money == m0 + 450, "Boş tank yarı fiyatına satılır")
 
