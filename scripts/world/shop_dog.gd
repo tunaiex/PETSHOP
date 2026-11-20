@@ -4,7 +4,8 @@ extends Node3D
 ## Oyuncu severse kuyruk sallar (silkinir / oyun daveti), müşteriler onu sever (+itibar, günde bir).
 
 const MODEL := "res://assets/models/animals/labrador.glb"
-const WALK_SPEED := 0.98   ## modelin yürüme animasyonuna uyan hız (m/sn)
+const SCALE := 0.5        ## model gerçeğin iki katı büyüklükte geliyor
+const WALK_SPEED := 0.98 * SCALE   ## yürüme animasyonuna uyan hız (m/sn)
 const NAME := "Karamel"
 
 var shop: Shop
@@ -23,6 +24,7 @@ func setup(s: Shop) -> void:
 		return
 	var m: Node3D = (load(MODEL) as PackedScene).instantiate()
 	m.rotation.y = PI  # model +Z'ye bakar, bu düğüm -Z yönünde yürür
+	m.scale = Vector3.ONE * SCALE
 	add_child(m)
 	for c in m.find_children("*", "MeshInstance3D", true, false):
 		(c as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
@@ -35,9 +37,9 @@ func setup(s: Shop) -> void:
 				_ap.get_animation(n).loop_mode = Animation.LOOP_LINEAR
 		_ap.animation_finished.connect(_on_anim_done)
 		_play("Idle")
-	Shop.add_blob_shadow(self, Vector2(0.5, 1.0), 0.45)
+	Shop.add_blob_shadow(self, Vector2(0.4, 0.8), 0.45)
 	# Bakınca etkileşim: yürümeyi engellemeyen 2. katman alanı
-	Interactable.create(self, Vector3(0.5, 0.7, 1.0), Vector3(0, 0.35, 0), get_prompt, interact)
+	Interactable.create(self, Vector3(0.4, 0.7, 0.9), Vector3(0, 0.35, 0), get_prompt, interact)
 
 
 func get_prompt() -> String:

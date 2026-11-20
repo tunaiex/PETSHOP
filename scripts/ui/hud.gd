@@ -42,6 +42,7 @@ var _build_bar: PanelContainer
 var _build_lbl: Label
 var _build_btns: Array = []
 var _carry_btn: Button
+var _drop_btn: Button
 var _haggle_customer: Customer
 var _ask_value: int = 0
 
@@ -77,9 +78,22 @@ func _ready() -> void:
 	_carry_btn.visible = false
 	_carry_btn.pressed.connect(func(): Game.carry_to_depot(); Game.notify.emit("Koli depoya kondu.", "info"))
 	_root.add_child(_carry_btn)
+	_drop_btn = Button.new()
+	_drop_btn.text = "YERE BIRAK"
+	_drop_btn.add_theme_font_size_override("font_size", 22)
+	_drop_btn.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	_drop_btn.offset_left = -690
+	_drop_btn.offset_top = -150
+	_drop_btn.offset_right = -480
+	_drop_btn.offset_bottom = -50
+	_drop_btn.visible = false
+	_drop_btn.pressed.connect(func(): if player: player.drop_carrying())
+	_root.add_child(_drop_btn)
 	Game.carry_changed.connect(func():
 		_carry_btn.visible = not Game.carrying.is_empty() and not Game.is_animal_box(Game.carrying)
-		_carry_btn.text = "DEPOYA KOY" if _touch else "DEPOYA KOY [G]")
+		_carry_btn.text = "DEPOYA KOY" if _touch else "DEPOYA KOY [G]"
+		_drop_btn.visible = not Game.carrying.is_empty()
+		_drop_btn.text = "YERE BIRAK" if _touch else "YERE BIRAK [B]")
 	Game.money_changed.connect(func(_v): _refresh_top())
 	Game.time_changed.connect(func(_m): _refresh_top())
 	Game.phase_changed.connect(func(_p): _refresh_top())
@@ -352,7 +366,7 @@ func _input(event: InputEvent) -> void:
 
 
 func _over_button(p: Vector2) -> bool:
-	for b in [_interact_btn, _menu_btn, _speed_btn, _phone_btn, _carry_btn] + _build_btns:
+	for b in [_interact_btn, _menu_btn, _speed_btn, _phone_btn, _carry_btn, _drop_btn] + _build_btns:
 		if b.visible and b.is_visible_in_tree() and b.get_global_rect().has_point(p):
 			return true
 	return false
@@ -588,6 +602,24 @@ func _upgrade_filter(body: VBoxContainer, aq: Aquarium) -> void:
 	_fill_tank(body, aq)
 
 
+func _remove_shelf_tank(aq: Aquarium) -> void:
+	var err: String = Game.remove_shelf_tank(aq.furniture_uid, aq.shelf_level)
+	if err != "":
+		toast(err, "bad")
+		return
+	close_panel()
+
+
+func _place_shelf_tank(body: VBoxContainer, sh: Shelf, lvl: int) -> void:
+	var err: String = Game.place_shelf_tank(sh.furniture_uid, lvl)
+	if err != "":
+		toast(err, "bad")
+	else:
+		Sfx.play("kaching")
+		toast("Rafa küçük akvaryum kondu. Kum, filtre ekleyip balık koyabilirsin.", "good")
+	_fill_shelf(body, sh)
+
+
 func _remove_rack_tank(aq: Aquarium) -> void:
 	var err: String = Game.remove_rack_tank(aq.furniture_uid, aq.rack_level)
 	if err != "":
@@ -793,7 +825,9 @@ func _fill_tank(body: VBoxContainer, aq: Aquarium) -> void:
 		_btn(mv, "Kuru teraryuma çevir (örümcek) %d ₺" % DRY_COST, _toggle_dry.bind(body, aq), alive.is_empty() and Game.money >= DRY_COST)
 	_btn(mv, "Fotoğraf çek ve paylaş", _photo.bind(body, aq), not Game.photos_today.has(aq.tank_id))
 	_btn(mv, "Karantina: %s" % ("AÇIK" if t.get("quarantine", false) else "KAPALI"), _toggle_quarantine.bind(body, aq))
-	if aq.rack_level >= 0:
+	if aq.shelf_level >= 0:
+		_btn(mv, "Akvaryumu raftan kaldır (%d ₺)" % (Game.SHELF_TANK_PRICE / 2), _remove_shelf_tank.bind(aq), t.fish.is_empty())
+	elif aq.rack_level >= 0:
 		_btn(mv, "Rafı taşı", _move_furniture.bind(aq.furniture_uid))
 		_btn(mv, "Akvaryumu raftan kaldır (%d ₺)" % (Game.RACK_TANK_PRICE / 2), _remove_rack_tank.bind(aq), t.fish.is_empty())
 	else:
@@ -883,7 +917,9 @@ func _fill_dry(body: VBoxContainer, aq: Aquarium, t: Dictionary) -> void:
 	if hab == "kuru":
 		_btn(mv, "Tekrar akvaryum yap (%d ₺)" % DRY_COST, _toggle_dry.bind(body, aq), alive.is_empty() and Game.money >= DRY_COST)
 	_btn(mv, "Fotoğraf çek ve paylaş", _photo.bind(body, aq), not Game.photos_today.has(aq.tank_id))
-	if aq.rack_level >= 0:
+	if aq.shelf_level >= 0:
+		_btn(mv, "Akvaryumu raftan kaldır (%d ₺)" % (Game.SHELF_TANK_PRICE / 2), _remove_shelf_tank.bind(aq), t.fish.is_empty())
+	elif aq.rack_level >= 0:
 		_btn(mv, "Rafı taşı", _move_furniture.bind(aq.furniture_uid))
 		_btn(mv, "Akvaryumu raftan kaldır (%d ₺)" % (Game.RACK_TANK_PRICE / 2), _remove_rack_tank.bind(aq), t.fish.is_empty())
 	else:
@@ -993,7 +1029,7 @@ func _shelf_move(body: VBoxContainer, sh: Shelf, pid: String, n: int) -> void:
 func _fill_shelf(body: VBoxContainer, sh: Shelf) -> void:
 	_clear(body)
 	var e: Dictionary = sh.entry()
-	var cap: int = int(FurnitureDB.item(sh.kind).capacity)
+	var cap: int = Game.shelf_capacity(e)
 	body.add_child(_lbl("Rafta %d / %d ürün. Ürünler depodan gelir, müşteriler sadece raftakini alır." % [Game.shelf_total(e), cap], 19, Color(0.8, 0.85, 0.87)))
 	for pid in ProductDB.ids():
 		if not FurnitureDB.shelf_accepts(sh.kind, pid) and int(e.shelf.get(pid, 0)) == 0:
@@ -1009,6 +1045,25 @@ func _fill_shelf(body: VBoxContainer, sh: Shelf) -> void:
 		_btn(row, "+1", _shelf_move.bind(body, sh, pid, 1), Game.stock.get(pid, 0) > 0)
 		_btn(row, "+5", _shelf_move.bind(body, sh, pid, 5), Game.stock.get(pid, 0) > 0)
 		_btn(row, "−1", _shelf_move.bind(body, sh, pid, -1), int(e.shelf.get(pid, 0)) > 0)
+	var cfg: Dictionary = FurnitureDB.item(sh.kind).get("shelf", {})
+	if cfg.get("tanks", false):
+		_section(body, "Raf katlarına akvaryum")
+		body.add_child(_lbl("Bir kata küçük ışıklı akvaryum (%d ₺) koyabilirsin; o kat ürün almaz." % Game.SHELF_TANK_PRICE, 17, Color(0.8, 0.85, 0.87)))
+		var st: Dictionary = e.get("shelf_tanks", {})
+		var levels: Array = cfg.get("levels", [])
+		for li in range(levels.size() - 1, -1, -1):
+			var trow := _row(body)
+			var nm := _lbl("Kat %d" % (li + 1), 20)
+			nm.custom_minimum_size.x = 90
+			trow.add_child(nm)
+			if st.has(str(li)):
+				var aq: Aquarium = sh.tank_on_level(li)
+				var t: Dictionary = Game.tanks[int(st[str(li)])]
+				trow.add_child(_lbl("Tank %d • %d hayvan" % [int(t.id) + 1, TankSim.living(t).size()], 19))
+				if aq:
+					_btn(trow, "Akvaryumu aç", func(): close_panel(); open_tank(aq))
+			else:
+				_btn(trow, "Bu kata akvaryum koy (%d ₺)" % Game.SHELF_TANK_PRICE, _place_shelf_tank.bind(body, sh, li), Game.money >= Game.SHELF_TANK_PRICE)
 	var mv := _row(body)
 	_btn(mv, "Taşı", _move_furniture.bind(sh.furniture_uid))
 	_btn(mv, "Sat (%d ₺, ürünler depoya döner)" % (int(FurnitureDB.item(sh.kind).price) / 2), _sell_furniture.bind(sh.furniture_uid))

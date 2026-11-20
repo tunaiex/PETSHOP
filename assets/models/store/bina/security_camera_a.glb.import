@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://b28dcfqcliyrm"
-path="res://.godot/imported/magaza.glb-40b4f33cdcd26088453285282baffc0b.scn"
+uid="uid://bihkv83tjps1q"
+path="res://.godot/imported/security_camera_a.glb-0087e2fcbc71ce4ec97c28620d07e1d1.scn"
 
 [deps]
 
-source_file="res://assets/models/store/magaza.glb"
-dest_files=["res://.godot/imported/magaza.glb-40b4f33cdcd26088453285282baffc0b.scn"]
+source_file="res://assets/models/store/bina/security_camera_a.glb"
+dest_files=["res://.godot/imported/security_camera_a.glb-0087e2fcbc71ce4ec97c28620d07e1d1.scn"]
 
 [params]
 

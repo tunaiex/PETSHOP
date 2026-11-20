@@ -97,10 +97,21 @@ func _unhandled_input(event: InputEvent) -> void:
 		try_interact()
 	elif event is InputEventKey and event.pressed and event.keycode == KEY_G and not Game.carrying.is_empty():
 		Game.carry_to_depot()
+	elif event is InputEventKey and event.pressed and event.keycode == KEY_B and not Game.carrying.is_empty():
+		drop_carrying()
 	elif event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 		if hud:
 			hud.open_menu()
+
+
+## Elindekini önüne, yere bırakır.
+func drop_carrying() -> void:
+	var fwd := -global_transform.basis.z
+	fwd.y = 0.0
+	var p: Vector3 = global_position + fwd.normalized() * 0.75
+	Game.drop_carrying(p.x, p.z, rotation.y)
+	Sfx.play("click")
 
 
 func try_interact() -> void:

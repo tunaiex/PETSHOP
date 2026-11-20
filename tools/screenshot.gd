@@ -8,19 +8,13 @@ var _main: Node
 var _game: Node
 ## ad, oyuncu konumu, bakış (yaw), eğim (pitch), kurulmuş dükkân mı
 var _shots := [
-	["bos_disari", Vector3(1.2, 0.05, 9.0), 0.0, 2.0, false],
-	["bos_ici", Vector3(3.0, 0.05, 3.1), 50.0, -8.0, false],
-	["genel", Vector3(4.3, 0.05, 3.2), 48.0, -14.0, true],
-	["raflar", Vector3(-1.2, 0.05, 1.6), 90.0, -10.0, true],
-	["buzdolabi", Vector3(-2.0, 0.05, -0.6), 0.0, -6.0, true],
-	["kasa", Vector3(1.6, 0.05, 2.9), -90.0, -18.0, true],
-	["akvaryumlar", Vector3(1.4, 0.05, 1.7), 140.0, -16.0, true],
-	["hamster", Vector3(1.8, 0.05, 2.6), 0.0, -34.0, true],
-	["civciv", Vector3(-3.6, 0.05, 1.6), 180.0, -48.0, true],
-	["kargo", Vector3(-0.6, 0.05, 6.0), 180.0, -30.0, true],
-	["aksam_disari", Vector3(1.2, 0.05, 9.0), 0.0, 4.0, true, "aksam"],
-	["telefon", Vector3(3.0, 0.05, 3.1), 50.0, -8.0, true, "telefon"],
-	["yem_elde", Vector3(-1.2, 0.05, 1.6), 90.0, -10.0, true, "yem"],
+	["bos_disari", Vector3(1.2, 0.05, 13.0), 0.0, 2.0, false],
+	["genel", Vector3(6.2, 0.05, 4.2), 52.0, -12.0, true],
+	["raflar", Vector3(-5.2, 0.05, 1.8), 90.0, -6.0, true],
+	["akvaryumlar", Vector3(4.6, 0.05, 2.8), 145.0, -16.0, true],
+	["kasa", Vector3(3.6, 0.05, 3.6), -90.0, -14.0, true],
+	["kopek", Vector3(1.6, 0.05, 2.6), 30.0, -25.0, true],
+	["aksam_disari", Vector3(1.2, 0.05, 13.0), 0.0, 4.0, true, "aksam"],
 ]
 var _idx := 0
 var _out := "user://shots"
@@ -93,24 +87,15 @@ func _build() -> void:
 	_built = true
 	var g := _game
 	g.money = 20000
-	# Sağdaki reyonları kaldırıp yerine akvaryum ve 3 katlı raf
-	for f in g.furniture.duplicate():
-		if (f.type == "reyon" or f.type == "reyon_basi") and abs(float(f.x)) < 0.1:
-			g.furniture.erase(f)
-	var a: Dictionary = g.add_furniture("akvaryum_ceviz", 0.0, 0.75, 90.0)
-	var rk: Dictionary = g.add_furniture("tank_rafi", 0.0, -0.75, 90.0)
-	var hk: Dictionary = g.add_furniture("hamster_kafesi", 1.8, 1.3, 0.0)
-	var ck: Dictionary = g.add_furniture("civciv_kafesi", -3.6, 2.9, 0.0)
+	var a: Dictionary = g.add_furniture("akvaryum_ceviz", 2.6, 0.3, 0.0)
+	var rk: Dictionary = g.add_furniture("tank_rafi", 4.3, -1.9, 0.0)
+	var hk: Dictionary = g.add_furniture("hamster_kafesi", 0.4, -0.2, 0.0)
+	var ck: Dictionary = g.add_furniture("civciv_kafesi", 0.5, 2.2, 0.0)
+	g.add_furniture("kedi_agaci", -0.4, 3.9, 0.0)
 	g.employees = {"kasiyer": true, "bakimci": false}
 	var t: Dictionary = g.tanks[int(a.tank)]
-	t.gravel = "natural"
-	t.light = true
-	t.air = true
-	t.filter = 2
-	t.heater_on = true
-	t.heater = 25.0
-	t.temp = 25.0
-	t.cycle = 100.0
+	t.gravel = "natural"; t.light = true; t.air = true; t.filter = 2
+	t.heater_on = true; t.heater = 25.0; t.temp = 25.0; t.cycle = 100.0
 	t.decor = ["kaya", "bitki", "bitki", "kok", "kilic_bitki", "bitki"]
 	for sp in {"neon": 6, "lepistes": 4, "melek": 2}:
 		for i in {"neon": 6, "lepistes": 4, "melek": 2}[sp]:
@@ -124,11 +109,8 @@ func _build() -> void:
 		if lv == 2:
 			rt.kind = "kuru"
 			rt.gravel = "toprak"
-		rt.heater_on = lv == 1
-		rt.heater = 26.0
-		rt.temp = 21.0 if lv == 0 else 26.0
-		rt.filter = 1
-		rt.cycle = 100.0
+		rt.heater_on = lv == 1; rt.heater = 26.0; rt.temp = 21.0 if lv == 0 else 26.0
+		rt.filter = 1; rt.cycle = 100.0
 		rt.decor = [["bitki", "kaya"], ["resif", "deniz_yildizi"], ["kok", "kaya"]][lv]
 		for sp in rack_fish[lv]:
 			for i in rack_fish[lv][sp]:
@@ -138,14 +120,20 @@ func _build() -> void:
 	for i in 7:
 		g.tanks[int(ck.tank)].fish.append(TankSim.new_fish("civciv", 0.9))
 	for pid in ProductDB.ids():
-		g.add_stock(pid, 60)
-	# Rafları doldur (soğuk ürün soğutuculara)
+		g.add_stock(pid, 80)
+	var first_wall := true
 	for f in g.furniture:
 		if f.has("shelf"):
+			if f.type == "duvar_rafi_m" and first_wall:
+				first_wall = false
+				g.place_shelf_tank(int(f.uid), 2)
+				var stt: Dictionary = g.tanks[int(f.shelf_tanks["2"])]
+				stt.gravel = "natural"; stt.cycle = 100.0; stt.heater_on = true; stt.temp = 25.0
+				for i in 5:
+					stt.fish.append(TankSim.new_fish("neon", 0.85))
 			for pid in ProductDB.ids():
-				g.stock_shelf(int(f.uid), pid, 6)
+				g.stock_shelf(int(f.uid), pid, 4)
 	g.order_animals("neon", 6)
-	g.order_animals("hamster", 2)
 	g.add_delivery("kedi_kumu", 10)
 	g.weather = "gunesli"
 	for tk in g.tanks:

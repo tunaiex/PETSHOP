@@ -101,9 +101,15 @@ func refresh() -> void:
 	var e: Dictionary = entry()
 	if e.is_empty():
 		return
+	_refresh_tanks(e)
 	var cap: int = int(FurnitureDB.item(kind).get("capacity", 20))
-	var rows_total: int = _rows.size() * _sides
-	var per_row: int = int(ceil(float(cap) / rows_total))
+	# Ürün dizilecek sıralar: (yüz, kat). Önce ön yüz göz hizasından; akvaryumlu katlar atlanır.
+	var all_rows: Array = []
+	for side in _sides:
+		for li in _level_order():
+			all_rows.append([side, li])
+	var rows: Array = all_rows.filter(func(r): return not (r[0] == 0 and e.get("shelf_tanks", {}).has(str(r[1]))))
+	var per_row: int = int(ceil(float(cap) / max(1, all_rows.size())))
 	var slot := 0
 	var ids: Array = ProductDB.ids()
 	for pid in ids:
@@ -112,13 +118,10 @@ func refresh() -> void:
 		for k in n:
 			var row: int = slot / per_row
 			var col: int = slot % per_row
-			if row >= rows_total:
+			if row >= rows.size():
 				break
-			# Önce ön yüzün katları (yukarıdan aşağı göz hizası önce), sonra arka yüz
-			var side: int = row / _rows.size()
-			var lvl: int = row % _rows.size()
-			var lvl_order: Array = _level_order()
-			var y: float = _rows[lvl_order[lvl]]
+			var side: int = rows[row][0]
+			var y: float = _rows[rows[row][1]]
 			var x: float = -_width * 0.5 + (col + 0.5) * _width / per_row
 			var z: float = _depth_z if side == 0 else -_depth_z
 			var mesh_parent := Node3D.new()
@@ -159,6 +162,41 @@ func _product_mesh(parent: Node3D, p: Dictionary, pos: Vector3, pid: String = ""
 			MeshKit.box(parent, Vector3(0.132, 0.05, 0.102), pos + Vector3(0, 0.14, 0), label)
 
 
+var _tank_nodes: Dictionary = {}   ## kat -> Aquarium
+
+
+## Katlardaki küçük akvaryumları kayıtla eşitler.
+func _refresh_tanks(e: Dictionary) -> void:
+	var st: Dictionary = e.get("shelf_tanks", {})
+	for k in _tank_nodes.keys():
+		if not st.has(k) or not is_instance_valid(_tank_nodes[k]):
+			if is_instance_valid(_tank_nodes[k]):
+				remove_child(_tank_nodes[k])
+				_tank_nodes[k].queue_free()
+			_tank_nodes.erase(k)
+	for k in st:
+		if _tank_nodes.has(k):
+			continue
+		var lvl: int = int(k)
+		if lvl < 0 or lvl >= _rows.size():
+			continue
+		var gap: float = (float(_rows[lvl + 1]) - float(_rows[lvl])) if lvl + 1 < _rows.size() else 0.45
+		var aq := Aquarium.new()
+		aq.furniture_uid = furniture_uid
+		aq.position = Vector3(0, 0, _depth_z)
+		add_child(aq)
+		aq.setup_shelf(int(st[k]), lvl, float(_rows[lvl]), Vector2(_width - 0.06, min(_shelf_depth - 0.04, 0.34)), min(gap - 0.05, 0.4))
+		_tank_nodes[k] = aq
+
+
+func tank_nodes() -> Array:
+	return _tank_nodes.values().filter(func(a): return is_instance_valid(a))
+
+
+func tank_on_level(lvl: int) -> Aquarium:
+	return _tank_nodes.get(str(lvl))
+
+
 ## Ürünlerin dolma sırası: göz hizasındaki kat önce
 func _level_order() -> Array:
 	var idx: Array = range(_rows.size())
@@ -177,7 +215,7 @@ func look_target() -> Vector3:
 
 func get_prompt() -> String:
 	var e := entry()
-	var cap: int = int(FurnitureDB.item(kind).get("capacity", 20))
+	var cap: int = Game.shelf_capacity(e)
 	if not Game.carrying.is_empty():
 		return "Koliden rafa diz (%d/%d)" % [Game.shelf_total(e), cap]
 	return "%s: Ürün diz (%d/%d)" % [FurnitureDB.item(kind).name, Game.shelf_total(e), cap]

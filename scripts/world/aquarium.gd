@@ -77,6 +77,22 @@ func setup_rack(id: int, level: int, y0: float, rack_size: Vector2) -> void:
 	setup(id)
 
 
+## Mağaza rafının bir katına konan küçük ışıklı akvaryum (kök: raf ön yüzü, zeminde)
+var shelf_level: int = -1
+
+
+func setup_shelf(id: int, level: int, y0: float, size: Vector2, height: float) -> void:
+	shelf_level = level
+	rack_level = level   # ince çerçeveli raf akvaryumu görünümü ve tek satır etiket
+	_rack_size = Vector2(size.x + 0.04, size.y + 0.04)
+	_tw = size.x
+	_td = size.y
+	_th = clamp(height, 0.2, 0.4)
+	_y0 = y0 + 0.01
+	_water_h = _th - 0.04
+	setup(id)
+
+
 ## Hamster / civciv kafesi kurulumu
 func setup_pen(id: int, kind: String) -> void:
 	pen = kind

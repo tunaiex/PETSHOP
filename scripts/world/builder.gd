@@ -5,12 +5,12 @@ extends Node3D
 
 signal state_changed()
 
-const ROOM_MIN := Vector2(-4.7, -2.3) ## satış alanının iç sınırları (Shop.ROOM)
-const ROOM_MAX := Vector2(4.7, 3.5)
+const ROOM_MIN := Vector2(-7.1, -3.5) ## satış alanının iç sınırları (Shop.ROOM)
+const ROOM_MAX := Vector2(7.1, 4.7)
 ## Kapı önü boş kalmalı (müşteri girişi)
-const DOOR_ZONE := [Vector2(0.15, 2.2), Vector2(2.25, 2.2), Vector2(2.25, 3.6), Vector2(0.15, 3.6)]
+const DOOR_ZONE := [Vector2(0.15, 3.4), Vector2(2.25, 3.4), Vector2(2.25, 4.8), Vector2(0.15, 4.8)]
 ## Koliler kapının solundaki kaldırıma bırakılır (dükkân dışı)
-const DELIVERY_ZONE := [Vector2(-1.7, 3.8), Vector2(0.3, 3.8), Vector2(0.3, 5.0), Vector2(-1.7, 5.0)]
+const DELIVERY_ZONE := [Vector2(-1.7, 5.0), Vector2(0.3, 5.0), Vector2(0.3, 6.6), Vector2(-1.7, 6.6)]
 const SNAP := 0.05
 const ROT_STEP := 15.0
 

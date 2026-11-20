@@ -54,6 +54,8 @@ var debt_days: int = 0
 var stock: Dictionary = {}   ## Depo (arka oda). Raftaki ürünler mobilya kaydında durur.
 const RACK_TANK_PRICE := 420 ## Raf katına konan ışıklı akvaryum
 const RACK_TANK_CAP := 8      ## Raf akvaryumunun yer kapasitesi
+const SHELF_TANK_PRICE := 260 ## Mağaza rafının bir katına konan küçük ışıklı akvaryum
+const SHELF_TANK_CAP := 5
 var tanks: Array = []        ## Satılan tanklar silinmez, "unlocked=false" olur (id'ler sabit kalsın)
 var furniture: Array = []    ## {"uid","type","x","z","rot", "tank"?, "shelf"?}
 var _fuid: int = 1
@@ -126,16 +128,22 @@ func new_game() -> void:
 
 ## Hazır dükkân: rafları, dolapları ve kasası yerinde ama bomboş gelir (ürünleri oyuncu dizer).
 const STARTER_LAYOUT := [
-	["duvar_rafi_m", -4.5, 1.58, 90.0], ["duvar_rafi_m", -4.5, 0.38, 90.0], ["duvar_rafi_m", -4.5, -0.82, 90.0],
-	["kose_rafi", -4.28, -1.88, 90.0],
-	["reyon", -2.4, 1.2, 90.0], ["reyon", -2.4, 0.0, 90.0], ["reyon_basi", -2.4, 2.1, 0.0],
-	["reyon", 0.0, 1.2, 90.0], ["reyon", 0.0, 0.0, 90.0], ["reyon_basi", 0.0, 2.1, 0.0],
-	["buzdolabi", -3.2, -1.95, 0.0], ["buzdolabi", -1.95, -1.95, 0.0],
-	["dondurucu_dik", -0.95, -1.92, 0.0], ["dondurucu_dik", -0.2, -1.92, 0.0],
-	["icecek_dolabi", 1.95, -2.1, 0.0], ["sandik_dondurucu", 1.8, 0.0, 0.0],
-	["sergi_masasi", 4.32, -0.52, 90.0], ["duvar_rafi_m", 4.5, -1.73, 270.0],
-	["kasa", 3.6, 2.4, 270.0], ["kasa_onu_raf", 3.6, 1.2, 270.0], ["delikli_pano", 4.72, 2.4, 270.0],
-	["sepet_standi", -0.3, 3.1, 180.0],
+	# Sol duvar boyunca 5 duvar rafı
+	["duvar_rafi_m", -6.88, 2.9, 90.0], ["duvar_rafi_m", -6.88, 1.7, 90.0], ["duvar_rafi_m", -6.88, 0.5, 90.0],
+	["duvar_rafi_m", -6.88, -0.7, 90.0], ["kose_rafi", -6.66, -3.05, 90.0],
+	# İki reyon sırası, aralarda geniş koridor
+	["reyon", -4.0, 0.0, 90.0], ["reyon", -4.0, 1.3, 90.0], ["reyon_basi", -4.0, 2.25, 0.0],
+	["reyon", -1.6, 0.0, 90.0], ["reyon", -1.6, 1.3, 90.0], ["reyon_basi", -1.6, 2.25, 0.0],
+	# Arka duvarda soğutucular
+	["buzdolabi", -5.6, -3.08, 0.0], ["buzdolabi", -4.25, -3.08, 0.0],
+	["dondurucu_dik", -3.1, -3.06, 0.0], ["dondurucu_dik", -2.3, -3.06, 0.0], ["icecek_dolabi", -1.5, -3.2, 0.0],
+	["sandik_dondurucu", 1.0, -2.9, 0.0],
+	# Sağ duvar rafları (kasanın gerisinde değil)
+	["duvar_rafi_m", 6.88, -2.8, 270.0], ["duvar_rafi_m", 6.88, -1.6, 270.0], ["duvar_rafi_m", 6.88, -0.4, 270.0],
+	["sergi_masasi", 3.2, 2.0, 0.0],
+	# Kasa: arkasında 1 m geçit
+	["kasa", 5.6, 3.3, 270.0], ["kasa_onu_raf", 5.6, 1.9, 270.0], ["delikli_pano", 7.08, 3.3, 270.0],
+	["sepet_standi", -0.6, 4.35, 180.0],
 ]
 
 
@@ -193,6 +201,63 @@ func move_furniture(uid: int, x: float, z: float, rot: float) -> void:
 	furniture_changed.emit()
 
 
+## Mağaza rafının bir katına küçük akvaryum koyar. O katın ürünleri depoya döner.
+func place_shelf_tank(uid: int, lvl: int) -> String:
+	var e := furniture_by_uid(uid)
+	if e.is_empty() or not FurnitureDB.item(e.type).get("shelf", {}).get("tanks", false):
+		return "Bu rafa akvaryum konmaz."
+	var st: Dictionary = e.get("shelf_tanks", {})
+	if st.has(str(lvl)):
+		return "Bu katta zaten akvaryum var."
+	if not spend(SHELF_TANK_PRICE):
+		return "Yeterli paran yok (%d ₺)." % SHELF_TANK_PRICE
+	var t := TankSim.new_tank(tanks.size(), true, 25.0, false)
+	t["cap"] = SHELF_TANK_CAP
+	t.light = true
+	tanks.append(t)
+	st[str(lvl)] = t.id
+	e["shelf_tanks"] = st
+	# Kapasite azaldı: sığmayan ürünler depoya
+	var cap: int = shelf_capacity(e)
+	for pid in e.shelf.keys():
+		while shelf_total(e) > cap and int(e.shelf[pid]) > 0:
+			e.shelf[pid] = int(e.shelf[pid]) - 1
+			add_stock(pid, 1)
+		if int(e.shelf.get(pid, 0)) <= 0:
+			e.shelf.erase(pid)
+	furniture_changed.emit()
+	stock_changed.emit()
+	tank_changed.emit(t.id)
+	return ""
+
+
+func remove_shelf_tank(uid: int, lvl: int) -> String:
+	var e := furniture_by_uid(uid)
+	var st: Dictionary = e.get("shelf_tanks", {})
+	if not st.has(str(lvl)):
+		return "Bu katta akvaryum yok."
+	var t: Dictionary = tanks[int(st[str(lvl)])]
+	if not t.fish.is_empty():
+		return "Önce içindeki balıkları sat ya da taşı."
+	t.unlocked = false
+	st.erase(str(lvl))
+	add_money(SHELF_TANK_PRICE / 2)
+	furniture_changed.emit()
+	return ""
+
+
+## Raf kapasitesi: akvaryum konan katlar ürün almaz.
+func shelf_capacity(e: Dictionary) -> int:
+	var info: Dictionary = FurnitureDB.item(e.type)
+	var cap: int = int(info.get("capacity", 20))
+	var cfg: Dictionary = info.get("shelf", {})
+	var rows: int = cfg.get("levels", []).size() * int(cfg.get("sides", 1))
+	var used: int = e.get("shelf_tanks", {}).size()
+	if rows <= 0 or used == 0:
+		return cap
+	return int(floor(float(cap) * float(rows - used) / float(rows)))
+
+
 ## Raf katına ışıklı akvaryum koyar. Başarılıysa "" döner.
 func buy_rack_tank(uid: int, level: int) -> String:
 	var e := furniture_by_uid(uid)
@@ -239,6 +304,12 @@ func sell_furniture(uid: int) -> String:
 			return "Önce tanktaki balıkları sat ya da çıkar."
 		t.unlocked = false
 	var refund: int = int(FurnitureDB.item(e.type).price) / 2
+	for k in e.get("shelf_tanks", {}):
+		if not tanks[int(e.shelf_tanks[k])].fish.is_empty():
+			return "Önce raftaki akvaryumların balıklarını sat ya da taşı."
+	for k in e.get("shelf_tanks", {}):
+		tanks[int(e.shelf_tanks[k])].unlocked = false
+		refund += SHELF_TANK_PRICE / 2
 	if e.has("tanks"):
 		for id in e.tanks:
 			if not tanks[int(id)].fish.is_empty():
@@ -268,7 +339,7 @@ func stock_shelf(uid: int, pid: String, n: int) -> int:
 	var e := furniture_by_uid(uid)
 	if e.is_empty() or not e.has("shelf") or not FurnitureDB.shelf_accepts(e.type, pid):
 		return 0
-	var cap: int = int(FurnitureDB.item(e.type).get("capacity", 20))
+	var cap: int = shelf_capacity(e)
 	var move: int = min(n, int(stock.get(pid, 0)), cap - shelf_total(e))
 	if move <= 0:
 		return 0
@@ -435,7 +506,7 @@ func carry_to_shelf(shelf_uid: int) -> int:
 	if not FurnitureDB.shelf_accepts(e.type, carrying.pid):
 		notify.emit("Bu ürün buraya konmaz (%s)." % ("soğutucuya sadece donuk/soğuk ürün" if FurnitureDB.item(e.type).get("shelf", {}).get("cold", false) else "soğuk ürün soğutucuda durmalı"), "bad")
 		return 0
-	var cap: int = int(FurnitureDB.item(e.type).get("capacity", 20))
+	var cap: int = shelf_capacity(e)
 	var move: int = min(int(carrying.n), cap - shelf_total(e))
 	if move <= 0:
 		notify.emit("Raf dolu.", "bad")
@@ -447,6 +518,17 @@ func carry_to_shelf(shelf_uid: int) -> int:
 	carry_changed.emit()
 	stock_changed.emit()
 	return move
+
+
+## Elindeki koliyi/poşeti olduğun yere, yere bırakır (sonra tekrar alınabilir).
+func drop_carrying(x: float, z: float, rot: float) -> void:
+	if carrying.is_empty():
+		return
+	carrying["pos"] = [x, z, rot]
+	boxes.append(carrying)
+	carrying = {}
+	boxes_changed.emit()
+	carry_changed.emit()
 
 
 func carry_to_depot() -> void:
@@ -735,6 +817,9 @@ func from_dict(d: Dictionary) -> bool:
 			e.tank = int(e.tank)
 		if e.has("tanks"):
 			e.tanks = e.tanks.map(func(v): return int(v))
+		if e.has("shelf_tanks"):
+			for k in e.shelf_tanks:
+				e.shelf_tanks[k] = int(e.shelf_tanks[k])
 		if e.has("shelf"):
 			for pid in e.shelf:
 				e.shelf[pid] = int(e.shelf[pid])
@@ -756,6 +841,8 @@ func from_dict(d: Dictionary) -> bool:
 			boxes.append({"uid": int(b.uid), "species": str(b.species), "fish": fl, "n": fl.size()})
 		else:
 			boxes.append({"uid": int(b.uid), "pid": str(b.pid), "n": int(b.n)})
+		if b.has("pos"):
+			boxes[-1]["pos"] = [float(b.pos[0]), float(b.pos[1]), float(b.pos[2])]
 	carrying = {}
 	_buid = int(d.get("buid", boxes.size() + 1))
 	regulars = d.get("regulars", [])

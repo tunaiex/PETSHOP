@@ -46,19 +46,19 @@ const ITEMS := {
 	"duvar_rafi_m": {
 		"name": "Duvar rafı (5 kat)", "price": 320, "cat": "raf", "model": "shelf_wall",
 		"size": Vector2(1.2, 0.45), "height": 2.0, "capacity": 40,
-		"shelf": {"levels": [0.125, 0.475, 0.825, 1.175, 1.525], "width": 1.14, "depth": 0.4, "z": 0.0, "sides": 1},
+		"shelf": {"levels": [0.125, 0.475, 0.825, 1.175, 1.525], "width": 1.14, "depth": 0.4, "z": 0.0, "sides": 1, "tanks": true},
 		"desc": "Duvar boyu 5 katlı raf, 40 ürün.",
 	},
 	"reyon": {
 		"name": "Çift yüzlü reyon", "price": 420, "cat": "raf", "model": "gondola_double",
 		"size": Vector2(1.26, 0.9), "height": 1.6, "capacity": 48,
-		"shelf": {"levels": [0.125, 0.475, 0.825, 1.175], "width": 1.14, "depth": 0.4, "z": 0.22, "sides": 2},
+		"shelf": {"levels": [0.125, 0.475, 0.825, 1.175], "width": 1.14, "depth": 0.4, "z": 0.22, "sides": 2, "tanks": true},
 		"desc": "Ortaya konan iki yüzlü reyon: iki tarafına da ürün dizilir. 48 ürün.",
 	},
 	"reyon_basi": {
 		"name": "Reyon başı", "price": 260, "cat": "raf", "model": "gondola_endcap",
 		"size": Vector2(0.9, 0.6), "height": 1.7, "capacity": 16,
-		"shelf": {"levels": [0.125, 0.475, 0.825, 1.175], "width": 0.84, "depth": 0.4, "z": 0.05, "sides": 1},
+		"shelf": {"levels": [0.125, 0.475, 0.825, 1.175], "width": 0.84, "depth": 0.4, "z": 0.05, "sides": 1, "tanks": true},
 		"desc": "Reyonun ucuna konan vitrin rafı. Kampanya ürünleri için ideal.",
 	},
 	"sergi_masasi": {
@@ -98,18 +98,21 @@ const ITEMS := {
 		"desc": "Vitrinde kedi ağacı: kedi sahiplerini çeker (+itibar).",
 	},
 	"kose_rafi": {
-		"name": "Köşe rafı", "price": 220, "cat": "dekor", "model": "shelf_corner",
-		"size": Vector2(0.9, 0.9), "height": 2.0,
+		"name": "Köşe rafı", "price": 220, "cat": "raf", "model": "shelf_corner",
+		"size": Vector2(0.9, 0.9), "height": 2.0, "capacity": 15,
+		"shelf": {"levels": [0.125, 0.475, 0.825, 1.175, 1.525], "width": 0.5, "depth": 0.3, "z": 0.1, "sides": 1},
 		"desc": "İki duvarın birleştiği köşeye.",
 	},
 	"kasa_onu_raf": {
-		"name": "Kasa önü standı", "price": 120, "cat": "dekor", "model": "checkout_impulse_rack",
-		"size": Vector2(0.6, 0.3), "height": 1.2,
+		"name": "Kasa önü standı", "price": 120, "cat": "raf", "model": "checkout_impulse_rack",
+		"size": Vector2(0.6, 0.3), "height": 1.2, "capacity": 9,
+		"shelf": {"levels": [0.3, 0.62, 0.94], "width": 0.5, "depth": 0.2, "z": 0.03, "sides": 1},
 		"desc": "Kasa önü küçük stand.",
 	},
 	"delikli_pano": {
-		"name": "Delikli duvar panosu", "price": 150, "cat": "dekor", "model": "pegboard_wall",
-		"size": Vector2(1.2, 0.2), "height": 1.8,
+		"name": "Delikli duvar panosu", "price": 150, "cat": "raf", "model": "pegboard_wall",
+		"size": Vector2(1.2, 0.2), "height": 1.8, "capacity": 12,
+		"shelf": {"levels": [0.55, 0.95, 1.35], "width": 1.0, "depth": 0.12, "z": 0.12, "sides": 1},
 		"desc": "Duvara asılan delikli pano.",
 	},
 	"sepet_standi": {

@@ -200,7 +200,7 @@ const SPECIES := {
 	},
 	"orumcek": {
 		"name": "Tarantula", "latin": "Brachypelma hamorii", "habitat": "kuru",
-		"buy": 120, "value": 320, "length": 0.11,
+		"buy": 120, "value": 320, "length": 0.3,
 		"temp_min": 20.0, "temp_max": 30.0, "dirt_rate": 0.3, "hardiness": 0.9,
 		"aggression": 0.7, "long_fins": false, "small": false, "schooling": 0.0, "speed": 0.25,
 		"desc": "Sakin ve dayanıklı. Kuru teraryuma çevrilmiş boş bir camda yaşar, suya konmaz.",

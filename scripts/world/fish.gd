@@ -170,8 +170,21 @@ func _build_walker() -> void:
 		holder.rotation.y = -PI * 0.5
 	elif fwd.is_equal_approx(Vector3(1, 0, 0)):
 		holder.rotation.y = PI * 0.5
+	var center := Vector3(box.get_center().x, box.position.y, box.get_center().z)
+	# Deri giydirilmiş modellerde mesh kutusu bacakları kapsamayabilir (örümcek):
+	# zemine oturtmak için kemiklerin en alt noktasını da hesaba kat.
+	for skn in m.find_children("*", "Skeleton3D", true, false):
+		var sk: Skeleton3D = skn
+		var xf := Transform3D.IDENTITY
+		var q: Node = sk
+		while q != m and q != null:
+			xf = (q as Node3D).transform * xf
+			q = q.get_parent()
+		for bi in sk.get_bone_count():
+			center.y = min(center.y, (xf * sk.get_bone_global_rest(bi).origin).y)
+		break
 	m.scale = Vector3.ONE * k
-	m.position = -Vector3(box.get_center().x, box.position.y, box.get_center().z) * k
+	m.position = -center * k
 	holder.add_child(m)
 	add_child(holder)
 	for c in m.find_children("*", "MeshInstance3D", true, false):

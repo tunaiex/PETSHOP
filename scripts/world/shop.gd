@@ -8,8 +8,8 @@ const D := 10.0
 const H := 3.2
 const WALL := 0.2
 
-var entrance := Vector3(1.2, 0, 2.9)
-var outside := Vector3(1.2, 0, 7.0)
+var entrance := Vector3(1.2, 0, 4.1)
+var outside := Vector3(1.2, 0, 8.6)
 var hud: Node   ## main tarafından atanır
 var main: Node
 
@@ -50,7 +50,7 @@ func build() -> void:
 	nm.cell_height = 0.05
 	nm.geometry_parsed_geometry_type = NavigationMesh.PARSED_GEOMETRY_STATIC_COLLIDERS
 	nm.geometry_collision_mask = 1
-	nm.filter_baking_aabb = AABB(Vector3(-8.0, -0.5, -5.0), Vector3(16.0, 3.0, 17.5))
+	nm.filter_baking_aabb = AABB(Vector3(-11.0, -0.5, -7.3), Vector3(22.0, 3.0, 24.0))
 	_geo.navigation_mesh = nm
 	add_child(_geo)
 	_furn_root = Node3D.new()
@@ -70,7 +70,7 @@ func build() -> void:
 	Game.time_changed.connect(func(_m): _clock.text = Game.clock_text())
 	# Dükkânın köpeği
 	var dog := ShopDog.new()
-	dog.position = Vector3(-1.2, 0, 2.7)
+	dog.position = Vector3(3.0, 0, 3.6)
 	dog.rotation.y = PI * 0.5
 	add_child(dog)
 	dog.setup(self)
@@ -209,45 +209,173 @@ func _collider(parent: Node3D, size: Vector3, pos: Vector3) -> void:
 	parent.add_child(b)
 
 
-const SHELL := "res://assets/models/store/magaza.glb"
+const PIECE := "res://assets/models/store/bina/%s.glb"
 const SIGN_BAND := "res://assets/models/store/tabela_bandi.glb"
-## Satış alanının iç sınırları (x0, z0, x1, z1) ve otomatik kapının ortası
-const ROOM := Rect2(-4.7, -2.3, 9.4, 5.8)
-const DOOR := Vector3(1.2, 0, 3.6)
+## Satış alanının iç sınırları (x0, z0, genişlik, derinlik) ve otomatik kapının ortası
+const ROOM := Rect2(-7.1, -3.5, 14.2, 8.2)
+const DOOR := Vector3(1.2, 0, 4.8)
 const H_IN := 3.0
+const X0 := -7.2      ## dış duvar çizgileri (1,20 m'lik ızgara)
+const X1 := 7.2
+const Z_FRONT := 4.8  ## vitrin
+const Z_PART := -3.6  ## satış alanı / depo arası duvar
+const Z_BACK := -7.2  ## arka duvar
 
-## Binanın parçalarından hangilerine ne tür çarpışma verileceği
-const NO_COLLIDE := ["floor_", "ceiling", "roof_", "parapet", "sidewalk", "decal", "light", "speaker", "smoke", "exit_sign", "wall_clock", "poster", "bunting", "balloon", "convex_mirror", "security_camera", "wall_ac", "neon", "open_sign", "parking_space", "parking_curb", "speed_bump", "awning", "rooftop", "roof_hatch", "clipboard", "calculator", "price_gun", "box_cutter", "desk_radio", "cash_drawer", "first_aid", "cctv"]
-const TRIMESH := ["wall_", "shopfront", "pillar", "stockroom_door"]
+static var _piece_cache: Dictionary = {}
 
 
-## Mağaza paketinin binası: zemin, duvarlar, vitrin, depo, tavan, çatı, otopark ve süsler.
+## Mağaza paketinden tek parça. collide: "" yok, "tri" görünen mesh'ten, "box" sınır kutusu
+func _piece(name: String, pos: Vector3, yaw: float = 0.0, collide: String = "", parent: Node3D = null) -> Node3D:
+	var path := PIECE % name
+	if not ResourceLoader.exists(path):
+		return null
+	if not _piece_cache.has(path):
+		_piece_cache[path] = load(path)
+	var n: Node3D = (_piece_cache[path] as PackedScene).instantiate()
+	FurnitureDB.hide_collision_meshes(n)
+	n.position = pos
+	n.rotation_degrees.y = yaw
+	(parent if parent else _geo).add_child(n)
+	if collide == "tri":
+		for c in n.find_children("*", "MeshInstance3D", true, false):
+			var cn: String = str(c.name)
+			if not c.visible or cn.contains("door") or cn.contains("shutter"):
+				continue
+			(c as MeshInstance3D).create_trimesh_collision()
+	elif collide == "box":
+		var box: AABB = MeshKit.model_aabb(n)
+		var b := StaticBody3D.new()
+		var cs := CollisionShape3D.new()
+		var sh := BoxShape3D.new()
+		sh.size = box.size
+		cs.shape = sh
+		cs.position = box.get_center()
+		b.add_child(cs)
+		n.add_child(b)
+	return n
+
+
+## Büyük mağaza: 14,4 x 8,4 m satış alanı, arkada 3,6 m depo, önde kaldırım ve otopark.
+## Hepsi paketin modüler parçalarıyla 1,20 m ızgarada kurulur.
 func _store_shell() -> void:
-	if not ResourceLoader.exists(SHELL):
-		push_warning("Mağaza modeli yok: " + SHELL)
-		return
-	var shell: Node3D = (load(SHELL) as PackedScene).instantiate()
-	FurnitureDB.hide_collision_meshes(shell)
-	_geo.add_child(shell)
-	# Zemin: içerisi, kaldırım ve otopark tek düz çarpışma
-	_collider(_geo, Vector3(22, 0.1, 22), Vector3(0, -0.05, 3.0))
-	for root in shell.get_children():
-		_shell_collision(root)
-		if str(root.name).begins_with("shopfront_entrance"):
-			for c in root.find_children("slide_door*", "Node3D", true, false):
-				if str(c.name).contains("left"):
-					_door_l = c
-				else:
-					_door_r = c
+	_collider(_geo, Vector3(30, 0.1, 30), Vector3(0, -0.05, 3.0))
+	var x := X0 + 0.6
+	while x < X1:
+		var z := Z_PART + 0.6
+		while z < Z_FRONT:
+			_piece("floor_store_120", Vector3(x, 0, z))
+			z += 1.2
+		z = Z_BACK + 0.6
+		while z < Z_PART:
+			_piece("floor_concrete_120", Vector3(x, 0, z))
+			z += 1.2
+		# Tavan: her üç karodan biri ışık paneli
+		z = Z_BACK + 0.6
+		var i := 0
+		while z < Z_FRONT:
+			var lit: bool = (int(round((x - X0 - 0.6) / 1.2)) % 3 == 1) and (i % 2 == 1)
+			_piece("ceiling_light_120" if lit else "ceiling_tile_120", Vector3(x, H_IN, z))
+			_piece("roof_flat_120", Vector3(x, H_IN + 0.03, z))
+			z += 1.2
+			i += 1
+		x += 1.2
+	# Dış duvarlar
+	var cx := X0 + 1.2
+	while cx < X1:
+		_piece("wall_240", Vector3(cx, 0, Z_BACK), 0.0, "tri")
+		_piece("parapet_120", Vector3(cx - 0.6, H_IN, Z_BACK))
+		_piece("parapet_120", Vector3(cx + 0.6, H_IN, Z_BACK))
+		cx += 2.4
+	var cz := Z_BACK + 1.2
+	while cz < Z_FRONT:
+		_piece("wall_240", Vector3(X0, 0, cz), 90.0, "tri")
+		_piece("wall_240", Vector3(X1, 0, cz), 270.0, "tri")
+		for side in [[X0, 90.0], [X1, 270.0]]:
+			_piece("parapet_120", Vector3(side[0], H_IN, cz - 0.6), side[1])
+			_piece("parapet_120", Vector3(side[0], H_IN, cz + 0.6), side[1])
+		cz += 2.4
+	for c in [[X0, Z_BACK, 90.0], [X1, Z_BACK, 0.0], [X0, Z_FRONT, 180.0], [X1, Z_FRONT, 270.0]]:
+		_piece("wall_corner", Vector3(c[0], 0, c[1]), c[2], "tri")
+		_piece("parapet_corner", Vector3(c[0], H_IN, c[1]), c[2])
+	# Depo duvarı: döner kapı sağda
+	cx = X0 + 1.2
+	while cx < X1 - 2.0:
+		_piece("wall_240", Vector3(cx, 0, Z_PART), 0.0, "tri")
+		cx += 2.4
+	_piece("wall_swing_door_120", Vector3(X1 - 1.8, 0, Z_PART), 0.0, "tri")
+	_piece("wall_120", Vector3(X1 - 0.6, 0, Z_PART), 0.0, "tri")
+	# Vitrin: camlar, ortada otomatik kapı, üstte tenteler
+	cx = X0 + 1.2
+	while cx < X1:
+		if abs(cx - DOOR.x) < 0.1:
+			var ent: Node3D = _piece("shopfront_entrance_240", Vector3(cx, 0, Z_FRONT), 180.0, "tri")
+			if ent:
+				for c in ent.find_children("slide_door*", "Node3D", true, false):
+					if str(c.name).contains("left"):
+						_door_l = c
+					else:
+						_door_r = c
+		else:
+			_piece("shopfront_glass_240", Vector3(cx, 0, Z_FRONT), 180.0, "tri")
+			_piece("awning_240", Vector3(cx, 2.4, Z_FRONT), 180.0)
+		_piece("parapet_120", Vector3(cx - 0.6, H_IN, Z_FRONT), 180.0)
+		_piece("parapet_120", Vector3(cx + 0.6, H_IN, Z_FRONT), 180.0)
+		cx += 2.4
 	if _door_l:
 		_door_l.set_meta("x0", _door_l.position.x)
 	if _door_r:
 		_door_r.set_meta("x0", _door_r.position.x)
+	# Kaldırım, bordür, otopark
+	x = -10.2
+	while x < 10.3:
+		_piece("sidewalk_120", Vector3(x, 0, Z_FRONT + 0.6), 180.0)
+		_piece("sidewalk_120", Vector3(x, 0, Z_FRONT + 1.8), 180.0)
+		_piece("sidewalk_curb_120", Vector3(x, 0, Z_FRONT + 3.0), 180.0)
+		x += 1.2
+	var asphalt := StandardMaterial3D.new()
+	asphalt.albedo_color = Color(0.2, 0.2, 0.22)
+	asphalt.roughness = 0.9
+	MeshKit.box(_geo, Vector3(24, 0.05, 10), Vector3(0, -0.03, Z_FRONT + 8.6), asphalt)
+	for i in 6:
+		_piece("parking_space", Vector3(-6.0 + i * 2.6, 0.0, Z_FRONT + 6.4), 0.0)
+		_piece("parking_curb_stop", Vector3(-6.0 + i * 2.6, 0.0, Z_FRONT + 4.2), 0.0)
+	_piece("car_hatchback", Vector3(-3.4, 0, Z_FRONT + 6.4), 180.0, "box")
+	_piece("cart_corral", Vector3(6.6, 0, Z_FRONT + 6.0), 90.0, "box")
+	for lp in [-8.4, 8.4]:
+		_piece("street_lamp", Vector3(lp, 0, Z_FRONT + 2.6), 180.0, "box")
+	_piece("light_pole_double", Vector3(1.2, 0, Z_FRONT + 9.2), 0.0, "box")
+	_piece("tree_garden", Vector3(-9.0, 0, Z_FRONT + 1.6), 0.0, "box")
+	_piece("planter_box", Vector3(-4.6, 0, Z_FRONT + 1.0), 0.0, "box")
+	_piece("planter_box", Vector3(4.6, 0, Z_FRONT + 1.0), 0.0, "box")
+	_piece("outdoor_bench", Vector3(-2.6, 0, Z_FRONT + 1.4), 180.0, "box")
+	_piece("shop_trash_bin_a", Vector3(3.2, 0, Z_FRONT + 1.0), 180.0, "box")
+	_piece("a_frame_sign_a", Vector3(-0.4, 0, Z_FRONT + 1.6), 160.0)
+	# İç süsler (duvarda, yürümeyi kapatmaz)
+	_piece("doormat", Vector3(DOOR.x, 0.002, Z_FRONT - 0.7))
+	_piece("wall_clock", Vector3(-1.2, 2.35, Z_PART + 0.075))
+	_piece("exit_sign", Vector3(X1 - 1.8, 2.45, Z_PART + 0.075))
+	_piece("poster_fox", Vector3(X0 + 0.08, 1.7, -2.6), 90.0)
+	_piece("poster_robot", Vector3(X1 - 0.08, 1.7, 0.6), 270.0)
+	_piece("security_camera_a", Vector3(X1 - 0.2, 2.7, Z_FRONT - 0.3), 225.0)
+	_piece("convex_mirror", Vector3(X0 + 0.1, 2.3, Z_PART + 0.2), 45.0)
+	_piece("neon_open", Vector3(-1.2, 1.9, Z_FRONT - 0.12), 180.0)
+	_piece("fire_extinguisher_a", Vector3(X1 - 0.15, 0, Z_PART + 0.6), 270.0)
+	_piece("potted_plant_tall_a", Vector3(X0 + 0.5, 0, Z_FRONT - 0.5), 0.0, "box")
+	# Depo
+	for i in 4:
+		_piece("backroom_rack", Vector3(X0 + 1.6 + i * 1.25, 0, Z_BACK + 0.35), 0.0, "box")
+	_piece("staff_lockers", Vector3(X1 - 0.35, 0, Z_BACK + 1.2), 270.0, "box")
+	_piece("office_desk", Vector3(X1 - 1.6, 0, Z_BACK + 0.6), 0.0, "box")
+	_piece("safe", Vector3(X1 - 0.4, 0, Z_BACK + 2.6), 270.0, "box")
+	_piece("pallet", Vector3(0.8, 0, -5.4), 0.0)
+	for i in 3:
+		_piece("shipping_box", Vector3(0.5 + (i % 2) * 0.45, 0.14 + (i / 2) * 0.35, -5.4), 10.0 * i)
+	_piece("hand_truck_a", Vector3(2.2, 0, -5.0), 30.0)
 	# Oyuncu otoparktan ileri gitmesin
-	_collider(_geo, Vector3(0.2, 3, 9), Vector3(-8.2, 1.5, 8.5))
-	_collider(_geo, Vector3(0.2, 3, 9), Vector3(8.2, 1.5, 8.5))
-	_collider(_geo, Vector3(16.6, 3, 0.2), Vector3(0, 1.5, 12.8))
-	# Yansıma probu: cam, su ve parlak zemin içeriyi yansıtsın
+	_collider(_geo, Vector3(0.2, 3, 12), Vector3(-11.0, 1.5, Z_FRONT + 6.0))
+	_collider(_geo, Vector3(0.2, 3, 12), Vector3(11.0, 1.5, Z_FRONT + 6.0))
+	_collider(_geo, Vector3(22.2, 3, 0.2), Vector3(0, 1.5, Z_FRONT + 12.0))
+	# Yansıma probu
 	var probe := ReflectionProbe.new()
 	probe.size = Vector3(ROOM.size.x, H_IN, ROOM.size.y)
 	probe.position = Vector3(ROOM.get_center().x, H_IN * 0.5, ROOM.get_center().y)
@@ -258,44 +386,6 @@ func _store_shell() -> void:
 	probe.ambient_mode = ReflectionProbe.AMBIENT_COLOR
 	probe.ambient_color = Color(0.42, 0.4, 0.37)
 	add_child(probe)
-
-
-func _shell_collision(root: Node) -> void:
-	var nm: String = str(root.name)
-	for k in NO_COLLIDE:
-		if nm.begins_with(k) or nm.contains(k):
-			return
-	var trimesh := false
-	for k in TRIMESH:
-		if nm.begins_with(k):
-			trimesh = true
-	if trimesh:
-		# Kapı ve pencere boşlukları açık kalsın: görünen mesh'ten üçgen çarpışma
-		for c in root.find_children("*", "MeshInstance3D", true, false):
-			var cn: String = str(c.name)
-			if cn.contains("door") or cn.contains("shutter") or not c.visible:
-				continue
-			(c as MeshInstance3D).create_trimesh_collision()
-		if root is MeshInstance3D and root.visible:
-			(root as MeshInstance3D).create_trimesh_collision()
-		return
-	# Diğer eşyalar (dolap, masa, araba, bank...): sınır kutusu
-	if not root is Node3D:
-		return
-	var n3: Node3D = root
-	var box: AABB = MeshKit.model_aabb(n3)
-	if root is MeshInstance3D:
-		box = (root as MeshInstance3D).get_aabb()
-	if box.size.y < 0.25 or box.size.x * box.size.z < 0.02:
-		return
-	var b := StaticBody3D.new()
-	var cs := CollisionShape3D.new()
-	var sh := BoxShape3D.new()
-	sh.size = box.size
-	cs.shape = sh
-	cs.position = box.get_center()
-	b.add_child(cs)
-	n3.add_child(b)
 
 
 ## Vitrin üstündeki tabela bandı ve dükkânın adı
@@ -375,28 +465,28 @@ func _lights() -> void:
 	_sun.directional_shadow_max_distance = 30.0
 	add_child(_sun)
 	_panel_mat = StandardMaterial3D.new()
-	for x in [-3.6, -1.2, 1.2, 3.6]:
-		for z in [-1.4, 0.9, 2.9]:
+	for x in [-5.4, -1.8, 1.8, 5.4]:
+		for z in [-2.2, 0.7, 3.5]:
 			var l := OmniLight3D.new()
 			l.position = Vector3(x, 2.75, z)
-			l.omni_range = 4.2
+			l.omni_range = 5.2
 			l.omni_attenuation = 1.2
-			l.light_energy = 1.15
+			l.light_energy = 1.25
 			l.light_color = Color(1.0, 0.95, 0.88)
 			l.light_specular = 0.25
 			l.shadow_enabled = false
 			add_child(l)
 			_room_lights.append(l)
-	for x in [-3.0, 0.0, 3.0]:
+	for x in [-4.8, 0.0, 4.8]:
 		var l := OmniLight3D.new()
-		l.position = Vector3(x, 2.7, -3.6)
-		l.omni_range = 3.5
+		l.position = Vector3(x, 2.7, -5.4)
+		l.omni_range = 4.0
 		l.light_energy = 0.9
 		l.light_color = Color(1.0, 0.96, 0.9)
 		add_child(l)
 		_room_lights.append(l)
 	# Dış mekân: gece sokak lambaları ve vitrin ışığı
-	for lp in [Vector3(4.4, 3.6, 5.25), Vector3(-4.4, 3.6, 5.25), Vector3(-5.4, 5.5, 8.4)]:
+	for lp in [Vector3(8.4, 3.6, Z_FRONT + 2.4), Vector3(-8.4, 3.6, Z_FRONT + 2.4), Vector3(1.2, 5.5, Z_FRONT + 9.0)]:
 		var sp := SpotLight3D.new()
 		sp.position = lp
 		sp.rotation_degrees = Vector3(-90, 0, 0)
@@ -488,11 +578,11 @@ func _build_clock() -> void:
 	_clock.pixel_size = 0.003
 	_clock.modulate = Color(0.9, 0.25, 0.2)
 	_clock.outline_size = 0
-	_clock.position = Vector3(4.66, 2.45, 2.4)
+	_clock.position = Vector3(X1 - 0.09, 2.45, 2.8)
 	_clock.rotation_degrees.y = -90
 	_clock.text = Game.clock_text()
 	add_child(_clock)
-	MeshKit.box(self, Vector3(0.04, 0.4, 0.9), Vector3(4.69, 2.45, 2.4), MeshKit.mat(Color(0.05, 0.05, 0.05), 0.3))
+	MeshKit.box(self, Vector3(0.04, 0.4, 0.9), Vector3(X1 - 0.06, 2.45, 2.8), MeshKit.mat(Color(0.05, 0.05, 0.05), 0.3))
 
 
 # ------------------------------------------------------------------ Eşyalar
@@ -509,7 +599,7 @@ func sync_furniture() -> void:
 			nodes[uid] = n
 		n.position = Vector3(e.x, 0, e.z)
 		n.rotation = Vector3(0, deg_to_rad(e.rot), 0)
-		if n is AquariumRack:
+		if n is AquariumRack or n is Shelf:
 			n.refresh()
 	for uid in nodes.keys():
 		if not seen.has(uid):
@@ -583,6 +673,7 @@ func _index() -> void:
 			aquariums.append_array(n.aquariums())
 		elif n is Shelf:
 			shelves.append(n)
+			aquariums.append_array(n.tank_nodes())
 		elif n is FurnitureItem and n.type == "kasa":
 			counter = n
 
@@ -596,10 +687,15 @@ func sync_boxes() -> void:
 		var b: Dictionary = Game.boxes[i]
 		var box := DeliveryBox.new()
 		box.setup(b)
+		if b.has("pos"):
+			box.position = Vector3(float(b.pos[0]), 0, float(b.pos[1]))
+			box.rotation.y = float(b.pos[2])
+			_boxes_root.add_child(box)
+			continue
 		var col: int = i % 4
 		var stack: int = (i / 4) % 3
 		var row: int = i / 12
-		box.position = Vector3(-1.45 + col * 0.5, stack * 0.36, 4.1 + row * 0.5)
+		box.position = Vector3(-1.45 + col * 0.5, stack * 0.36, Z_FRONT + 0.6 + row * 0.5)
 		box.rotation.y = (i % 3) * 0.08
 		_boxes_root.add_child(box)
 
