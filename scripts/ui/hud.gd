@@ -829,7 +829,7 @@ func _fill_tank(body: VBoxContainer, aq: Aquarium) -> void:
 		_btn(mv, "Akvaryumu raftan kaldır (%d ₺)" % (Game.SHELF_TANK_PRICE / 2), _remove_shelf_tank.bind(aq), t.fish.is_empty())
 	elif aq.rack_level >= 0:
 		_btn(mv, "Rafı taşı", _move_furniture.bind(aq.furniture_uid))
-		_btn(mv, "Akvaryumu raftan kaldır (%d ₺)" % (Game.RACK_TANK_PRICE / 2), _remove_rack_tank.bind(aq), t.fish.is_empty())
+		_btn(mv, "Akvaryumu raftan kaldır (%d ₺)" % (Game.rack_price(Game.furniture_by_uid(aq.furniture_uid).get("type", "tank_rafi")) / 2), _remove_rack_tank.bind(aq), t.fish.is_empty())
 	else:
 		_btn(mv, "Taşı", _move_furniture.bind(aq.furniture_uid))
 		_btn(mv, "Sat (%d ₺)" % (int(FurnitureDB.item(Game.furniture_by_uid(aq.furniture_uid).get("type", "akvaryum_beyaz")).price) / 2), _sell_furniture.bind(aq.furniture_uid), t.fish.is_empty())
@@ -921,7 +921,7 @@ func _fill_dry(body: VBoxContainer, aq: Aquarium, t: Dictionary) -> void:
 		_btn(mv, "Akvaryumu raftan kaldır (%d ₺)" % (Game.SHELF_TANK_PRICE / 2), _remove_shelf_tank.bind(aq), t.fish.is_empty())
 	elif aq.rack_level >= 0:
 		_btn(mv, "Rafı taşı", _move_furniture.bind(aq.furniture_uid))
-		_btn(mv, "Akvaryumu raftan kaldır (%d ₺)" % (Game.RACK_TANK_PRICE / 2), _remove_rack_tank.bind(aq), t.fish.is_empty())
+		_btn(mv, "Akvaryumu raftan kaldır (%d ₺)" % (Game.rack_price(Game.furniture_by_uid(aq.furniture_uid).get("type", "tank_rafi")) / 2), _remove_rack_tank.bind(aq), t.fish.is_empty())
 	else:
 		_btn(mv, "Taşı", _move_furniture.bind(aq.furniture_uid))
 		_btn(mv, "Sat (%d ₺)" % (int(FurnitureDB.item(Game.furniture_by_uid(aq.furniture_uid).get("type", "akvaryum_beyaz")).price) / 2), _sell_furniture.bind(aq.furniture_uid), t.fish.is_empty())
@@ -1266,6 +1266,7 @@ func _fill_fish(body: VBoxContainer, target_tank: int) -> void:
 		["Örümcek (kuru teraryum)", FishDB.ids_in_habitat("kuru")],
 		["Hamster (hamster kafesi)", FishDB.ids_in_habitat("hamster")],
 		["Civciv (civciv kafesi)", FishDB.ids_in_habitat("civciv")],
+		["Kuşlar (kuş kafesi)", FishDB.ids_in_habitat("kus")],
 	]
 	for g in groups:
 		_section(body, g[0])

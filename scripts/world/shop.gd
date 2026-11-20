@@ -520,7 +520,7 @@ func spawn(e: Dictionary) -> Node3D:
 		var pn := Aquarium.new()
 		pn.furniture_uid = int(e.uid)
 		_furn_root.add_child(pn)
-		pn.setup_pen(int(e.tank), str(FurnitureDB.item(e.type).pen))
+		pn.setup_pen(int(e.tank), str(FurnitureDB.item(e.type).pen), FurnitureDB.item(e.type).get("renk", []))
 		n = pn
 	elif FurnitureDB.is_tank(e.type):
 		var aq := Aquarium.new()
@@ -531,7 +531,7 @@ func spawn(e: Dictionary) -> Node3D:
 	elif FurnitureDB.is_rack(e.type):
 		var rk := AquariumRack.new()
 		_furn_root.add_child(rk)
-		rk.setup(int(e.uid))
+		rk.setup(int(e.uid), e.type)
 		n = rk
 	elif FurnitureDB.is_shelf(e.type):
 		var sh := Shelf.new()

@@ -66,12 +66,14 @@ func setup(id: int, wood: bool = false, terra: bool = false) -> void:
 
 ## 3 katlı rafın bir katındaki küçük ışıklı akvaryum. Düğüm kökü zemindedir,
 ## tank `y0` yüksekliğindeki raf tablasına oturur.
-func setup_rack(id: int, level: int, y0: float, rack_size: Vector2) -> void:
+func setup_rack(id: int, level: int, y0: float, rack_size: Vector2, dims: Vector3 = Vector3.ZERO) -> void:
 	rack_level = level
 	_rack_size = rack_size
-	_tw = RACK_TW
-	_th = RACK_TH
-	_td = RACK_TD
+	if dims == Vector3.ZERO:
+		dims = Vector3(RACK_TW, RACK_TH, RACK_TD)
+	_tw = dims.x
+	_th = dims.y
+	_td = dims.z
 	_y0 = y0 + 0.012
 	_water_h = _th - 0.05
 	setup(id)
@@ -94,9 +96,21 @@ func setup_shelf(id: int, level: int, y0: float, size: Vector2, height: float) -
 
 
 ## Hamster / civciv kafesi kurulumu
-func setup_pen(id: int, kind: String) -> void:
+var _pen_colors: Array = []
+const BIRD_CAGE_MODEL := "res://assets/models/props/kus_kafesi.glb"
+const BIRD_STAND := 0.75   ## kuş kafesi sehpasının üst yüzeyi
+const BIRD_W := 0.72       ## kafes tabanı genişliği
+
+
+func setup_pen(id: int, kind: String, colors: Array = []) -> void:
 	pen = kind
-	if kind == "hamster":
+	_pen_colors = colors
+	if kind == "kus":
+		_tw = BIRD_W - 0.08
+		_td = BIRD_W * 0.8 - 0.08
+		_th = 0.55
+		_y0 = BIRD_STAND + 0.105
+	elif kind == "hamster":
 		_tw = RACK_TW
 		_th = RACK_TH
 		_td = RACK_TD
@@ -132,6 +146,9 @@ func _build_static() -> void:
 		return
 	if pen == "civciv":
 		_build_chick_cage()
+		return
+	if pen == "kus":
+		_build_bird_cage()
 		return
 	if rack_level >= 0:
 		_build_rack_tank()
@@ -318,6 +335,79 @@ func _build_hamster_stand() -> void:
 		b.rotation_degrees.y = 8 - i * 14
 
 
+## Kuş kafesi: ahşap sehpa + oyuncunun modelinin tabanı, kabı, tünekleri (renkli) + hafif tel
+func _build_bird_cage() -> void:
+	var wood := MeshKit.shader_mat("res://shaders/wood_floor.gdshader", {"wood_a": Color(0.55, 0.38, 0.22), "wood_b": Color(0.45, 0.3, 0.17), "plank": Vector2(4.0, 0.5)})
+	var sw: float = BIRD_W + 0.08
+	var sd: float = BIRD_W * 0.8 + 0.08
+	MeshKit.box(self, Vector3(sw, 0.04, sd), Vector3(0, BIRD_STAND - 0.02, 0), wood)
+	for x in [-1.0, 1.0]:
+		for z in [-1.0, 1.0]:
+			MeshKit.box(self, Vector3(0.04, BIRD_STAND - 0.04, 0.04), Vector3(x * (sw * 0.5 - 0.04), (BIRD_STAND - 0.04) * 0.5, z * (sd * 0.5 - 0.04)), wood)
+	MeshKit.box(self, Vector3(sw - 0.08, 0.02, sd - 0.08), Vector3(0, 0.2, 0), wood)
+	var top_h := 0.62
+	if ResourceLoader.exists(BIRD_CAGE_MODEL):
+		var m: Node3D = (load(BIRD_CAGE_MODEL) as PackedScene).instantiate()
+		for c in m.find_children("*", "MeshInstance3D", true, false):
+			var mi: MeshInstance3D = c
+			var mat = mi.get_active_material(0)
+			var mn: String = str(mat.resource_name) if mat else ""
+			if mn == "cage_bar_mat":
+				mi.visible = false   # teller: aşağıda hafif tel ile çizilir
+			elif mat is BaseMaterial3D and _pen_colors.size() == 2 and (mn == "Base_Mat" or mn == "Bowl_Mat"):
+				var d: BaseMaterial3D = mat.duplicate()
+				d.albedo_color = _pen_colors[0] if mn == "Base_Mat" else _pen_colors[1]
+				mi.material_override = d
+		var box: AABB = MeshKit.model_aabb(m)
+		var k: float = BIRD_W / max(box.size.x, 0.001)
+		m.scale = Vector3.ONE * k
+		m.position = Vector3(-box.get_center().x * k, BIRD_STAND - box.position.y * k, -box.get_center().z * k)
+		add_child(m)
+	# Teller: dikey çubuklu dört yüz ve üst
+	var bars := MeshKit.shader_mat("res://shaders/wire_net.gdshader", {"wire_color": Color(0.92, 0.92, 0.9), "cells_u": 40.0, "cells_v": 3.0, "thickness": 0.12})
+	var y_lo: float = _y0 - 0.01
+	var w: float = BIRD_W - 0.02
+	var d: float = BIRD_W * 0.8 - 0.02
+	for face in [[Vector3(w, top_h, 0.002), Vector3(0, y_lo + top_h * 0.5, d * 0.5)], [Vector3(w, top_h, 0.002), Vector3(0, y_lo + top_h * 0.5, -d * 0.5)],
+			[Vector3(0.002, top_h, d), Vector3(w * 0.5, y_lo + top_h * 0.5, 0)], [Vector3(0.002, top_h, d), Vector3(-w * 0.5, y_lo + top_h * 0.5, 0)],
+			[Vector3(w, 0.002, d), Vector3(0, y_lo + top_h, 0)]]:
+		var q := MeshInstance3D.new()
+		var qm := QuadMesh.new()
+		var sz: Vector3 = face[0]
+		if sz.y < 0.01:
+			qm.size = Vector2(sz.x, sz.z)
+			q.rotation_degrees.x = -90
+		elif sz.x < 0.01:
+			qm.size = Vector2(sz.z, sz.y)
+			q.rotation_degrees.y = 90
+		else:
+			qm.size = Vector2(sz.x, sz.y)
+		q.mesh = qm
+		q.material_override = bars
+		q.position = face[1]
+		q.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(q)
+	MeshKit.box(self, Vector3(0.03, 0.03, 0.03), Vector3(0, y_lo + top_h + 0.02, 0), MeshKit.mat(Color(0.9, 0.9, 0.88), 0.3, 0.6))
+	_glass_mat = null
+	_label = Label3D.new()
+	_label.font_size = 22
+	_label.pixel_size = 0.001
+	_label.outline_size = 5
+	_label.outline_modulate = Color(0, 0, 0, 0.8)
+	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_label.position = Vector3(0, y_lo + top_h + 0.15, 0)
+	add_child(_label)
+	var body := StaticBody3D.new()
+	var cs := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(sw, y_lo + top_h, sd)
+	cs.shape = shape
+	cs.position.y = shape.size.y * 0.5
+	body.add_child(cs)
+	body.set_meta("interact", self)
+	add_child(body)
+
+
 ## Yuvarlak tel civciv kafesi: oyuncunun modeli (ahşap taban + kapak) + hafif tel örgü
 func _build_chick_cage() -> void:
 	var h := 0.5
@@ -416,6 +506,8 @@ func _rebuild_dry_content(d: Dictionary) -> void:
 			_build_hamster_props(yf)
 		"civciv":
 			_build_chick_props(yf)
+		"kus":
+			pass   # tünek, kap: kafes modelinde
 		_:
 			_build_decor(RandomNumberGenerator.new())
 	# Işık (hamster kafesinde LED, kuru teraryumda lamba alınmışsa)
@@ -878,7 +970,7 @@ func _update_label() -> void:
 	if counts.is_empty():
 		lines.append("(boş)")
 	if pen != "":
-		lines[0] = "%s %d" % ["HAMSTER" if pen == "hamster" else "CİVCİV", tank_id + 1]
+		lines[0] = "%s %d" % [{"hamster": "HAMSTER", "civciv": "CİVCİV", "kus": "KUŞ"}.get(pen, "KAFES"), tank_id + 1]
 		_label.text = "  •  ".join(lines) if pen == "hamster" else "\n".join(lines)
 		return
 	if rack_level >= 0:
@@ -943,7 +1035,7 @@ func get_prompt() -> String:
 	if Game.is_animal_box(Game.carrying):
 		return "Tank %d: %s ×%d içine bırak" % [tank_id + 1, FishDB.display_name(Game.carrying.species), int(Game.carrying.n)]
 	if pen != "":
-		return "%s %d: İncele" % ["Hamster kafesi" if pen == "hamster" else "Civciv kafesi", tank_id + 1]
+		return "%s %d: İncele" % [{"hamster": "Hamster kafesi", "civciv": "Civciv kafesi", "kus": "Kuş kafesi"}.get(pen, "Kafes"), tank_id + 1]
 	if TankSim.living(d).is_empty() and str(d.get("gravel", "")) == "":
 		return "Tank %d: Kur (kum, filtre, ısıtıcı, lamba...)" % (tank_id + 1)
 	return "Tank %d: İncele" % (tank_id + 1)

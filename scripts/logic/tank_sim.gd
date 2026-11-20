@@ -155,16 +155,18 @@ static func habitat_of(tank: Dictionary) -> String:
 			return "hamster"
 		"civciv":
 			return "civciv"
+		"kus":
+			return "kus"
 	return "su"
 
 
 ## Suyu olmayan (kafes / kuru teraryum) bölme mi?
 static func is_dry(tank: Dictionary) -> bool:
-	return habitat_of(tank) in ["kuru", "hamster", "civciv"]
+	return habitat_of(tank) in ["kuru", "hamster", "civciv", "kus"]
 
 
 static func _habitat_animals(h: String) -> String:
-	return {"turtle": "kaplumbağa", "kuru": "örümcek", "hamster": "hamster", "civciv": "civciv"}.get(h, "balık")
+	return {"turtle": "kaplumbağa", "kuru": "örümcek", "hamster": "hamster", "civciv": "civciv", "kus": "kuş"}.get(h, "balık")
 
 
 ## Hamster / civciv kafesi kaydı: suyu yok, talaşlı, ışıklı.

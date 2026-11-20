@@ -159,6 +159,20 @@ func _build_walker() -> void:
 	var cfg: Array = FishDB.LAND_MODELS[species]
 	var m: Node3D = (load(cfg[0]) as PackedScene).instantiate()
 	var box: AABB = MeshKit.model_aabb(m)
+	# Deri giydirilmiş modellerde gerçek boyut iskeletten: mesh kutusu çok küçük kalabiliyor (muhabbet kuşu)
+	for skn in m.find_children("*", "Skeleton3D", true, false):
+		var sk: Skeleton3D = skn
+		var sxf := Transform3D.IDENTITY
+		var q0: Node = sk
+		while q0 != m and q0 != null:
+			sxf = (q0 as Node3D).transform * sxf
+			q0 = q0.get_parent()
+		var bb := AABB(sxf * sk.get_bone_global_rest(0).origin, Vector3.ZERO)
+		for bi in sk.get_bone_count():
+			bb = bb.expand(sxf * sk.get_bone_global_rest(bi).origin)
+		if bb.size.length() > box.size.length() * 2.0:
+			box = bb.grow(bb.size.length() * 0.08)
+		break
 	var fwd: Vector3 = cfg[1]
 	var along: float = abs(box.size.dot(fwd.abs()))
 	var k: float = float(_data.length) / max(along, 0.0001)

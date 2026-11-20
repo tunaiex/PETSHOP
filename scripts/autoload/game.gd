@@ -202,9 +202,9 @@ func add_furniture(type: String, x: float, z: float, rot: float) -> Dictionary:
 	if FurnitureDB.is_rack(type):
 		# Raf katları boş gelir: tanklar kilitli açılır, oyuncu katlara akvaryum alır.
 		var ids: Array = []
-		for i in int(FurnitureDB.item(type).get("levels", 3)):
+		for i in rack_slots(type):
 			var t := TankSim.new_tank(tanks.size(), false, 25.0, false)
-			t["cap"] = RACK_TANK_CAP
+			t["cap"] = rack_cap(type)
 			tanks.append(t)
 			ids.append(t.id)
 		e["tanks"] = ids
@@ -280,6 +280,20 @@ func shelf_capacity(e: Dictionary) -> int:
 	return int(floor(float(cap) * float(rows - used) / float(rows)))
 
 
+## Akvaryum rafının bölme sayısı, bölme fiyatı ve bölme akvaryumunun kapasitesi
+func rack_slots(type: String) -> int:
+	var r: Dictionary = FurnitureDB.item(type).get("rack", {})
+	return r.get("levels", [0, 0, 0]).size() * r.get("bays", [0]).size()
+
+
+func rack_price(type: String) -> int:
+	return int(FurnitureDB.item(type).get("rack", {}).get("slot_price", RACK_TANK_PRICE))
+
+
+func rack_cap(type: String) -> int:
+	return int(FurnitureDB.item(type).get("rack", {}).get("slot_cap", RACK_TANK_CAP))
+
+
 ## Raf katına ışıklı akvaryum koyar. Başarılıysa "" döner.
 func buy_rack_tank(uid: int, level: int) -> String:
 	var e := furniture_by_uid(uid)
@@ -288,10 +302,10 @@ func buy_rack_tank(uid: int, level: int) -> String:
 	var id: int = int(e.tanks[level])
 	if tanks[id].unlocked:
 		return "Bu katta zaten akvaryum var."
-	if not spend(RACK_TANK_PRICE):
-		return "Yeterli paran yok (%d ₺)." % RACK_TANK_PRICE
+	if not spend(rack_price(e.type)):
+		return "Yeterli paran yok (%d ₺)." % rack_price(e.type)
 	var t := TankSim.new_tank(id, true, 25.0, false)
-	t["cap"] = RACK_TANK_CAP
+	t["cap"] = rack_cap(e.type)
 	t.light = true
 	tanks[id] = t
 	furniture_changed.emit()
@@ -310,7 +324,7 @@ func remove_rack_tank(uid: int, level: int) -> String:
 	if not t.fish.is_empty():
 		return "Önce tanktaki balıkları sat ya da taşı."
 	t.unlocked = false
-	add_money(RACK_TANK_PRICE / 2)
+	add_money(rack_price(e.type) / 2)
 	furniture_changed.emit()
 	return ""
 
@@ -339,7 +353,7 @@ func sell_furniture(uid: int) -> String:
 		for id in e.tanks:
 			if tanks[int(id)].unlocked:
 				tanks[int(id)].unlocked = false
-				refund += RACK_TANK_PRICE / 2
+				refund += rack_price(e.type) / 2
 	if e.has("shelf"):
 		for pid in e.shelf:
 			add_stock(pid, int(e.shelf[pid]))

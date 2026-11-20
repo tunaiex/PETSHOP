@@ -219,6 +219,20 @@ const SPECIES := {
 		"aggression": 0.0, "long_fins": false, "small": true, "schooling": 0.6, "speed": 0.45,
 		"desc": "Cıvıl cıvıl. Civciv kafesinde toplu yaşar, ucuzdur ama çok satar.",
 	},
+	"muhabbet": {
+		"name": "Muhabbet Kuşu", "latin": "Melopsittacus undulatus", "habitat": "kus",
+		"buy": 45, "value": 120, "length": 0.18,
+		"temp_min": 16.0, "temp_max": 30.0, "dirt_rate": 1.0, "hardiness": 0.75,
+		"aggression": 0.0, "long_fins": false, "small": true, "schooling": 0.6, "speed": 0.35,
+		"desc": "Cıvıl cıvıl, sosyal kuş. Kuş kafesinde ikili-üçlü mutlu olur. Kuş yemi yer.",
+	},
+	"papagan": {
+		"name": "Ara Papağanı", "latin": "Ara macao", "habitat": "kus",
+		"buy": 950, "value": 2600, "length": 0.42,
+		"temp_min": 18.0, "temp_max": 30.0, "dirt_rate": 2.0, "hardiness": 0.85,
+		"aggression": 0.3, "long_fins": false, "small": false, "schooling": 0.0, "speed": 0.08,
+		"desc": "Rengârenk, akıllı ve pahalı. Koleksiyoncular bayılır. Geniş kafes ve bol yem ister.",
+	},
 	"kedi": {
 		"name": "Kedi Balığı", "latin": "Ictalurus punctatus",
 		"buy": 60, "value": 150, "length": 0.18,
@@ -274,6 +288,8 @@ static func get_species(id: String) -> Dictionary:
 const LAND_MODELS := {
 	"hamster": ["res://assets/models/animals/hamster.glb", Vector3(-1, 0, 0), "HamsterALL_Walk", "HamsterALL_Idle"],
 	"civciv": ["res://assets/models/animals/civciv.glb", Vector3(0, 0, 1), "Take 001", "Take 001"],
+	"muhabbet": ["res://assets/models/animals/muhabbet.glb", Vector3(0, 0, 1), "walk", "idle"],
+	"papagan": ["res://assets/models/animals/papagan.glb", Vector3(0, 0, 1), "", ""],
 	"orumcek": ["res://assets/models/animals/orumcek.glb", Vector3(0, 0, 1), "Spider_Armature|walk_ani_vor", "Spider_Armature|warte_pose"],
 }
 
@@ -286,11 +302,11 @@ static func habitat(id: String) -> String:
 
 ## Suda değil karada yaşayan, yürüyen hayvan mı?
 static func is_land(id: String) -> bool:
-	return habitat(id) in ["kuru", "hamster", "civciv"]
+	return habitat(id) in ["kuru", "hamster", "civciv", "kus"]
 
 
 static func habitat_name(h: String) -> String:
-	return {"su": "akvaryum", "turtle": "kaplumbağa teraryumu", "kuru": "kuru teraryum", "hamster": "hamster kafesi", "civciv": "civciv kafesi"}.get(h, h)
+	return {"su": "akvaryum", "turtle": "kaplumbağa teraryumu", "kuru": "kuru teraryum", "hamster": "hamster kafesi", "civciv": "civciv kafesi", "kus": "kuş kafesi"}.get(h, h)
 
 
 static func ids_in_habitat(h: String) -> Array:
@@ -310,6 +326,8 @@ static func food_type(id: String) -> String:
 			return "hepsi"
 		"hamster", "civciv":
 			return "kafes"
+		"kus":
+			return "kus"
 	return "soguk" if id in ["japon", "koi", "alabalik"] else "tropikal"
 
 

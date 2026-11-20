@@ -110,7 +110,7 @@ const PRODUCTS := {
 		"desc": "Topaklanan kedi kumu.",
 	},
 	"kus_yemi": {
-		"name": "Kuş Yemi", "buy": 20, "price": 50, "use": false,
+		"name": "Kuş Yemi", "buy": 20, "price": 50, "use": true, "food": "kus",
 		"color": Color(0.85, 0.7, 0.3), "shape": "bag", "model": "bird_seed_bag", "h": -1.0,
 		"desc": "Muhabbet kuşu ve kanarya için tohum karışımı.",
 	},
