@@ -60,6 +60,9 @@ func _build_frame() -> void:
 		holder.add_child(m)
 		add_child(holder)
 		return
+	if cfg.has("frame"):
+		_build_shop_frame()
+		return
 	var dark := MeshKit.mat(Color(0.12, 0.12, 0.13), 0.4, 0.6)
 	var wood := MeshKit.mat(Color(0.75, 0.58, 0.38), 0.7)
 	for x in [-size.x * 0.5 + 0.02, size.x * 0.5 - 0.02]:
@@ -67,6 +70,45 @@ func _build_frame() -> void:
 			MeshKit.box(self, Vector3(0.03, 1.6, 0.04), Vector3(x, 0.8, z), dark)
 	for y in levels():
 		MeshKit.box(self, Vector3(size.x - 0.04, 0.012, size.y - 0.04), Vector3(0, y - 0.006, 0), wood)
+
+
+## Balıkçı tipi raf: kolonlar, kat tablaları, her katın altında ışık bandı (kodla çizilir)
+func _build_shop_frame() -> void:
+	var white: bool = str(cfg.frame) == "beyaz"
+	var col: Color = Color(0.93, 0.93, 0.92) if white else Color(0.08, 0.08, 0.09)
+	var frame := MeshKit.mat(col, 0.5 if white else 0.35, 0.0 if white else 0.6)
+	var post_w: float = 0.1 if white else 0.04
+	var lv: Array = levels()
+	var top: float = float(lv[-1]) + tank_size().y + 0.16
+	var bx: Array = bays()
+	var half: float = size.x * 0.5
+	var xs: Array = [-half + post_w * 0.5, half - post_w * 0.5]
+	for i in range(1, bx.size()):
+		xs.append((float(bx[i - 1]) + float(bx[i])) * 0.5)
+	for x in xs:
+		for z in [-size.y * 0.5 + post_w * 0.5, size.y * 0.5 - post_w * 0.5]:
+			MeshKit.box(self, Vector3(post_w, top, post_w), Vector3(x, top * 0.5, z), frame)
+	# Kat tablaları ve üst kapak
+	var shelf_ys: Array = lv.duplicate()
+	shelf_ys.append(top - 0.02)
+	for y in shelf_ys:
+		MeshKit.box(self, Vector3(size.x, 0.04, size.y), Vector3(0, float(y) - 0.02, 0), frame)
+		# Ön kenar bandı (beyaz rafta kalın)
+		MeshKit.box(self, Vector3(size.x, 0.08 if white else 0.04, 0.02), Vector3(0, float(y) - 0.04, size.y * 0.5), frame)
+	# Her kat tablasının altında ve üst kapakta ışıklı tüp (fotoğraflardaki gibi)
+	var led_col: Color = cfg.get("style", {}).get("led", Color(0.85, 0.95, 1.0))
+	var tube := StandardMaterial3D.new()
+	tube.albedo_color = led_col
+	tube.emission_enabled = true
+	tube.emission = led_col
+	tube.emission_energy_multiplier = 3.5
+	for y in shelf_ys.slice(1):
+		for b in bx:
+			var t := MeshKit.cylinder(self, 0.018, tank_size().x * 0.9, Vector3(float(b), float(y) - 0.07, size.y * 0.3), tube, 10)
+			t.rotation_degrees.z = 90
+			t.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Taban süpürgeliği
+	MeshKit.box(self, Vector3(size.x, float(lv[0]) - 0.04, size.y - 0.04), Vector3(0, (float(lv[0]) - 0.04) * 0.5, 0), frame)
 
 
 ## Zemin ile alt kat arası: yürünemez gövde (bölmelerin üstünü akvaryum/boş bölme gövdeleri kaplar).
@@ -114,7 +156,7 @@ func refresh() -> void:
 			aq.furniture_uid = furniture_uid
 			aq.position = Vector3(p.x, 0, p.z)
 			add_child(aq)
-			aq.setup_rack(int(ids[i]), i, p.y, slot_footprint(), tank_size())
+			aq.setup_rack(int(ids[i]), i, p.y, slot_footprint(), tank_size(), cfg.get("style", {}))
 			n = aq
 		else:
 			var slot := RackSlot.new()

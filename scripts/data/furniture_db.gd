@@ -35,6 +35,22 @@ const ITEMS := {
 			"tank": Vector3(0.9, 0.48, 0.45), "slot_price": 420, "slot_cap": 8},
 		"desc": "Yan yana iki bölme, 4 kat: 8 ışıklı akvaryum alır. Akvaryumları ayrıca alırsın.",
 	},
+	"balikci_duvari_siyah": {
+		"name": "Balıkçı akvaryum duvarı (siyah, pembe ışık)", "price": 3200, "cat": "akvaryum",
+		"size": Vector2(2.44, 0.62), "height": 2.15,
+		"rack": {"frame": "siyah", "levels": [0.14, 0.84, 1.54], "bays": [-0.6, 0.6], "z": 0.0,
+			"tank": Vector3(1.12, 0.5, 0.5), "slot_price": 300, "slot_cap": 10, "prefilled": true,
+			"style": {"bg": Color(0.04, 0.2, 0.75), "led": Color(1.0, 0.35, 0.85), "sponge": true}},
+		"desc": "Akvaryumcu dükkânlarındaki gibi: 3 kat, her katta 2 uzun tank (6 tank). Mavi fon, pembe bitki lambası, sünger filtre. Suyla dolu gelir. Yan yana dizerek duvar yap.",
+	},
+	"balikci_duvari_beyaz": {
+		"name": "Balıkçı akvaryum duvarı (beyaz, beyaz ışık)", "price": 3200, "cat": "akvaryum",
+		"size": Vector2(2.44, 0.62), "height": 2.15,
+		"rack": {"frame": "beyaz", "levels": [0.14, 0.84, 1.54], "bays": [-0.6, 0.6], "z": 0.0,
+			"tank": Vector3(1.08, 0.5, 0.5), "slot_price": 300, "slot_cap": 10, "prefilled": true,
+			"style": {"bg": Color(0.03, 0.15, 0.6), "led": Color(0.85, 0.95, 1.0), "sponge": true}},
+		"desc": "Beyaz kolonlu akvaryum duvarı: 3 kat, 6 uzun tank, mavi fon, beyaz LED, sünger filtre. Suyla dolu gelir.",
+	},
 	"turk_akvaryum_rafi": {
 		"name": "18 bölmeli akvaryum duvarı", "price": 2800, "cat": "akvaryum",
 		"size": Vector2(4.25, 0.7), "height": 2.3,

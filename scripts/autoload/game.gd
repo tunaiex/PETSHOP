@@ -212,6 +212,7 @@ func add_furniture(type: String, x: float, z: float, rot: float) -> Dictionary:
 				t.gravel = "natural"
 				t.filter = 1
 				t.cycle = 100.0
+				t.air = true
 			tanks.append(t)
 			ids.append(t.id)
 		e["tanks"] = ids

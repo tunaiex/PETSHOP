@@ -66,7 +66,12 @@ func setup(id: int, wood: bool = false, terra: bool = false) -> void:
 
 ## 3 katlı rafın bir katındaki küçük ışıklı akvaryum. Düğüm kökü zemindedir,
 ## tank `y0` yüksekliğindeki raf tablasına oturur.
-func setup_rack(id: int, level: int, y0: float, rack_size: Vector2, dims: Vector3 = Vector3.ZERO) -> void:
+## Balıkçı tipi raf akvaryumları için görünüm: "bg" arka fon rengi, "led" ışık rengi, "sponge" sünger filtre
+var rack_style: Dictionary = {}
+
+
+func setup_rack(id: int, level: int, y0: float, rack_size: Vector2, dims: Vector3 = Vector3.ZERO, style: Dictionary = {}) -> void:
+	rack_style = style
 	rack_level = level
 	_rack_size = rack_size
 	if dims == Vector3.ZERO:
@@ -260,7 +265,7 @@ func _build_rack_tank() -> void:
 
 	# Arka fon
 	var bg := StandardMaterial3D.new()
-	bg.albedo_color = Color(0.02, 0.05, 0.07)
+	bg.albedo_color = rack_style.get("bg", Color(0.02, 0.05, 0.07))
 	bg.roughness = 0.9
 	MeshKit.box(self, Vector3(_tw - 0.01, _th - 0.01, 0.004), Vector3(0, y0 + _th * 0.5, -_td * 0.5 - 0.004), bg)
 
@@ -276,7 +281,8 @@ func _build_rack_tank() -> void:
 	var led := StandardMaterial3D.new()
 	led.albedo_color = Color(0.85, 0.95, 1.0)
 	led.emission_enabled = true
-	led.emission = Color(0.7, 0.88, 1.0)
+	led.emission = rack_style.get("led", Color(0.7, 0.88, 1.0))
+	led.albedo_color = rack_style.get("led", Color(0.85, 0.95, 1.0))
 	led.emission_energy_multiplier = 4.0
 	var strip := MeshKit.box(self, Vector3(_tw - 0.06, 0.004, 0.035), Vector3(0, y0 + _th + 0.011, _td * 0.18), led)
 	strip.name = "LedStrip"
@@ -675,7 +681,9 @@ func _rebuild_content() -> void:
 		_light.spot_range = 1.2 if rack_level < 0 else _th + 0.25
 		_light.spot_angle = 65.0
 		_light.light_energy = 2.2
-		_light.light_color = Color(0.85, 0.95, 1.0)
+		_light.light_color = rack_style.get("led", Color(0.85, 0.95, 1.0)).lerp(Color.WHITE, 0.15)
+		if rack_style.has("led"):
+			_light.light_energy = 3.0
 		_light.shadow_enabled = false
 		_light.visible = not Game.power_out
 		_content.add_child(_light)
@@ -698,8 +706,13 @@ func _rebuild_content() -> void:
 		var h := MeshKit.cylinder(_content, 0.012, 0.3, Vector3(-_tw * 0.5 + 0.04, y0 + gh + 0.18, -_td * 0.5 + 0.03), MeshKit.mat(Color(0.75, 0.85, 0.9, 1.0), 0.1), 12)
 		h.rotation_degrees.z = 8
 		MeshKit.box(_content, Vector3(0.03, 0.03, 0.02), Vector3(-_tw * 0.5 + 0.04, y0 + _water_h + 0.01, -_td * 0.5 + 0.03), black)
+	if rack_style.get("sponge", false):
+		# Sünger filtre: köşede siyah sünger + üstünde hava borusu
+		var sp_pos := Vector3(_tw * 0.5 - 0.08, y0 + gh, -_td * 0.5 + 0.08)
+		MeshKit.cylinder(_content, 0.04, 0.12, sp_pos + Vector3(0, 0.06, 0), MeshKit.mat(Color(0.05, 0.05, 0.05), 0.95), 12)
+		MeshKit.cylinder(_content, 0.006, _water_h - gh, sp_pos + Vector3(0, (_water_h - gh) * 0.5 + 0.06, 0), MeshKit.mat(Color(0.85, 0.9, 0.95, 1.0), 0.2), 6)
 	var fl: int = int(d.filter)
-	if fl > 0:
+	if fl > 0 and not rack_style.get("sponge", false):
 		var fh: float = 0.12 + fl * 0.05
 		MeshKit.box(_content, Vector3(0.07, fh, 0.05), Vector3(_tw * 0.5 - 0.06, y0 + _water_h - fh * 0.5 - 0.02, -_td * 0.5 + 0.04), black)
 
@@ -876,7 +889,7 @@ func _build_particles() -> void:
 	bubbles.mesh = bm
 	bubbles.amount = 40
 	bubbles.lifetime = 2.6
-	bubbles.position = Vector3(_tw * 0.3, _y0 + _gravel_h() + 0.01, -_td * 0.35)
+	bubbles.position = Vector3(_tw * 0.5 - 0.08, _y0 + _gravel_h() + 0.13, -_td * 0.5 + 0.08) if rack_style.get("sponge", false) else Vector3(_tw * 0.3, _y0 + _gravel_h() + 0.01, -_td * 0.35)
 	bubbles.direction = Vector3.UP
 	bubbles.spread = 6.0
 	bubbles.gravity = Vector3(0, 0.05, 0)
