@@ -214,7 +214,7 @@ const SPECIES := {
 	},
 	"civciv": {
 		"name": "Civciv", "latin": "Gallus gallus domesticus", "habitat": "civciv",
-		"buy": 15, "value": 45, "length": 0.09,
+		"buy": 15, "value": 45, "length": 0.13,
 		"temp_min": 18.0, "temp_max": 32.0, "dirt_rate": 0.9, "hardiness": 0.6,
 		"aggression": 0.0, "long_fins": false, "small": true, "schooling": 0.6, "speed": 0.45,
 		"desc": "Cıvıl cıvıl. Civciv kafesinde toplu yaşar, ucuzdur ama çok satar.",

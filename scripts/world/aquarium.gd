@@ -326,6 +326,26 @@ func _build_chick_cage() -> void:
 		var box: AABB = MeshKit.model_aabb(m)
 		var k: float = CHICK_D / max(box.size.x, box.size.z)
 		m.scale = Vector3.ONE * k
+		# Ahşap kapağın ortasını aç: içerideki civcivler görünsün
+		for c in m.find_children("*", "MeshInstance3D", true, false):
+			var mi: MeshInstance3D = c
+			var ma: AABB = mi.get_aabb()
+			if ma.size.x < 1.5:
+				mi.visible = false   # yanlış yere düşen kapı parçaları
+				continue
+			var src = mi.get_active_material(0)
+			var cut := MeshKit.shader_mat("res://shaders/cut_top.gdshader", {
+				"cut_y": ma.position.y + ma.size.y * 0.88,
+				"keep_r": ma.size.x * 0.5 * 0.86,
+				"center": Vector2(ma.get_center().x, ma.get_center().z),
+				"core_r": ma.size.x * 0.5 * 0.3,
+				"core_y": ma.position.y + ma.size.y * 0.12,
+			})
+			if src is BaseMaterial3D:
+				cut.set_shader_parameter("albedo_tex", (src as BaseMaterial3D).albedo_texture)
+				cut.set_shader_parameter("has_tex", (src as BaseMaterial3D).albedo_texture != null)
+				cut.set_shader_parameter("albedo_color", (src as BaseMaterial3D).albedo_color)
+			mi.material_override = cut
 		m.position = -Vector3(box.get_center().x, box.position.y, box.get_center().z) * k
 		add_child(m)
 		h = box.size.y * k
