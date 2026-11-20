@@ -27,7 +27,7 @@ func _ready() -> void:
 	shop.hud = hud
 	# Oyuna dışarıda, kaldırımda, dükkâna bakarak başlanır.
 	player = Player.new()
-	player.position = Shop.DOOR + Vector3(0, 0.05, 3.2)
+	player.position = Shop.PLAYER_START
 	player.rotation.y = 0.0
 	player.hud = hud
 	add_child(player)

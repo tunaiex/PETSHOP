@@ -5,12 +5,13 @@ extends Node3D
 
 signal state_changed()
 
-const ROOM_MIN := Vector2(-7.1, -3.5) ## satış alanının iç sınırları (Shop.ROOM)
-const ROOM_MAX := Vector2(7.1, 4.7)
 ## Kapı önü boş kalmalı (müşteri girişi)
-const DOOR_ZONE := [Vector2(0.15, 3.4), Vector2(2.25, 3.4), Vector2(2.25, 4.8), Vector2(0.15, 4.8)]
-## Koliler kapının solundaki kaldırıma bırakılır (dükkân dışı)
-const DELIVERY_ZONE := [Vector2(-1.7, 5.0), Vector2(0.3, 5.0), Vector2(0.3, 6.6), Vector2(-1.7, 6.6)]
+## Kapı önü boş kalmalı (müşteri girişi): kapının içerisinde 2,1 x 1,4 m (Shop.DOOR'dan hesaplanır)
+static func door_zone() -> PackedVector2Array:
+	var d: Vector3 = Shop.DOOR
+	return PackedVector2Array([Vector2(d.x - 1.05, d.z - 1.4), Vector2(d.x + 1.05, d.z - 1.4), Vector2(d.x + 1.05, d.z), Vector2(d.x - 1.05, d.z)])
+
+
 const SNAP := 0.05
 const ROT_STEP := 15.0
 
@@ -114,14 +115,12 @@ func _validate() -> void:
 	var info: Dictionary = FurnitureDB.item(type)
 	var mine: PackedVector2Array = FurnitureDB.corners(type, pos, rot)
 	for c in mine:
-		if c.x < ROOM_MIN.x - 0.04 or c.y < ROOM_MIN.y - 0.04 or c.x > ROOM_MAX.x + 0.04 or c.y > ROOM_MAX.y + 0.04:
+		var r: Rect2 = Shop.ROOM
+		if c.x < r.position.x - 0.04 or c.y < r.position.y - 0.04 or c.x > r.end.x + 0.04 or c.y > r.end.y + 0.04:
 			reason = "Dükkânın içine sığmıyor"
 			return
-	if not info.get("walkable", false) and FurnitureDB.polys_overlap(mine, PackedVector2Array(DOOR_ZONE)):
+	if not info.get("walkable", false) and FurnitureDB.polys_overlap(mine, door_zone()):
 		reason = "Kapının önünü kapatma"
-		return
-	if not info.get("walkable", false) and FurnitureDB.polys_overlap(mine, PackedVector2Array(DELIVERY_ZONE)):
-		reason = "Burası koli teslim alanı"
 		return
 	for e in Game.furniture:
 		if int(e.uid) == moving_uid:

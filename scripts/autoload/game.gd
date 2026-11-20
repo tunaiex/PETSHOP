@@ -121,9 +121,31 @@ func new_game() -> void:
 	loan = {}
 	branches = 0
 	_reset_stats()
-	for f in STARTER_LAYOUT:
+	for f in starter_layout():
 		add_furniture(f[0], f[1], f[2], f[3])
 	roll_day()
+
+
+## Hazır eşyalar: mağaza sahnesindeki (scenes/magaza.tscn) "Esyalar" altındaki EsyaYeri düğümleri.
+## Sahne yoksa ya da eşya yeri yoksa aşağıdaki varsayılan liste kullanılır.
+func starter_layout() -> Array:
+	var path := "res://scenes/magaza.tscn"
+	if not ResourceLoader.exists(path):
+		return STARTER_LAYOUT
+	var st: SceneState = (load(path) as PackedScene).get_state()
+	var out: Array = []
+	for i in st.get_node_count():
+		var tip := ""
+		var xf := Transform3D.IDENTITY
+		for k in st.get_node_property_count(i):
+			match str(st.get_node_property_name(i, k)):
+				"tip":
+					tip = str(st.get_node_property_value(i, k))
+				"transform":
+					xf = st.get_node_property_value(i, k)
+		if tip != "" and FurnitureDB.ITEMS.has(tip) and str(st.get_node_path(i)).contains("Esyalar"):
+			out.append([tip, xf.origin.x, xf.origin.z, rad_to_deg(xf.basis.get_euler().y)])
+	return out if not out.is_empty() else STARTER_LAYOUT
 
 
 ## Hazır dükkân: rafları, dolapları ve kasası yerinde ama bomboş gelir (ürünleri oyuncu dizer).
