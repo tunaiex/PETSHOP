@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>PETSHOP Reels</title>
+<style>
+  html,body{margin:0;background:#111;}
+  canvas{display:block;width:min(100vw,56.25vh);height:auto;margin:0 auto;}
+</style>
+</head>
+<body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script>
+const W = 1080, H = 1920, DURATION = 9;
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+// ---------- yardımcılar ----------
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const prog = (t, start, dur) => clamp((t - start) / dur);
+const lerp = (a, b, k) => a + (b - a) * k;
+const easeOutCubic = k => 1 - Math.pow(1 - k, 3);
+const easeInCubic = k => k * k * k;
+const easeInOut = k => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+const easeOutBack = k => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(k - 1, 3) + c1 * Math.pow(k - 1, 2); };
+const easeOutElastic = k => k === 0 ? 0 : k === 1 ? 1 : Math.pow(2, -10 * k) * Math.sin((k * 10 - .75) * (2 * Math.PI) / 3) + 1;
+const rand = (i) => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+
+const FONT = 'Inter, "DejaVu Sans", sans-serif';
+const C = { dark: '#2B2D42', yellow: '#FFD23F', pink: '#FF6B9A', cream: '#FFF4E0', orange: '#F4A259', orangeD: '#D9823B' };
+
+// sahne arka planları: [üst, alt]
+const BG = [
+  ['#7B5CFF', '#FF6B9A'],
+  ['#18C29C', '#3A86FF'],
+  ['#FF8A3D', '#FF3D7F'],
+];
+
+function text(str, x, y, size, { fill = '#fff', stroke = null, sw = 0, weight = 900, align = 'center', alpha = 1, shadow = true } = {}) {
+  ctx.save();
+  ctx.globalAlpha *= alpha;
+  ctx.font = `${weight} ${size}px ${FONT}`;
+  ctx.textAlign = align;
+  ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
+  if (shadow) { ctx.shadowColor = 'rgba(0,0,0,.25)'; ctx.shadowOffsetY = size * 0.06; ctx.shadowBlur = size * 0.08; }
+  if (stroke) { ctx.lineWidth = sw; ctx.strokeStyle = stroke; ctx.strokeText(str, x, y); ctx.shadowColor = 'transparent'; }
+  ctx.fillStyle = fill;
+  ctx.fillText(str, x, y);
+  ctx.restore();
+}
+
+function paw(x, y, s, color, alpha = 1, rot = 0) {
+  ctx.save();
+  ctx.translate(x, y); ctx.rotate(rot); ctx.scale(s, s);
+  ctx.globalAlpha *= alpha;
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.ellipse(0, 18, 30, 25, 0, 0, Math.PI * 2); ctx.fill();
+  [[-34, -10, 12, 15], [-13, -32, 12, 16], [13, -32, 12, 16], [34, -10, 12, 15]].forEach(([px, py, rx, ry]) => {
+    ctx.beginPath(); ctx.ellipse(px, py, rx, ry, px * 0.01, 0, Math.PI * 2); ctx.fill();
+  });
+  ctx.restore();
+}
+
+function heart(x, y, s, color, alpha = 1) {
+  ctx.save();
+  ctx.translate(x, y); ctx.scale(s, s); ctx.globalAlpha *= alpha;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(0, 12);
+  ctx.bezierCurveTo(-30, -8, -18, -34, 0, -18);
+  ctx.bezierCurveTo(18, -34, 30, -8, 0, 12);
+  ctx.fill();
+  ctx.restore();
+}
+
+function gradient(c1, c2) {
+  const g = ctx.createLinearGradient(0, 0, W * 0.4, H);
+  g.addColorStop(0, c1); g.addColorStop(1, c2);
+  return g;
+}
+
+// ---------- arka plan + sahne geçişi ----------
+function background(t) {
+  const cuts = [3, 6];
+  let idx = t < cuts[0] ? 0 : t < cuts[1] ? 1 : 2;
+  ctx.fillStyle = gradient(...BG[idx]);
+  ctx.fillRect(0, 0, W, H);
+
+  // yüzen yumuşak daireler
+  for (let i = 0; i < 9; i++) {
+    const x = rand(i) * W + Math.sin(t * 0.6 + i) * 60;
+    const y = ((rand(i + 20) * H) - t * (30 + rand(i + 5) * 50)) % H;
+    const r = 80 + rand(i + 40) * 160;
+    ctx.fillStyle = `rgba(255,255,255,${0.06 + rand(i + 9) * 0.06})`;
+    ctx.beginPath(); ctx.arc(x, (y + H) % H, r, 0, Math.PI * 2); ctx.fill();
+  }
+  // yukarı süzülen patiler
+  for (let i = 0; i < 12; i++) {
+    const speed = 60 + rand(i + 3) * 80;
+    const y = H + 100 - ((t * speed + rand(i + 7) * (H + 200)) % (H + 200));
+    const x = rand(i + 11) * W + Math.sin(t + i) * 30;
+    paw(x, y, 0.6 + rand(i) * 0.6, '#fff', 0.12, (rand(i + 2) - .5) * 0.8);
+  }
+}
+
+function transition(t) {
+  // kesim noktasından hemen önce yeni rengin dairesi ekranı kaplar
+  [[3, 1], [6, 2]].forEach(([cut, next]) => {
+    const k = prog(t, cut - 0.35, 0.35);
+    if (k > 0 && k < 1) {
+      ctx.save();
+      ctx.fillStyle = gradient(...BG[next]);
+      ctx.beginPath();
+      ctx.arc(W / 2, H / 2, easeInCubic(k) * Math.hypot(W, H) * 0.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  });
+}
+
+// ---------- SAHNE 1: başlık ----------
+function scene1(t) {
+  if (t > 3) return;
+  const exit = easeInCubic(prog(t, 2.55, 0.4));
+  ctx.save();
+  ctx.translate(0, -exit * 500);
+  ctx.globalAlpha = 1 - exit;
+
+  // MAHALLE: harf harf düşer
+  const word = 'MAHALLE';
+  ctx.font = `900 150px ${FONT}`;
+  const widths = [...word].map(ch => ctx.measureText(ch).width + 8);
+  const total = widths.reduce((a, b) => a + b, 0);
+  let x = W / 2 - total / 2;
+  [...word].forEach((ch, i) => {
+    const k = prog(t, 0.1 + i * 0.07, 0.5);
+    const y = lerp(-200, 720, easeOutBack(k));
+    const rot = (1 - easeOutCubic(k)) * (i % 2 ? 0.6 : -0.6);
+    ctx.save();
+    ctx.translate(x + widths[i] / 2, y);
+    ctx.rotate(rot);
+    text(ch, 0, 0, 150, { alpha: k > 0 ? 1 : 0 });
+    ctx.restore();
+    x += widths[i];
+  });
+
+  // PETSHOP: elastik büyüme
+  const kp = prog(t, 0.75, 0.9);
+  if (kp > 0) {
+    const s = easeOutElastic(kp);
+    const wob = Math.sin(t * 4) * 0.02;
+    ctx.save();
+    ctx.translate(W / 2, 900);
+    ctx.rotate(-0.05 + wob);
+    ctx.scale(s, s);
+    text('PETSHOP', 0, 0, 185, { fill: C.yellow, stroke: C.dark, sw: 22 });
+    ctx.restore();
+  }
+
+  // alt etiket
+  const kl = easeOutBack(prog(t, 1.4, 0.5));
+  if (kl > 0) {
+    ctx.save();
+    ctx.translate(lerp(-400, W / 2, kl), 1090);
+    ctx.fillStyle = C.dark;
+    ctx.beginPath(); ctx.roundRect(-230, -50, 460, 100, 50); ctx.fill();
+    text('yeni açıldı!', 0, 2, 56, { weight: 800, shadow: false });
+    ctx.restore();
+  }
+
+  // patiler pıt pıt
+  for (let i = 0; i < 5; i++) {
+    const k = prog(t, 1.7 + i * 0.12, 0.25);
+    if (k > 0) paw(250 + i * 145, 1300 - (i % 2) * 50, easeOutBack(k) * 1.1, '#fff', 0.9, (i % 2 ? 0.3 : -0.3));
+  }
+  ctx.restore();
+}
+
+// ---------- SAHNE 2: kedi ----------
+function cat(cx, cy, t) {
+  const blink = (t % 2.2) > 2.05 ? 0.12 : 1;
+  const wag = Math.sin(t * 7) * 0.6;
+  ctx.save();
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+
+  // kuyruk
+  ctx.strokeStyle = C.orangeD; ctx.lineWidth = 46;
+  ctx.beginPath();
+  ctx.moveTo(cx + 110, cy + 200);
+  ctx.quadraticCurveTo(cx + 300, cy + 220, cx + 260 + wag * 90, cy + 10 - Math.abs(wag) * 30);
+  ctx.stroke();
+
+  // gövde
+  ctx.fillStyle = C.orange;
+  ctx.beginPath(); ctx.ellipse(cx, cy + 170, 165, 150, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = C.cream;
+  ctx.beginPath(); ctx.ellipse(cx, cy + 205, 95, 100, 0, 0, Math.PI * 2); ctx.fill();
+  // ön patiler
+  ctx.fillStyle = C.cream;
+  [-70, 70].forEach(dx => { ctx.beginPath(); ctx.ellipse(cx + dx, cy + 310, 48, 30, 0, 0, Math.PI * 2); ctx.fill(); });
+
+  // kulaklar
+  [-1, 1].forEach(d => {
+    ctx.fillStyle = C.orange;
+    ctx.beginPath();
+    ctx.moveTo(cx + d * 130, cy - 90);
+    ctx.lineTo(cx + d * 115, cy - 260 + (d === 1 ? Math.sin(t * 5) * 8 : 0));
+    ctx.lineTo(cx + d * 30, cy - 175);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = C.pink;
+    ctx.beginPath();
+    ctx.moveTo(cx + d * 112, cy - 120);
+    ctx.lineTo(cx + d * 106, cy - 215);
+    ctx.lineTo(cx + d * 55, cy - 165);
+    ctx.closePath(); ctx.fill();
+  });
+
+  // kafa
+  ctx.fillStyle = C.orange;
+  ctx.beginPath(); ctx.ellipse(cx, cy - 60, 165, 145, 0, 0, Math.PI * 2); ctx.fill();
+  // çizgiler
+  ctx.strokeStyle = C.orangeD; ctx.lineWidth = 14;
+  [-40, 0, 40].forEach(dx => { ctx.beginPath(); ctx.moveTo(cx + dx, cy - 195); ctx.lineTo(cx + dx * 0.8, cy - 150); ctx.stroke(); });
+  // ağız çevresi
+  ctx.fillStyle = C.cream;
+  ctx.beginPath(); ctx.ellipse(cx, cy + 10, 85, 55, 0, 0, Math.PI * 2); ctx.fill();
+
+  // gözler
+  [-62, 62].forEach(dx => {
+    ctx.fillStyle = C.dark;
+    ctx.beginPath(); ctx.ellipse(cx + dx, cy - 70, 24, 34 * blink, 0, 0, Math.PI * 2); ctx.fill();
+    if (blink === 1) {
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(cx + dx + 8, cy - 82, 9, 0, Math.PI * 2); ctx.fill();
+    }
+  });
+  // yanaklar
+  ctx.fillStyle = 'rgba(255,107,154,.45)';
+  [-110, 110].forEach(dx => { ctx.beginPath(); ctx.ellipse(cx + dx, cy - 10, 30, 18, 0, 0, Math.PI * 2); ctx.fill(); });
+  // burun + ağız
+  ctx.fillStyle = C.pink;
+  ctx.beginPath(); ctx.moveTo(cx - 18, cy - 15); ctx.lineTo(cx + 18, cy - 15); ctx.lineTo(cx, cy + 5); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = C.dark; ctx.lineWidth = 7;
+  ctx.beginPath(); ctx.arc(cx - 16, cy + 8, 16, 0.1 * Math.PI, 0.9 * Math.PI); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx + 16, cy + 8, 16, 0.1 * Math.PI, 0.9 * Math.PI); ctx.stroke();
+  // bıyıklar
+  ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(43,45,66,.7)';
+  [-1, 1].forEach(d => [-12, 8].forEach(dy => {
+    ctx.beginPath(); ctx.moveTo(cx + d * 75, cy + dy); ctx.lineTo(cx + d * 190, cy + dy * 2 - 6); ctx.stroke();
+  }));
+  ctx.restore();
+}
+
+function scene2(t) {
+  if (t < 3 || t > 6.05) return;
+  const lt = t - 3;
+  const enter = easeOutBack(prog(lt, 0.05, 0.6));
+  const exit = easeInCubic(prog(lt, 2.6, 0.35));
+  const bob = Math.sin(lt * 5) * 14;
+  const squash = 1 + Math.sin(lt * 10) * 0.015;
+
+  // kalpler
+  for (let i = 0; i < 7; i++) {
+    const k = ((lt - 0.8 - i * 0.25) % 1.6) / 1.6;
+    if (lt > 0.8 + i * 0.25 && exit === 0) {
+      const hx = W / 2 + 230 + Math.sin(k * 8 + i) * 40 - (i % 2) * 460;
+      heart(hx, 760 - k * 350, 1.6 + rand(i) * 0.8, C.pink, 1 - k);
+    }
+  }
+
+  ctx.save();
+  ctx.translate(W / 2 - exit * 900, lerp(H + 500, 1000, enter) + bob);
+  ctx.scale(squash, 2 - squash);
+  cat(0, 0, lt);
+  ctx.restore();
+
+  // konuşma balonu
+  const kb = easeOutBack(prog(lt, 0.7, 0.4)) * (1 - exit);
+  if (kb > 0) {
+    ctx.save();
+    ctx.translate(W / 2, 520);
+    ctx.scale(kb, kb);
+    ctx.rotate(Math.sin(lt * 3) * 0.03);
+    ctx.fillStyle = '#fff';
+    ctx.shadowColor = 'rgba(0,0,0,.2)'; ctx.shadowBlur = 30; ctx.shadowOffsetY = 12;
+    ctx.beginPath(); ctx.roundRect(-360, -110, 720, 200, 60); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-40, 80); ctx.lineTo(40, 80); ctx.lineTo(-10, 160); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    ctx.save(); ctx.translate(W / 2, 520); ctx.scale(kb, kb);
+    text('Miyav! Beni sahiplen!', 0, -8, 64, { fill: C.dark, shadow: false });
+    ctx.restore();
+  }
+
+  // daktilo efekti
+  const line = 'Yeni dostun seni bekliyor';
+  const n = Math.floor(prog(lt, 1.2, 1.1) * line.length);
+  if (n > 0) {
+    const shown = line.slice(0, n);
+    const cursor = (Math.floor(lt * 4) % 2 === 0 && n < line.length) ? '|' : '';
+    text(shown + cursor, W / 2, 1520, 76, { alpha: 1 - exit, stroke: C.dark, sw: 14 });
+  }
+}
+
+// ---------- SAHNE 3: kategoriler + kapanış ----------
+function scene3(t) {
+  if (t < 6) return;
+  const lt = t - 6;
+  const items = [
+    ['Kedi', '#FFD23F'], ['Köpek', '#7BDFF2'], ['Kuş', '#B8F2A0'], ['Balık', '#FFB3C6'],
+  ];
+  const out = easeInCubic(prog(lt, 1.35, 0.35));
+  items.forEach(([label, color], i) => {
+    const k = easeOutBack(prog(lt, 0.05 + i * 0.13, 0.45));
+    const dir = i % 2 ? 1 : -1;
+    const x = lerp(W / 2 + dir * 1100, W / 2, k) - dir * out * 1100;
+    const y = 560 + i * 230;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(dir * -0.04);
+    ctx.fillStyle = color;
+    ctx.shadowColor = 'rgba(0,0,0,.2)'; ctx.shadowBlur = 24; ctx.shadowOffsetY = 12;
+    ctx.beginPath(); ctx.roundRect(-340, -90, 680, 180, 90); ctx.fill();
+    ctx.shadowColor = 'transparent';
+    paw(-235, 0, 1, C.dark, 0.9, -0.2);
+    text(label, 40, 4, 96, { fill: C.dark, shadow: false });
+    ctx.restore();
+  });
+
+  // kapanış kartı
+  const ke = prog(lt, 1.6, 0.7);
+  if (ke > 0) {
+    // pati patlaması
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2 + rand(i) * 0.3;
+      const d = easeOutCubic(prog(lt, 1.6, 1.0)) * (380 + rand(i + 3) * 260);
+      const fade = 1 - prog(lt, 2.1, 0.8);
+      paw(W / 2 + Math.cos(a) * d, 900 + Math.sin(a) * d, 0.9, i % 2 ? C.yellow : '#fff', fade, a);
+    }
+    const pulse = 1 + Math.sin(lt * 9) * 0.03 * prog(lt, 2.2, 0.3);
+    ctx.save();
+    ctx.translate(W / 2, 900);
+    ctx.scale(easeOutElastic(ke) * pulse, easeOutElastic(ke) * pulse);
+    ctx.rotate(-0.06);
+    text('YAKINDA', 0, 0, 165, { fill: C.yellow, stroke: C.dark, sw: 22 });
+    ctx.restore();
+    const ks = easeOutBack(prog(lt, 2.0, 0.5));
+    if (ks > 0) {
+      ctx.save();
+      ctx.translate(W / 2, 1110 + (1 - ks) * 80);
+      ctx.globalAlpha = clamp(ks);
+      text('Mahalle Petshop oyunu', 0, 0, 64, { weight: 800 });
+      ctx.restore();
+    }
+  }
+}
+
+function render(t) {
+  ctx.clearRect(0, 0, W, H);
+  background(t);
+  scene1(t);
+  scene2(t);
+  scene3(t);
+  transition(t);
+}
+
+window.render = render;
+window.DURATION = DURATION;
+window.ready = document.fonts.load(`900 100px Inter`).then(() => document.fonts.load(`800 100px Inter`));
+
+// tarayıcıda açınca canlı oynat
+if (!navigator.webdriver) {
+  window.ready.then(() => {
+    const t0 = performance.now();
+    (function loop(now) { render(((now - t0) / 1000) % DURATION); requestAnimationFrame(loop); })(t0);
+  });
+}
+</script>
+</body>
+</html>
