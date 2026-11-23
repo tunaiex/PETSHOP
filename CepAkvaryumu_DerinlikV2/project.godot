@@ -1,0 +1,29 @@
+; Godot 4.3+ / Samsung Galaxy Watch 8 / 480 x 480 / 2.5D
+config_version=5
+
+[application]
+config/name="Cep Akvaryumu - Derinlik V2"
+run/main_scene="res://sahneler/akvaryum.tscn"
+config/features=PackedStringArray("4.3", "GL Compatibility")
+
+[display]
+window/size/viewport_width=480
+window/size/viewport_height=480
+window/size/window_width_override=480
+window/size/window_height_override=480
+window/stretch/mode="canvas_items"
+window/handheld/orientation=1
+
+[input_devices]
+pointing/emulate_mouse_from_touch=false
+
+[input_devices/sensors]
+enable_accelerometer=true
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
+
+[physics]
+common/physics_ticks_per_second=30

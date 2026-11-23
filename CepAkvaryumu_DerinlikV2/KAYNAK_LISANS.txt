@@ -1,0 +1,4 @@
+Betta yonden gorunus atlasinin kaynagi: kullanicinin sagladigi 3D_fish_pack.zip / 3D_Fish_Pack/previews/07_betta.gif.
+Kaynak paket 3D_Fish_Pack/LICENSE.txt dosyasinda CC0 1.0 olarak belirtilmistir.
+Kaynak asamasindaki 3D model (07_betta.glb) bu projeye dahil edilmedi; 16 karelik PNG atlas kullanildi.
+Akvaryum arka plani ve kaya/kutuk katmanlari bu sohbet icin uretilen gorsellerden islenmistir.
