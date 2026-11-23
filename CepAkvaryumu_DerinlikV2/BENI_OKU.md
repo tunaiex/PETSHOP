@@ -1,6 +1,6 @@
 # Cep Akvaryumu — Derinlik V2 (Godot 4, 480×480)
 
-Bu proje, eski birinci aşamadan **ayrı** bir projedir; mevcut projenin üzerine yazmaz. Samsung Galaxy Watch 8'de henüz test edilmemiştir. 2,5D kullanır: balık gerçek anlamda 3B bir akvaryum mesh'i içinde yüzmez, ama bağımsız bir X/Y/Z konumuyla ölçeklenir ve objelerin altına / üstüne çizilerek **önde / arkada yüzme** etkisi verir.
+Bu proje, eski birinci aşamadan **ayrı** bir projedir; mevcut projenin üzerine yazmaz. Samsung Galaxy Watch 8'de henüz test edilmemiştir. **Balık artık gerçek 3B modeldir** (`modeller/beta3d.glb`, ~7.600 üçgen): küçük bir 3B görüntü alanında (`Balik3D`, 192×192) çizilir ve 2B akvaryumun içine yerleştirilir. Akvaryum dekoru 2B katmandır; balık bağımsız bir X/Y/Z konumuyla ölçeklenir ve objelerin altına / üstüne çizilerek **önde / arkada yüzme** etkisi verir.
 
 ## Nasıl açılır?
 
@@ -18,7 +18,8 @@ Bu proje, eski birinci aşamadan **ayrı** bir projedir; mevcut projenin üzerin
 Akvaryum (Node2D) - betikler/akvaryum.gd
   ArkaPlan (Sprite2D)
   Baloncuklar (Node2D) - betikler/baloncuklar.gd
-  Balik (Sprite2D, 4×4 16 yönlü betta görseli)
+  Balik3D (SubViewport) - betikler/balik_3d.gd  → 3B betta, kamera, ışık
+  Balik (Sprite2D, Balik3D'nin görüntüsünü gösterir)
   Yem (Node2D) - betikler/yem.gd
   Tas (Sprite2D, z_index=2)
   Kutuk (Sprite2D, z_index=4)
@@ -34,7 +35,9 @@ Akvaryum (Node2D) - betikler/akvaryum.gd
 - `0.33 < z <= 0.64` ise kaya önünde, kütük ve yaprakların **arkasında** (`z_index = 3`).
 - `z <= 0.33` ise tüm dekorların **önünde** (`z_index = 7`).
 - Uzaklaştıkça ölçek 0.66 → 0.43, hafif mavimsi renk ve konum düzeltmesi uygulanır.
-- Betta görselleri, gönderilen `3D_fish_pack.zip` içindeki `07_betta.gif` 3B dönüş önizlemesinden 16 farklı açı alınarak oluşturuldu. **Kuyruk ve yüzgeç rig animasyonu henüz yok.** Saat için hafif; 50.000 üçgenlik GLB'yi gerçek zamanlı çizdirmiyoruz.
+- Balık 3B modeli yüzme yönüne döner, yukarı / aşağı eğilir ve dönerken hafifçe yana yatar.
+- Modelde iskelet yok; kuyruk ve yüzgeç hareketi `golgeler/yuzme.gdshader` gölgelendiricisi ile yapılır (gövde dalgası + yüzgeç dalgalanması). Hızlandıkça (yeme giderken) kuyruk daha hızlı çırpar; ışık kapalıyken yavaşlar.
+- Eski 16 yönlü 2B görsel (`gorseller/betta_yonler.png`) artık kullanılmıyor.
 
 ### Hareket algılama
 
@@ -73,7 +76,8 @@ Dikkat: Eşleştirme ve bağlantı portları farklıdır. APK'nın Termux taraf�
 
 ## Yapılmayanlar (sonraki aşama)
 
-- Gerçek 3D GLB mesh'i ve fizik çarpışmaları, tünelden gerçek geçiş, yüzgeç rig animasyonu
+- Fizik çarpışmaları, tünelden gerçek geçiş, iskeletli (rig) yüzgeç animasyonu
+- Watch 8'de 3B balığın pil / ısınma testi (gerekirse `Balik3D` boyutu 160'a, MSAA kapalıya düşürülebilir)
 - Su temizliği, mutluluk, cam silme, para, yeni balık, satın alma, büyüme
 - Akvaryumun sürekli açık saat kadranı/arka plan hizmeti olarak çalışması
 

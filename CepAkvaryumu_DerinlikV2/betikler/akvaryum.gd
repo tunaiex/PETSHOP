@@ -1,7 +1,8 @@
 extends Node2D
-## Cep Akvaryumu — 2. asama: 2,5D derinlik, besleme, kayit ve isik.
-## Bu gercek bir 3D fizik dunyasi degil; Z ekseni, boyut ve cizim sirasi ile
-## saatte cok daha az pil tuketen on/arka etkisi olusturur.
+## Cep Akvaryumu — 3. asama: gercek 3B betta, 2,5D derinlik, besleme, kayit ve isik.
+## Balik gercek 3B model olarak kucuk bir SubViewport'ta (Balik3D) cizilir;
+## akvaryum dekoru 2B katmandir. On/arka etkisi Z ekseni, boyut ve cizim
+## sirasi ile saglanir; tam 3B sahneye gore saatte daha az pil tuketir.
 
 const MERKEZ := Vector2(240.0, 240.0)
 const KAYIT_YOLU := "user://akvaryum_kaydi.json"
@@ -10,6 +11,7 @@ const UZUN_BASMA_SANIYE := 1.0
 const KAYDIRMA_ESIGI := 60.0
 
 @onready var balik: Sprite2D = $Balik
+@onready var balik_3d: SubViewport = $Balik3D
 @onready var yem_gorseli: Node2D = $Yem
 @onready var gosterge: Node2D = $Gosterge
 
@@ -24,6 +26,7 @@ var balik_hedefi := Vector3(-103.0, 55.0, 0.88)
 var yon := Vector3(-1.0, 0.0, 0.0)
 var yuzme_zamani := 0.0
 var bekleme_suresi := 0.0
+var anlik_hiz := 0.0
 var hedef_sayaci := 0
 
 var yem_var := false
@@ -48,6 +51,7 @@ var hazir := false
 
 func _ready() -> void:
 	randomize()
+	balik.texture = balik_3d.get_texture()
 	_kaydi_yukle()
 	_zaman_farkini_uygula()
 	Engine.max_fps = 20 if isik_acik else 6
@@ -79,7 +83,9 @@ func _process(delta: float) -> void:
 		_yemi_gorsellestir()
 	else:
 		# Isik kapaliyken yuzme ve sensor okumasi durur.
+		anlik_hiz = 0.0
 		_baligi_gorsellestir()
+	balik_3d.guncelle(yon, anlik_hiz, delta, not isik_acik)
 
 	kayit_sayaci += delta
 	if kayit_sayaci >= 15.0:
@@ -158,6 +164,7 @@ func _yem_birak(ekran_konumu: Vector2) -> void:
 
 func _baligi_hareket_ettir(delta: float) -> void:
 	irkilme_beklemesi = maxf(0.0, irkilme_beklemesi - delta)
+	anlik_hiz = lerpf(anlik_hiz, 0.0, minf(1.0, delta * 3.0))
 	if bekleme_suresi > 0.0 and not yem_var:
 		bekleme_suresi -= delta
 		return
@@ -179,6 +186,7 @@ func _baligi_hareket_ettir(delta: float) -> void:
 	hiz += 7.0 * hareket_siddeti
 	var adim := fark.normalized() * minf(mesafe, hiz * delta)
 	balik_konumu = _sinirla(balik_konumu + adim)
+	anlik_hiz = adim.length() / maxf(delta, 0.001)
 	yon = yon.lerp(fark.normalized(), minf(1.0, delta * 2.4)).normalized()
 
 
@@ -219,18 +227,15 @@ func _ekranda_sinirla(nokta: Vector2, yaricap: float) -> Vector2:
 func _baligi_gorsellestir() -> void:
 	# Arkadaki balik daha kucuk ve mavimsi gozukur.
 	var derinlik := balik_konumu.z
-	var boyut: float = lerpf(0.66, 0.43, derinlik)
+	var boyut: float = lerpf(0.82, 0.54, derinlik)
 	var solukluk: float = lerpf(1.0, 0.77, derinlik)
 	balik.modulate = Color(solukluk * 0.91, solukluk * 0.98, 1.0, 1.0)
 	balik.position = MERKEZ + Vector2(
 		balik_konumu.x,
 		balik_konumu.y - derinlik * 14.0 + sin(yuzme_zamani * 2.0) * 1.7
 	)
-	balik.scale = Vector2(boyut, boyut * (1.0 + sin(yuzme_zamani * 3.7) * 0.01))
-	# 16 farkli turntable acisi: sadece yatay cevirme degil, on/arka yonu da var.
-	var aci := atan2(yon.z, yon.x)
-	balik.frame = posmod(int(round((aci + PI) / TAU * 16.0)), 16)
-	balik.rotation = clampf(yon.y * 0.16, -0.15, 0.15)
+	balik.scale = Vector2(boyut, boyut)
+	# Yon ve egim artik 3B modelin kendisinde (betikler/balik_3d.gd).
 
 	# Cizim sirasi = Z. Z>0.64: tasin/kutugun arkasinda;
 	# ortada: tasin onunde ama kutugun ve yapraklarin arkasinda;
