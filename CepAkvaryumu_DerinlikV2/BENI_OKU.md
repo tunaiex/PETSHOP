@@ -35,7 +35,9 @@ Akvaryum (Node2D) - betikler/akvaryum.gd
 - `0.33 < z <= 0.64` ise kaya önünde, kütük ve yaprakların **arkasında** (`z_index = 3`).
 - `z <= 0.33` ise tüm dekorların **önünde** (`z_index = 7`).
 - Uzaklaştıkça ölçek 0.66 → 0.43, hafif mavimsi renk ve konum düzeltmesi uygulanır.
-- Balık 3B modeli yüzme yönüne döner, yukarı / aşağı eğilir ve dönerken hafifçe yana yatar.
+- Balık önce burnunu hedefe çevirir (dönüş hızı sınırlı: normalde 2,4, yeme giderken 3,6 rad/sn), sonra baktığı yöne yüzer. Ters yöndeki hedefe ayna gibi anında dönmez: kameraya ya da arkaya bakarak 3B **U dönüşü** yapar. Hedefe bakmıyorsa yavaşlar, yerinde döner.
+- Derinlik (z: 0–1) yön hesabında `DERINLIK_PIKSEL` = 260 piksel sayılır; böylece balık öne / arkaya da yüzer ve o sırada kameraya dönük görünür.
+- Yukarı / aşağı eğilir (en fazla `MAKS_EGIM`), dönerken yana yatar ve gövdesi dönüş yönüne bükülür.
 - Modelin kendi yüzgeç animasyonu (`Take 01`) döngüde oynar. Hızı yüzme hızına bağlıdır: yeme giderken ~2,6 kat hızlı, ışık kapalıyken (uyurken) yavaş.
 - Dönerken omurga kemikleri (`Bone.002`–`Bone.005`) kodla ek olarak bükülür: gövde dönüş yönüne C şeklinde kıvrılır.
 - Yarı saydam yüzgeçler için `Balik` Sprite2D'si "premultiplied alpha" karışımı kullanır (kenarlarda koyu çizgi olmasın diye).

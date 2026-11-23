@@ -93,9 +93,10 @@ func guncelle(yon: Vector3, hiz: float, delta: float, uyuyor: bool) -> void:
 	# Donus hizi: govde C seklinde bukulur ve hafifce yana yatar
 	var donus := wrapf(sapma - onceki_sapma, -PI, PI) / maxf(delta, 0.001)
 	onceki_sapma = sapma
-	var yumusat := minf(1.0, delta * 3.0)
-	yalpa = lerpf(yalpa, clampf(-donus * 0.12, -0.35, 0.35), yumusat)
-	bukulme = lerpf(bukulme, clampf(-donus * 0.10, -0.30, 0.30), yumusat)
+	var yumusat := minf(1.0, delta * 5.0)
+	yalpa = lerpf(yalpa, clampf(-donus * 0.10, -0.30, 0.30), yumusat)
+	# 4 omurga kemigi x bukulme = toplam govde kivrimi (en fazla ~1,4 rad)
+	bukulme = lerpf(bukulme, clampf(-donus * 0.14, -0.35, 0.35), yumusat)
 	pivot.rotation = Vector3(egim, sapma, yalpa)
 
 	# Animasyon hizi: uyurken cok yavas, yeme giderken hizli

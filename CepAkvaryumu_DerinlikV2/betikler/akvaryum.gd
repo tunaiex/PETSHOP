@@ -9,6 +9,12 @@ const KAYIT_YOLU := "user://akvaryum_kaydi.json"
 const TOKLUK_BITIS_SANIYE := 10800.0 # 3 saat
 const UZUN_BASMA_SANIYE := 1.0
 const KAYDIRMA_ESIGI := 60.0
+# Derinlik (z: 0..1) piksele cevrilirken kullanilir. Boylece balik one / arkaya
+# da yuzer, U donusunde kameraya ya da arkaya bakarak 3B doner.
+const DERINLIK_PIKSEL := 260.0
+const DONUS_HIZI := 2.4        # rad/sn, normal yuzme
+const DONUS_HIZI_YEM := 3.6    # rad/sn, yeme giderken
+const MAKS_EGIM := 0.55        # yukari / asagi en fazla egim (rad)
 
 @onready var balik: Sprite2D = $Balik
 @onready var balik_3d: SubViewport = $Balik3D
@@ -23,7 +29,9 @@ var son_hesaplama_zamani := 0.0
 # X sag-sol, Y yukari-asagi, Z derinlik: 0 = cam, 1 = arkadaki su.
 var balik_konumu := Vector3(0.0, -20.0, 0.35)
 var balik_hedefi := Vector3(-103.0, 55.0, 0.88)
-var yon := Vector3(-1.0, 0.0, 0.0)
+var yon := Vector3(-1.0, 0.0, 0.0)   # x saga, y asagi, z derine (piksel olcekli)
+var sapma := PI                       # yatay yon acisi: 0 = saga, PI = sola, PI/2 = derine
+var egim := 0.0                       # dikey: + = asagi
 var yuzme_zamani := 0.0
 var bekleme_suresi := 0.0
 var anlik_hiz := 0.0
@@ -170,6 +178,7 @@ func _baligi_hareket_ettir(delta: float) -> void:
 		return
 
 	var fark: Vector3 = balik_hedefi - balik_konumu
+	fark.z *= DERINLIK_PIKSEL
 	var mesafe: float = fark.length()
 	if mesafe < 8.0:
 		if yem_var:
@@ -181,13 +190,25 @@ func _baligi_hareket_ettir(delta: float) -> void:
 		_rastgele_hedef_sec()
 		return
 
-	# 3B koordinatta gercekten ilerler: yana, yukariya ve derine.
+	# Gercek balik gibi: once burnunu hedefe cevirir (sinirli donus hizi),
+	# sonra baktigi yone dogru yuzer. Ters yondeki hedefe anlik ayna
+	# cevirmesi yerine kameraya ya da arkaya bakarak U donusu yapar.
+	var hedef_sapma := atan2(fark.z, fark.x)
+	var hedef_egim := clampf(atan2(fark.y, Vector2(fark.x, fark.z).length()), -MAKS_EGIM, MAKS_EGIM)
+	var maks_donus := (DONUS_HIZI_YEM if yem_var else DONUS_HIZI) * delta
+	sapma = wrapf(sapma + clampf(wrapf(hedef_sapma - sapma, -PI, PI), -maks_donus, maks_donus), -PI, PI)
+	egim += clampf(hedef_egim - egim, -maks_donus * 0.7, maks_donus * 0.7)
+	yon = Vector3(cos(egim) * cos(sapma), sin(egim), cos(egim) * sin(sapma))
+
+	# Hedefe bakmiyorsa yavaslar (yerinde doner), boylece hedefin etrafinda
+	# daire cizip durmaz.
 	var hiz := 66.0 if yem_var else 32.0
 	hiz += 7.0 * hareket_siddeti
-	var adim := fark.normalized() * minf(mesafe, hiz * delta)
+	hiz *= clampf(yon.dot(fark / mesafe), 0.12, 1.0)
+	var yol := minf(mesafe, hiz * delta)
+	var adim := Vector3(yon.x, yon.y, yon.z / DERINLIK_PIKSEL) * yol
 	balik_konumu = _sinirla(balik_konumu + adim)
-	anlik_hiz = adim.length() / maxf(delta, 0.001)
-	yon = yon.lerp(fark.normalized(), minf(1.0, delta * 2.4)).normalized()
+	anlik_hiz = yol / maxf(delta, 0.001)
 
 
 func _rastgele_hedef_sec() -> void:
