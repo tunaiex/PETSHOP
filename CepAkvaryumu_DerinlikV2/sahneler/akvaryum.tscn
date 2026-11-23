@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://betikler/akvaryum.gd" id="1_root"]
 [ext_resource type="Texture2D" path="res://gorseller/arka_plan.webp" id="2_bg"]
@@ -10,6 +10,9 @@
 [ext_resource type="Script" path="res://betikler/gosterge.gd" id="8_hud"]
 [ext_resource type="Script" path="res://betikler/baloncuklar.gd" id="9_bub"]
 [ext_resource type="Script" path="res://betikler/yem.gd" id="10_food"]
+
+[sub_resource type="CanvasItemMaterial" id="premult"]
+blend_mode = 4
 
 [node name="Akvaryum" type="Node2D"]
 script = ExtResource("1_root")
@@ -31,6 +34,7 @@ render_target_update_mode = 4
 script = ExtResource("3_fish3d")
 
 [node name="Balik" type="Sprite2D" parent="."]
+material = SubResource("premult")
 position = Vector2(240, 220)
 
 [node name="Yem" type="Node2D" parent="."]

@@ -2,4 +2,8 @@ Betta yonden gorunus atlasinin kaynagi: kullanicinin sagladigi 3D_fish_pack.zip 
 Kaynak paket 3D_Fish_Pack/LICENSE.txt dosyasinda CC0 1.0 olarak belirtilmistir.
 Kaynak asamasindaki 3D model (07_betta.glb) bu projeye dahil edilmedi; 16 karelik PNG atlas kullanildi.
 Akvaryum arka plani ve kaya/kutuk katmanlari bu sohbet icin uretilen gorsellerden islenmistir.
-Gercek 3B betta modeli (modeller/beta3d.glb) kullanicinin sagladigi beta3d.prisma / beta3d.glb dosyasindandir.
+Rig'li 3B betta modeli (modeller/betta_splendens.glb):
+  "Betta Splendens" - BlueMesh (https://sketchfab.com/VapTor)
+  Kaynak: https://sketchfab.com/3d-models/betta-splendens-f4eeb7f50ad24873842bd954ad27d23b
+  Lisans: CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  CC-BY geregi oyunun icinde (or. hakkinda ekrani / magaza sayfasi) yazar adi belirtilmelidir.

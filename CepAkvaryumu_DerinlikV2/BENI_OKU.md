@@ -1,6 +1,6 @@
 # Cep Akvaryumu — Derinlik V2 (Godot 4, 480×480)
 
-Bu proje, eski birinci aşamadan **ayrı** bir projedir; mevcut projenin üzerine yazmaz. Samsung Galaxy Watch 8'de henüz test edilmemiştir. **Balık artık gerçek 3B modeldir** (`modeller/beta3d.glb`, ~7.600 üçgen): küçük bir 3B görüntü alanında (`Balik3D`, 192×192) çizilir ve 2B akvaryumun içine yerleştirilir. Akvaryum dekoru 2B katmandır; balık bağımsız bir X/Y/Z konumuyla ölçeklenir ve objelerin altına / üstüne çizilerek **önde / arkada yüzme** etkisi verir.
+Bu proje, eski birinci aşamadan **ayrı** bir projedir; mevcut projenin üzerine yazmaz. Samsung Galaxy Watch 8'de henüz test edilmemiştir. **Balık artık gerçek, rig'li (iskeletli) 3B modeldir** (`modeller/betta_splendens.glb`, ~10.700 üçgen, 53 kemik): küçük bir 3B görüntü alanında (`Balik3D`, 192×192) çizilir ve 2B akvaryumun içine yerleştirilir. Akvaryum dekoru 2B katmandır; balık bağımsız bir X/Y/Z konumuyla ölçeklenir ve objelerin altına / üstüne çizilerek **önde / arkada yüzme** etkisi verir.
 
 ## Nasıl açılır?
 
@@ -18,7 +18,7 @@ Bu proje, eski birinci aşamadan **ayrı** bir projedir; mevcut projenin üzerin
 Akvaryum (Node2D) - betikler/akvaryum.gd
   ArkaPlan (Sprite2D)
   Baloncuklar (Node2D) - betikler/baloncuklar.gd
-  Balik3D (SubViewport) - betikler/balik_3d.gd  → 3B betta, kamera, ışık
+  Balik3D (SubViewport) - betikler/balik_3d.gd  → rig'li 3B betta, kamera, ışık, animasyon
   Balik (Sprite2D, Balik3D'nin görüntüsünü gösterir)
   Yem (Node2D) - betikler/yem.gd
   Tas (Sprite2D, z_index=2)
@@ -36,7 +36,11 @@ Akvaryum (Node2D) - betikler/akvaryum.gd
 - `z <= 0.33` ise tüm dekorların **önünde** (`z_index = 7`).
 - Uzaklaştıkça ölçek 0.66 → 0.43, hafif mavimsi renk ve konum düzeltmesi uygulanır.
 - Balık 3B modeli yüzme yönüne döner, yukarı / aşağı eğilir ve dönerken hafifçe yana yatar.
-- Modelde iskelet yok; kuyruk ve yüzgeç hareketi `golgeler/yuzme.gdshader` gölgelendiricisi ile yapılır (gövde dalgası + yüzgeç dalgalanması). Hızlandıkça (yeme giderken) kuyruk daha hızlı çırpar; ışık kapalıyken yavaşlar.
+- Modelin kendi yüzgeç animasyonu (`Take 01`) döngüde oynar. Hızı yüzme hızına bağlıdır: yeme giderken ~2,6 kat hızlı, ışık kapalıyken (uyurken) yavaş.
+- Dönerken omurga kemikleri (`Bone.002`–`Bone.005`) kodla ek olarak bükülür: gövde dönüş yönüne C şeklinde kıvrılır.
+- Yarı saydam yüzgeçler için `Balik` Sprite2D'si "premultiplied alpha" karışımı kullanır (kenarlarda koyu çizgi olmasın diye).
+- Modeli değiştirirsen `balik_3d.gd` içindeki `OLCEK` (boyut), `MERKEZ` (dönme noktası) ve `OMURGA` (kemik adları) ayarlanmalı.
+- Önceki dokulu ama iskeletsiz model `../modeller/beta3d.glb` olarak projenin dışında saklanıyor.
 - Eski 16 yönlü 2B görsel (`gorseller/betta_yonler.png`) artık kullanılmıyor.
 
 ### Hareket algılama
@@ -76,7 +80,8 @@ Dikkat: Eşleştirme ve bağlantı portları farklıdır. APK'nın Termux taraf�
 
 ## Yapılmayanlar (sonraki aşama)
 
-- Fizik çarpışmaları, tünelden gerçek geçiş, iskeletli (rig) yüzgeç animasyonu
+- Fizik çarpışmaları, tünelden gerçek geçiş
+- Ek animasyonlar (kabarma/flare, yaprakta uyuma, kapalı yüzgeç, yem kapma) — kemikler hazır, kodla eklenebilir
 - Watch 8'de 3B balığın pil / ısınma testi (gerekirse `Balik3D` boyutu 160'a, MSAA kapalıya düşürülebilir)
 - Su temizliği, mutluluk, cam silme, para, yeni balık, satın alma, büyüme
 - Akvaryumun sürekli açık saat kadranı/arka plan hizmeti olarak çalışması
