@@ -1,29 +1,56 @@
-; Godot 4.3+ / Samsung Galaxy Watch 8 / 480 x 480 / 2.5D
+; Godot 4.3+ / Samsung Galaxy Watch 8 (Wear OS 6) / 480x480 (44 mm) ve 438x438 (40 mm)
 config_version=5
 
 [application]
-config/name="Cep Akvaryumu - Derinlik V2"
+
+config/name="Cep Akvaryumu"
+config/description="Galaxy Watch icin 3B betta akvaryumu"
 run/main_scene="res://sahneler/akvaryum.tscn"
 config/features=PackedStringArray("4.3", "GL Compatibility")
+config/icon="res://simge.png"
+; Hedef 30 FPS; grafik profili (Ayarlar) calisirken bunu 24/30 olarak ayarlar.
+run/max_fps=30
+
+[autoload]
+
+Ayarlar="*res://betikler/ayarlar.gd"
 
 [display]
+
+; Tasarim cozunurlugu 480x480. canvas_items + keep: 438x438 ekranda tum
+; sahne orantili kuculur; kare ekran oldugu icin siyah serit olusmaz.
 window/size/viewport_width=480
 window/size/viewport_height=480
 window/size/window_width_override=480
 window/size/window_height_override=480
 window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
+; Ekran cihazin hareketine gore donmez (dikey kilitli).
 window/handheld/orientation=1
+; Saat ekrani sistem zaman asimiyla kapanabilsin (pil). Kapaninca oyun kaydeder.
+window/energy_saving/keep_screen_on=false
+window/vsync/vsync_mode=1
 
 [input_devices]
-pointing/emulate_mouse_from_touch=false
 
-[input_devices/sensors]
-enable_accelerometer=true
+pointing/emulate_mouse_from_touch=false
+; Galaxy Watch cercevesi (rotary) dikey fare tekerlegi olarak gelir.
+pointing/android/rotary_input_scroll_axis=1
+
+[physics]
+
+common/physics_ticks_per_second=30
 
 [rendering]
+
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/default_filters/use_nearest_mipmap_filter=false
-
-[physics]
-common/physics_ticks_per_second=30
+; Android icin zorunlu: 3B model dokulari ETC2/ASTC ile sikistirilir (az bellek, hizli).
+textures/vram_compression/import_etc2_astc=true
+; 2B katmanlar icin kenar yumusatma gerekmez; 3B balik kendi MSAA'sini kullanir.
+anti_aliasing/quality/msaa_2d=0
+anti_aliasing/quality/msaa_3d=0
+lights_and_shadows/directional_shadow/size=1024
+lights_and_shadows/directional_shadow/size.mobile=512
+environment/defaults/default_clear_color=Color(0, 0, 0, 1)

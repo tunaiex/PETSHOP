@@ -6,6 +6,9 @@ extends SubViewport
 ## Model: "Betta Splendens" - BlueMesh (sketchfab.com/VapTor), CC-BY-4.0.
 ## 53 kemik + "Take 01" yuzgec animasyonu. Animasyon hizi yuzme hizina
 ## baglanir; donerken omurga kemikleri ek olarak kodla bukulur.
+##
+## Saat optimizasyonu: dahili cozunurluk, MSAA ve normal harita grafik
+## profiline (Ayarlar) gore secilir; oyun arka plandayken cizim durdurulur.
 
 const MODEL := preload("res://modeller/betta_splendens.glb")
 const ANIMASYON := "Take 01"
@@ -14,6 +17,8 @@ const OLCEK := 0.165
 const MERKEZ := Vector3(0.0, 0.16, -0.15)
 # Omurga: govdeden kuyruga (Bone.002 -> Bone.005)
 const OMURGA := ["Bone.002_Armature", "Bone.003_Armature", "Bone.004_Armature", "Bone.005_Armature"]
+# Balik Sprite2D olcekleri bu dahili boyuta gore ayarlanmisti.
+const REFERANS_BOYUT := 192.0
 
 var pivot := Node3D.new()
 var iskelet: Skeleton3D
@@ -23,12 +28,13 @@ var bukulme_ekseni := Vector3.UP
 var yalpa := 0.0
 var bukulme := 0.0
 var onceki_sapma := 0.0
+var malzemeler: Array[BaseMaterial3D] = []
+var etkin := true
 
 
 func _ready() -> void:
 	own_world_3d = true
 	transparent_bg = true
-	msaa_3d = Viewport.MSAA_2X
 	render_target_update_mode = SubViewport.UPDATE_ALWAYS
 
 	var ortam := WorldEnvironment.new()
@@ -40,8 +46,10 @@ func _ready() -> void:
 	ortam.environment = env
 	add_child(ortam)
 
-	# Yukaridan gelen gunes isigi (arka plandaki isik huzmeleriyle uyumlu)
+	# Yukaridan gelen gunes isigi (arka plandaki isik huzmeleriyle uyumlu).
+	# Gercek zamanli golge yok: saatte en pahali 3B islemlerinden biri.
 	var isik := DirectionalLight3D.new()
+	isik.shadow_enabled = false
 	isik.rotation_degrees = Vector3(-62.0, 20.0, 0.0)
 	isik.light_energy = 1.1
 	isik.light_color = Color(1.0, 0.97, 0.9)
@@ -64,6 +72,14 @@ func _ready() -> void:
 	var kup := model.find_child("Cube_0", true, false)
 	if kup is VisualInstance3D:
 		kup.visible = false
+	for ad in ["BODY_0", "EYES_0"]:
+		var parca := model.find_child(ad, true, false)
+		if parca is MeshInstance3D:
+			parca.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			for i in parca.mesh.get_surface_count():
+				var m: Material = (parca as MeshInstance3D).get_active_material(i)
+				if m is BaseMaterial3D:
+					malzemeler.append(m)
 
 	iskelet = model.find_child("Skeleton3D", true, false)
 	oynatici = model.find_child("AnimationPlayer", true, false)
@@ -79,9 +95,38 @@ func _ready() -> void:
 	oynatici.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
 	oynatici.play(ANIMASYON)
 
+	_profili_uygula()
+	Ayarlar.profil_degisti.connect(_profili_uygula)
+
+
+func _profili_uygula() -> void:
+	var boyut: int = Ayarlar.deger("balik_boyutu")
+	size = Vector2i(boyut, boyut)
+	msaa_3d = Ayarlar.deger("msaa")
+	var normal: bool = Ayarlar.deger("normal_harita")
+	for m in malzemeler:
+		# Dusuk profilde pul kabartmasi (normal harita) ve AO dokusu kapanir:
+		# piksel basina 2 doku okumasi daha az.
+		m.normal_enabled = normal and m.normal_texture != null
+		m.ao_enabled = normal and m.ao_texture != null
+
+
+## Balik Sprite2D'sinin olcegi bununla carpilir (dahili cozunurluk ne olursa
+## olsun balik ekranda ayni boyda gorunur).
+func olcek_carpani() -> float:
+	return REFERANS_BOYUT / float(size.x)
+
+
+## Oyun arka plandayken / ekran kapaliyken 3B cizimi tamamen durdurur.
+func etkinlestir(acik: bool) -> void:
+	etkin = acik
+	render_target_update_mode = SubViewport.UPDATE_ALWAYS if acik else SubViewport.UPDATE_DISABLED
+
 
 ## yon: oyunun koordinatinda (x saga, y asagi, z derine). hiz: piksel/sn.
 func guncelle(yon: Vector3, hiz: float, delta: float, uyuyor: bool) -> void:
+	if not etkin:
+		return
 	# Oyun -> 3B: ekran asagisi = -Y, derinlik (cama uzak) = -Z
 	var d := Vector3(yon.x, -yon.y, -yon.z)
 	if d.length_squared() < 0.0001:

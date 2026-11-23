@@ -3,12 +3,25 @@ extends Node2D
 ## Balik gercek 3B model olarak kucuk bir SubViewport'ta (Balik3D) cizilir;
 ## akvaryum dekoru 2B katmandir. On/arka etkisi Z ekseni, boyut ve cizim
 ## sirasi ile saglanir; tam 3B sahneye gore saatte daha az pil tuketir.
+##
+## Galaxy Watch 8 (Wear OS): 480x480 tasarim, 438x438 icin orantili olcek.
+## Dokunma: kisa = yem, 1 sn = isik, >60 px kaydirma = cam temizleme,
+## kenarda dairesel kaydirma / cerceve (bezel) = ileride menu secimi.
+
+## Gelecekteki ozellikler bu sinyallere baglanacak (cam kirlenmesi, menu).
+signal cam_temizlendi(baslangic: Vector2, bitis: Vector2)
+signal menu_adimi(yon: int)
 
 const MERKEZ := Vector2(240.0, 240.0)
 const KAYIT_YOLU := "user://akvaryum_kaydi.json"
 const TOKLUK_BITIS_SANIYE := 10800.0 # 3 saat
 const UZUN_BASMA_SANIYE := 1.0
 const KAYDIRMA_ESIGI := 60.0
+const DOKUNMA_TOLERANSI := 18.0   # bu kadar kayan parmak hala "dokunma / basili tutma"
+const DOKUNMA_YARICAPI := 236.0   # ekranin neredeyse tamami dokunmaya acik
+const KENAR_YARICAPI := 165.0     # dairesel kaydirma bu halkada baslar
+const DAIRE_ADIM := deg_to_rad(30.0)  # her 30 derecelik daire hareketi = 1 menu adimi
+const DAIRE_ESIGI := deg_to_rad(45.0) # bundan azsa dairesel kaydirma sayilmaz
 # Derinlik (z: 0..1) piksele cevrilirken kullanilir. Boylece balik one / arkaya
 # da yuzer, U donusunde kameraya ya da arkaya bakarak 3B doner.
 const DERINLIK_PIKSEL := 260.0
@@ -46,6 +59,10 @@ var basma_suresi := 0.0
 var kaydirildi := false
 var uzun_basma_yapildi := false
 var etkin_parmak := -1
+var son_konum := Vector2.ZERO
+var daire_acisi := 0.0         # kenarda toplam donulen aci (rad, isaretli)
+var daire_bildirilen := 0      # menuye bildirilen adim sayisi
+var kenarda_kaldi := false
 
 var kayit_sayaci := 0.0
 var zaman_kontrol_sayaci := 0.0
@@ -54,6 +71,10 @@ var yer_cekimi_ortalama := Vector3.ZERO
 var sensor_ilk_okuma := true
 var hareket_siddeti := 0.0
 var irkilme_beklemesi := 0.0
+var sarsinti_sayaci := 0
+var jiroskop_suzgec := Vector3.ZERO
+var su_akintisi := 0.0         # bilek donusunden gelen yatay su itmesi (-1..1)
+var odakta := true             # uygulama on planda mi (degilse 3B ve sensor durur)
 var hazir := false
 
 
@@ -62,7 +83,8 @@ func _ready() -> void:
 	balik.texture = balik_3d.get_texture()
 	_kaydi_yukle()
 	_zaman_farkini_uygula()
-	Engine.max_fps = 20 if isik_acik else 6
+	_fps_ayarla()
+	Ayarlar.profil_degisti.connect(_fps_ayarla)
 	_baligi_gorsellestir()
 	_yemi_gorsellestir()
 	hazir = true
@@ -79,9 +101,12 @@ func _process(delta: float) -> void:
 		if basma_suresi >= UZUN_BASMA_SANIYE:
 			uzun_basma_yapildi = true
 			isik_acik = not isik_acik
-			Engine.max_fps = 20 if isik_acik else 6
+			_fps_ayarla()
 			_yemi_gorsellestir()
 			_kaydet()
+
+	if not odakta:
+		return
 
 	if isik_acik:
 		yuzme_zamani += delta
@@ -102,7 +127,13 @@ func _process(delta: float) -> void:
 	gosterge.queue_redraw()
 
 
+func _fps_ayarla() -> void:
+	Engine.max_fps = int(Ayarlar.deger("fps")) if isik_acik else Ayarlar.ISIK_KAPALI_FPS
+
+
 func _input(olay: InputEvent) -> void:
+	# Not: Konumlar 480x480 tasarim koordinatindadir; 438x438 saatte de
+	# Godot olcekleme (canvas_items) sayesinde ayni kalir.
 	if olay is InputEventScreenTouch:
 		if olay.pressed and not basili:
 			etkin_parmak = olay.index
@@ -112,7 +143,11 @@ func _input(olay: InputEvent) -> void:
 			etkin_parmak = -1
 	elif olay is InputEventScreenDrag:
 		if olay.index == etkin_parmak:
-			_kaydirma_kontrol(olay.position)
+			_surukle(olay.position)
+	elif olay is InputEventMouseButton and olay.pressed and olay.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+		# Galaxy Watch cercevesi (bezel / doner cerceve) Android'de fare
+		# tekerlegi olarak gelir: ileride menu secimi icin.
+		_menu_adimi(1 if olay.button_index == MOUSE_BUTTON_WHEEL_DOWN else -1)
 	elif not OS.has_feature("mobile"):
 		if olay is InputEventMouseButton and olay.button_index == MOUSE_BUTTON_LEFT:
 			if olay.pressed:
@@ -120,7 +155,7 @@ func _input(olay: InputEvent) -> void:
 			else:
 				_basmayi_bitir(olay.position)
 		elif olay is InputEventMouseMotion and basili:
-			_kaydirma_kontrol(olay.position)
+			_surukle(olay.position)
 
 	# Bilgisayarda derinlik deneyini gostermek icin:
 	if olay is InputEventKey and olay.pressed and not olay.echo:
@@ -133,28 +168,62 @@ func _input(olay: InputEvent) -> void:
 
 
 func _basmayi_baslat(konum: Vector2) -> void:
-	if konum.distance_to(MERKEZ) > 205.0:
+	if konum.distance_to(MERKEZ) > DOKUNMA_YARICAPI:
 		return
 	basili = true
 	baslangic = konum
+	son_konum = konum
 	basma_suresi = 0.0
 	kaydirildi = false
 	uzun_basma_yapildi = false
+	daire_acisi = 0.0
+	daire_bildirilen = 0
+	kenarda_kaldi = konum.distance_to(MERKEZ) >= KENAR_YARICAPI
 
 
-func _kaydirma_kontrol(konum: Vector2) -> void:
-	if basili and konum.distance_to(baslangic) >= KAYDIRMA_ESIGI:
+func _surukle(konum: Vector2) -> void:
+	if not basili:
+		return
+	# Parmak biraz kaydiysa artik dokunma / uzun basma sayilmaz.
+	if konum.distance_to(baslangic) > DOKUNMA_TOLERANSI:
 		kaydirildi = true
-		# Cam silme sonraki asamada eklenecek.
+	# Kenar halkasinda kalan hareketin merkez etrafindaki acisini topla.
+	if konum.distance_to(MERKEZ) < KENAR_YARICAPI - 25.0:
+		kenarda_kaldi = false
+	daire_acisi += wrapf((konum - MERKEZ).angle() - (son_konum - MERKEZ).angle(), -PI, PI)
+	son_konum = konum
+	if kenarda_kaldi and absf(daire_acisi) >= DAIRE_ESIGI:
+		var adim := int(daire_acisi / DAIRE_ADIM)
+		while daire_bildirilen != adim:
+			var y := signi(adim - daire_bildirilen)
+			daire_bildirilen += y
+			_menu_adimi(y)
 
 
 func _basmayi_bitir(konum: Vector2) -> void:
 	if not basili:
 		return
-	_kaydirma_kontrol(konum)
-	if not kaydirildi and not uzun_basma_yapildi and basma_suresi < UZUN_BASMA_SANIYE:
-		_yem_birak(konum)
+	_surukle(konum)
 	basili = false
+	if uzun_basma_yapildi:
+		return  # isik zaten degisti; birakinca yem atilmaz
+	if kenarda_kaldi and absf(daire_acisi) >= DAIRE_ESIGI:
+		return  # dairesel kaydirma: menu (cam temizleme ile karismaz)
+	if konum.distance_to(baslangic) >= KAYDIRMA_ESIGI:
+		_cami_temizle(baslangic, konum)
+	elif not kaydirildi and basma_suresi < UZUN_BASMA_SANIYE:
+		_yem_birak(konum)
+	# Aradaki durum (18-60 px kayma): bilincli olarak hicbir sey yapmaz.
+
+
+func _cami_temizle(bas: Vector2, son: Vector2) -> void:
+	# Jest hazir; cam kirlenmesi mekanigi henuz yok (oyun mekanigi degistirilmedi).
+	cam_temizlendi.emit(bas, son)
+
+
+func _menu_adimi(yon_: int) -> void:
+	# Dairesel kaydirma ve cerceve icin ayrildi; menu henuz yok.
+	menu_adimi.emit(yon_)
 
 
 func _yem_birak(ekran_konumu: Vector2) -> void:
@@ -184,6 +253,7 @@ func _baligi_hareket_ettir(delta: float) -> void:
 		if yem_var:
 			yem_var = false
 			aclik = clampf(aclik + 22.0, 0.0, 100.0)
+			_titret(60)
 			_kaydet()
 		else:
 			bekleme_suresi = randf_range(0.35, 1.0)
@@ -255,6 +325,7 @@ func _baligi_gorsellestir() -> void:
 		balik_konumu.x,
 		balik_konumu.y - derinlik * 14.0 + sin(yuzme_zamani * 2.0) * 1.7
 	)
+	boyut *= balik_3d.olcek_carpani()
 	balik.scale = Vector2(boyut, boyut)
 	# Yon ve egim artik 3B modelin kendisinde (betikler/balik_3d.gd).
 
@@ -279,28 +350,55 @@ func _yemi_gorsellestir() -> void:
 
 
 func _sensoru_kontrol_et(delta: float) -> void:
-	# Sensor yalnizca oyun gorunurken, yaklasik saniyede bes kez okunur.
+	# Sensorler yalnizca oyun on plandayken ve isik acikken, saniyede ~10 kez
+	# okunur. Android'de Godot, uygulama arka plana gecince sensorleri kapatir.
 	if not OS.has_feature("mobile"):
 		return
 	sensor_kontrol_sayaci += delta
-	if sensor_kontrol_sayaci < 0.20:
+	if sensor_kontrol_sayaci < 0.10:
 		return
+	var aralik := sensor_kontrol_sayaci
 	sensor_kontrol_sayaci = 0.0
+
+	# --- Ivmeolcer: yurume ve sarsinti ---
 	var olcum := Input.get_accelerometer()
-	if olcum.length_squared() < 0.01:
-		return
-	if sensor_ilk_okuma:
-		yer_cekimi_ortalama = olcum
-		sensor_ilk_okuma = false
-		return
-	yer_cekimi_ortalama = yer_cekimi_ortalama.lerp(olcum, 0.13)
-	var sarsinti := (olcum - yer_cekimi_ortalama).length()
-	hareket_siddeti = lerpf(hareket_siddeti, clampf((sarsinti - 0.9) / 4.0, 0.0, 1.0), 0.30)
-	if sarsinti > 5.8 and irkilme_beklemesi <= 0.0 and not yem_var:
-		# Ani hareket: canli bitkilerin ve kayanin arkasina saklanir.
-		balik_hedefi = Vector3(-108.0, 54.0, 0.91)
-		bekleme_suresi = 0.0
-		irkilme_beklemesi = 10.0
+	if olcum.length_squared() > 0.01:
+		if sensor_ilk_okuma:
+			yer_cekimi_ortalama = olcum
+			sensor_ilk_okuma = false
+		else:
+			yer_cekimi_ortalama = yer_cekimi_ortalama.lerp(olcum, 0.08)
+			var sarsinti := (olcum - yer_cekimi_ortalama).length()
+			# Yurume: yavasca artan / azalan hareket siddeti (ani tepe etkisiz)
+			hareket_siddeti = lerpf(hareket_siddeti, clampf((sarsinti - 0.9) / 4.0, 0.0, 1.0), 0.15)
+			# Irkilme: tek bir bilek hareketi degil, art arda 3 olcumde (~0,3 sn)
+			# guclu sarsinti gerekir; sonra 10 sn bekleme.
+			sarsinti_sayaci = sarsinti_sayaci + 1 if sarsinti > 5.8 else 0
+			if sarsinti_sayaci >= 3 and irkilme_beklemesi <= 0.0 and not yem_var:
+				balik_hedefi = Vector3(-108.0, 54.0, 0.91)
+				bekleme_suresi = 0.0
+				irkilme_beklemesi = 10.0
+				sarsinti_sayaci = 0
+
+	# --- Jiroskop: bilek donusu suyu hafifce iter ---
+	var jiro := Input.get_gyroscope()
+	jiroskop_suzgec = jiroskop_suzgec.lerp(jiro, 0.35)
+	# Kolun ekseni etrafinda donus (saatte genelde X ekseni). 0,4 rad/sn
+	# altindaki kucuk hareketler yok sayilir.
+	var donus := jiroskop_suzgec.x
+	var itme := 0.0
+	if absf(donus) > 0.4:
+		itme = clampf((absf(donus) - 0.4) / 3.0, 0.0, 1.0) * signf(donus)
+	su_akintisi = clampf(su_akintisi + itme * aralik * 2.0, -1.0, 1.0)
+	su_akintisi = move_toward(su_akintisi, 0.0, aralik * 0.5)
+	if absf(su_akintisi) > 0.01 and not yem_var:
+		# Balik akintiyla birkac piksel suruklenir; hedef / mekanik degismez.
+		balik_konumu = _sinirla(balik_konumu + Vector3(su_akintisi * 6.0 * aralik, 0.0, 0.0))
+
+
+func _titret(sure_ms: int) -> void:
+	if OS.has_feature("mobile"):
+		Input.vibrate_handheld(sure_ms, 0.6)
 
 
 func _zaman_farkini_uygula() -> void:
@@ -348,12 +446,34 @@ func _kaydet() -> void:
 func _notification(bildirim: int) -> void:
 	if not hazir:
 		return
-	if bildirim == NOTIFICATION_APPLICATION_PAUSED or bildirim == NOTIFICATION_WM_CLOSE_REQUEST or bildirim == NOTIFICATION_WM_GO_BACK_REQUEST:
-		_kaydet()
-	elif bildirim == NOTIFICATION_APPLICATION_RESUMED:
-		_zaman_farkini_uygula()
-		Engine.max_fps = 20 if isik_acik else 6
-		_kaydet()
+	match bildirim:
+		NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_APPLICATION_FOCUS_OUT:
+			# Ekran kapandi / baska uygulamaya gecildi: kaydet, 3B cizimi ve
+			# sensor islemeyi durdur.
+			_kaydet()
+			_on_planda(false)
+		NOTIFICATION_WM_CLOSE_REQUEST, NOTIFICATION_WM_GO_BACK_REQUEST:
+			# Geri tusu sistem davranisini korur (uygulamayi kapatir); once kaydet.
+			_kaydet()
+		NOTIFICATION_APPLICATION_RESUMED, NOTIFICATION_APPLICATION_FOCUS_IN:
+			# Gecen gercek sure tokluga yansitilir.
+			_zaman_farkini_uygula()
+			_on_planda(true)
+			_kaydet()
+
+
+func _on_planda(acik: bool) -> void:
+	if odakta == acik:
+		return
+	odakta = acik
+	balik_3d.etkinlestir(acik)
+	basili = false
+	if acik:
+		_fps_ayarla()
+		sensor_ilk_okuma = true  # yeniden kalibre et, sahte irkilme olmasin
+		sarsinti_sayaci = 0
+	else:
+		Engine.max_fps = 5
 
 
 func _exit_tree() -> void:

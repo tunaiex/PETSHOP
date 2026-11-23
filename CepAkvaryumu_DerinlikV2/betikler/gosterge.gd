@@ -1,11 +1,13 @@
 extends Node2D
 ## En son katmanda hem gece karartmasi hem acik yazi yerine yay gosterir.
+## Guvenli bolge: tum gostergeler merkezden en fazla ~221 px uzakta (yuvarlak
+## ekranin kenarindan >=19 px iceride); 438x438 saatte orantili kuculur.
 const MERKEZ := Vector2(240.0, 240.0)
 @onready var akvaryum: Node = get_parent()
 
 func _draw() -> void:
 	if not bool(akvaryum.get("isik_acik")):
-		draw_circle(MERKEZ, 229.0, Color(0.0, 0.02, 0.07, 0.75))
+		draw_circle(MERKEZ, 241.0, Color(0.0, 0.02, 0.07, 0.75))
 	# Saat cercevesinin solunda tokluk gostergesi, draw_arc() ile.
 	var baslangic := deg_to_rad(145.0)
 	var bitis := deg_to_rad(215.0)
