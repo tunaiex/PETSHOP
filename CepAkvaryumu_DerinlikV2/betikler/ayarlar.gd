@@ -10,16 +10,16 @@ enum Profil { DUSUK, DENGELI, YUKSEK }
 const DOSYA := "user://ayarlar.cfg"
 const ADLAR := ["Dusuk", "Dengeli", "Yuksek"]
 
-# fps: isik acikken hedef kare hizi
+# fps: isik acikken hedef kare hizi; gece_fps: isik kapaliyken (balik uyur,
+# daha az hareket var ama dokunmaya hizli tepki ve akici gorunum korunur)
 # balik_boyutu: 3B baligin cizildigi dahili cozunurluk (piksel, kare)
 # msaa: 3B kenar yumusatma; normal_harita: balik pullarinin kabartma dokusu
 # baloncuk: ayni anda gorunen kabarcik sayisi
 const DEGERLER := {
-	Profil.DUSUK: {"fps": 24, "balik_boyutu": 128, "msaa": Viewport.MSAA_DISABLED, "normal_harita": false, "baloncuk": 6},
-	Profil.DENGELI: {"fps": 30, "balik_boyutu": 160, "msaa": Viewport.MSAA_2X, "normal_harita": true, "baloncuk": 9},
-	Profil.YUKSEK: {"fps": 30, "balik_boyutu": 224, "msaa": Viewport.MSAA_4X, "normal_harita": true, "baloncuk": 11},
+	Profil.DUSUK: {"fps": 24, "gece_fps": 15, "balik_boyutu": 128, "msaa": Viewport.MSAA_DISABLED, "normal_harita": false, "baloncuk": 6},
+	Profil.DENGELI: {"fps": 30, "gece_fps": 20, "balik_boyutu": 160, "msaa": Viewport.MSAA_2X, "normal_harita": true, "baloncuk": 9},
+	Profil.YUKSEK: {"fps": 30, "gece_fps": 24, "balik_boyutu": 224, "msaa": Viewport.MSAA_4X, "normal_harita": true, "baloncuk": 11},
 }
-const ISIK_KAPALI_FPS := 6
 
 var profil: int = Profil.DENGELI
 

@@ -38,7 +38,12 @@ Akvaryum (Node2D) - betikler/akvaryum.gd
 - Balık önce burnunu hedefe çevirir (dönüş hızı sınırlı: normalde 2,4, yeme giderken 3,6 rad/sn), sonra baktığı yöne yüzer. Ters yöndeki hedefe ayna gibi anında dönmez: kameraya ya da arkaya bakarak 3B **U dönüşü** yapar. Hedefe bakmıyorsa yavaşlar, yerinde döner.
 - Derinlik (z: 0–1) yön hesabında `DERINLIK_PIKSEL` = 260 piksel sayılır; böylece balık öne / arkaya da yüzer ve o sırada kameraya dönük görünür.
 - Yukarı / aşağı eğilir (en fazla `MAKS_EGIM`), dönerken yana yatar ve gövdesi dönüş yönüne bükülür.
-- Modelin kendi yüzgeç animasyonu (`Take 01`) döngüde oynar. Hızı yüzme hızına bağlıdır: yeme giderken ~2,6 kat hızlı, ışık kapalıyken (uyurken) yavaş.
+- Modelin kendi yüzgeç animasyonu (`Take 01`) döngüde oynar, ama gövdeyi hiç oynatmaz. Üstüne kodla bir **yüzme katmanı** eklenir (`balik_3d.gd` → `YUZME_KEMIKLERI`):
+  - Gövde: baştan kuyruğa S dalgası (omurga `Bone.002`–`005`); baş ters yönde hafif salınır.
+  - Kuyruk yüzgeci: dalganın ucunda gecikmeli savrulma + yelpaze gibi açılıp kapanma.
+  - Sırt / karın yüzgeçleri: gövdeyi izleyen dalgalanma, kalkıp inme.
+  - Göğüs yüzgeçleri: sürekli kürek çekme (dururken de), karın yüzgeçleri hafif sallanma.
+  - Hız arttıkça dalga genişler ve hızlanır (5 → 14 rad/sn), yüzgeçler geriye yatar; uyurken çok yavaş.
 - Dönerken omurga kemikleri (`Bone.002`–`Bone.005`) kodla ek olarak bükülür: gövde dönüş yönüne C şeklinde kıvrılır.
 - Yarı saydam yüzgeçler için `Balik` Sprite2D'si "premultiplied alpha" karışımı kullanır (kenarlarda koyu çizgi olmasın diye).
 - Modeli değiştirirsen `balik_3d.gd` içindeki `OLCEK` (boyut), `MERKEZ` (dönme noktası) ve `OMURGA` (kemik adları) ayarlanmalı.
@@ -107,12 +112,13 @@ Hepsi gerçek zamanla ilerler, uygulama kapalıyken de hesaplanır.
 | | Düşük | **Dengeli (varsayılan)** | Yüksek |
 |---|---|---|---|
 | FPS (ışık açık) | 24 | 30 | 30 |
+| FPS (ışık kapalı) | 15 | 20 | 24 |
 | 3B balık dahili çözünürlüğü | 128 px | 160 px | 224 px |
 | 3B kenar yumuşatma (MSAA) | yok | 2x | 4x |
 | Pul kabartması (normal harita) + AO dokusu | kapalı | açık | açık |
 | Kabarcık sayısı | 6 | 9 | 11 |
 
-- Işık kapalıyken 6 FPS, uygulama arka plandayken 5 FPS ve 3B çizim tamamen durur.
+- Işık kapalıyken FPS profile göre 15 / 20 / 24 (dokunmaya hızlı tepki, akıcı uyku); uygulama arka plandayken 5 FPS ve 3B çizim tamamen durur.
 - Profil `user://ayarlar.cfg` içinde saklanır. Şimdilik değiştirme arayüzü yok (dairesel menü gelince bağlanacak); bilgisayarda `1` / `2` / `3` tuşları.
 - Gerçek zamanlı gölge yok. Su ışık huzmeleri ve caustics arka plan görselinin içinde (ayrı shader yok, ek maliyet yok).
 - Balık modeli `araclar/glb_optimize.py` ile hafifletildi: 3 doku 2048 → 512 px, kullanılmayan UV kanalları atıldı (9,2 MB → 1,4 MB). Orijinali: `../modeller/betta_splendens_orijinal.glb`.

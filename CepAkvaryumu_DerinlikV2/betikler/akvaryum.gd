@@ -152,7 +152,7 @@ func _process(delta: float) -> void:
 
 
 func _fps_ayarla() -> void:
-	Engine.max_fps = int(Ayarlar.deger("fps")) if isik_acik else Ayarlar.ISIK_KAPALI_FPS
+	Engine.max_fps = int(Ayarlar.deger("fps" if isik_acik else "gece_fps"))
 
 
 func _input(olay: InputEvent) -> void:
