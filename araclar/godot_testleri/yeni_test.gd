@@ -54,7 +54,7 @@ func _initialize():
 	kontrol("Super yem: tam tok, 1 inci (tokluk=%.0f, inci=%d)" % [s.aclik, b.inci_sayisi], s.aclik > 99.0 and b.inci_sayisi == 9)
 	await cerceve(1); await tikla(Vector2(240, 240))   # filtre
 	kontrol("Filtre alinir (5 inci)", b.filtre and b.inci_sayisi == 4)
-	await cerceve(1); await tikla(Vector2(240, 240))   # gun batimi isigi
+	await cerceve(1); await cerceve(1); await tikla(Vector2(240, 240))   # (lepistes'i atla) gun batimi isigi
 	kontrol("Gun batimi isigi alinir ve secilir", b.renkler[1] and b.isik_rengi == 1 and b.inci_sayisi == 1)
 	await cerceve(1); await tikla(Vector2(240, 240))   # ay isigi: inci yetmez
 	kontrol("Inci yetmezse alinmaz", not b.renkler[2] and b.inci_sayisi == 1)

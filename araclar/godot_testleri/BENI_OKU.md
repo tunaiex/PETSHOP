@@ -10,7 +10,7 @@ saatteki performansı **sınamaz**.
 mkdir -p CepAkvaryumu_DerinlikV2/arac && cp araclar/godot_testleri/*.gd CepAkvaryumu_DerinlikV2/arac/
 cd CepAkvaryumu_DerinlikV2
 godot --headless --import
-for t in testler bakim_test yeni_test yasam_test gece_kostik; do
+for t in testler bakim_test yeni_test yasam_test lepistes_test kesik gece_kostik; do
   godot --rendering-driver opengl3 --resolution 480x480 --fixed-fps 30 --script res://arac/$t.gd | grep -E "GECTI|KALDI|kostik|Dusuk"
 done
 ```

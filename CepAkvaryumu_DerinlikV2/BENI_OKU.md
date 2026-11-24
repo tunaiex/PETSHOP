@@ -124,13 +124,21 @@ Tamagotchi mantığı. **Ölüm yok:** bakılmazsa balık hastalanır ve "kritik
 - Görünüm: `golgeler/balik.gdshader` (doygunluk, parlaklık, ton, beyaz benek) + `balik_3d.gd` (yüzgeç kök kemik ölçeği, kapalı yüzgeç).
 - Bilgisayarda `T` tuşu 1 saat ileri sarar (yaşam saati dahil).
 
+## Lepistesler (guppy) — akvaryum arkadaşları
+
+- Mağazadan **3 inci** ile alınır, en fazla **4**. Her biri rastgele renk tonu (shader ton kayması) ve boyda.
+- Model: rig'li lepistes (`modeller/lepistes.glb`, ~1.500 üçgen, 43 kemik, kendi yüzme animasyonu). Kaynak: kullanıcının yüklediği `guppy-fish.zip` (Guppy.blend, Blender 2.7) → `../araclar/blender/lepistes_donustur.py` ile malzemesi yenilenip GLB'ye aktarıldı, dokusu 512 px'e indirildi.
+- Her lepistes betta gibi kendi küçük 3B görüntüsünde çizilir (Dengeli 116 px, çerçeve payı dahil); derinlik katmanları, parallax ve renk tonu bettayla aynı sistem.
+- Davranış: gevşek sürü halinde gezinir, birbirine çok yaklaşmaz, bettadan kaçar; yem düşünce yeme toplanır (yemi betta yer); gece bitkilerin dibinde dinlenir. Betta yakınına gelen lepistese ara ara **kabarır** (45–90 sn'de bir).
+- **Biyolojik yük:** her lepistes suyu %12 daha hızlı kirletir (4 lepistes: 24 saatte ~74 puan; filtre bunu yarıya indirir).
+
 ## Menü (`betikler/menu.gd`)
 
 Küçük yuvarlak ekran için tek öğe ortada büyük gösterilir; çerçeve / kenar kaydırma ile değişir, dokunma seçer, 8 sn dokunulmazsa kapanır.
 
 - (Gerekirse en başta) **İlaç ver** · **Yeni nesil**
 - **Su değiştir** — temiz su, dipteki yem alınır (önceki "tam tur / 12 tık" jesti yerine)
-- **Mağaza** — incilerle: Süper yem (1: tam tok, +mutluluk), Filtre (5: su 2 kat geç kirlenir), Gün batımı ışığı (3), Ay ışığı (3), Normal ışık
+- **Mağaza** — incilerle: Süper yem (1: tam tok, +mutluluk), Filtre (5: su 2 kat geç kirlenir), Lepistes (3, en fazla 4), Gün batımı ışığı (3), Ay ışığı (3), Normal ışık
 - **Bilgi** — isim, nesil, evre ve form, yaş, boy, sağlık, mutluluk, tokluk, su, cam, inci, bakım hatası
 - **Oyna** — ışık kovalama oyunu · **Soy ağacı** — önceki nesiller
 - **Ses** aç/kapat · **Grafik** Düşük/Dengeli/Yüksek · **FPS göstergesi** (FPS, kare süresi, çizim çağrısı, bellek — saatte performans ölçmek için) · **Kapat**

@@ -46,6 +46,7 @@ const PARALAKS_KATMANLAR := {"ArkaPlan": 0.35, "Baloncuklar": 0.4, "Bakim/Yuva":
 @onready var bakim: Node = $Bakim
 @onready var menu: Node2D = $Menu
 @onready var yasam: Node = $Yasam
+@onready var lepistesler: Node2D = $Lepistesler
 @onready var arka_plan: Sprite2D = $ArkaPlan
 @onready var su_yuzeyi_malzeme: ShaderMaterial = $ArkaPlan.material
 var kostik_gucu := 0.35          # ekrandaki guc; hedefe yumusakca yaklasir
@@ -188,6 +189,7 @@ func _process(delta: float) -> void:
 		_baligi_gorsellestir()
 	if balik.visible:
 		balik_3d.guncelle(yon, anlik_hiz, delta, not isik_acik)
+	lepistesler.kare(delta, isik_acik, UYKU_NOKTASI)
 
 	kayit_sayaci += delta
 	if kayit_sayaci >= 15.0:
@@ -406,6 +408,12 @@ func _menu_komutu(komut: String) -> void:
 				aclik = 100.0
 				Ses.cal("inci")
 				_titret(40)
+		"lepistes":
+			if bakim.satin_al("lepistes"):
+				lepistesler.ekle()
+				Ses.cal("inci")
+				_titret(40)
+				gosterge.bildirim("Yeni bir lepistes akvaryuma katıldı!")
 		"filtre":
 			if bakim.satin_al("filtre"):
 				Ses.cal("inci")
@@ -798,6 +806,8 @@ func _kaydi_yukle() -> void:
 				balik_konumu = _sinirla(Vector3(float(dizi[0]), float(dizi[1]), float(dizi[2])))
 		if kayit.get("bakim") is Dictionary:
 			bakim.yukle(kayit["bakim"])
+		if kayit.get("lepistesler") is Array:
+			lepistesler.yukle(kayit["lepistesler"])
 		if kayit.get("yasam") is Dictionary:
 			yasam.yukle(kayit["yasam"])
 		else:
@@ -819,7 +829,8 @@ func _kaydet() -> void:
 		"zaman": son_hesaplama_zamani,
 		"balik_konumu": [balik_konumu.x, balik_konumu.y, balik_konumu.z],
 		"bakim": bakim.sozluk(),
-		"yasam": yasam.sozluk()
+		"yasam": yasam.sozluk(),
+		"lepistesler": lepistesler.sozluk()
 	}))
 	dosya.flush()
 
@@ -848,6 +859,7 @@ func _on_planda(acik: bool) -> void:
 		return
 	odakta = acik
 	balik_3d.etkinlestir(acik)
+	lepistesler.etkinlestir(acik)
 	basili = false
 	if acik:
 		_fps_ayarla()
