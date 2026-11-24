@@ -107,6 +107,7 @@ Arka plan artık yapay zekâ çizimi değil, gerçek taranmış (Poly Haven, CC0
 - Su: derinlikte turkuaza kaybolan hacimsel sis + ışık huzmeleri; yukarıda aşağıdan bakınca tam iç yansıma yapan dalgalı su yüzeyi; güneş ışığı su yüzeyi deseninden geçerek kumda **kostik** oluşturur; arkada koyu akvaryum fonu; hafif alan derinliği.
 - Saat yalnızca hazır resimleri çizer: ek 3B maliyeti **yok**.
 - **Su yüzeyi dalgalanması:** `golgeler/su_yuzeyi.gdshader`, arka planın yalnızca üst %27'sini hafifçe kırar ve üzerinde ışıltılar gezdirir (piksel başına tek doku okuması). "Düşük" profilde kapalı.
+- **Kumda kostikler:** `golgeler/kostik.gdshaderinc` — su yüzeyinden süzülen hareketli ışık ağı kumda ve kayalarda kayar, parıldar. Döşenebilir `gorseller/kostik.png` dokusunun iki kopyası farklı yön ve hızda kayar, kesiştikleri yerler parlar (piksel başına 2 doku okuması). Ekran konumu zemin düzlemine perspektifle izdüşürülür (yakında iri, ufukta sık ve sisle söner); gölgede zayıf, güneş alan kumda güçlü. Kayalarda (`kostik_kaya.gdshader`) daha zayıf. Işık kapanınca söner, su kirlendikçe zayıflar (`akvaryum.gd` → `_kostigi_guncelle`). "Düşük" profilde kapalı.
 - **Kabarcıklar** (`betikler/baloncuklar.gd`): `gorseller/kabarcik.png` dokusuyla (ışık halkası + parlama benekli cam kabarcık). %70'i sağ kayanın arkasından ince bir hava akışı, kalanı bitkilerden kopan minik oksijen kabarcıkları. Büyük kabarcık daha hızlı yükselir ve yalpalar, yüzeyde söner. Adet: 8 / 14 / 18 (profile göre). Köpük yuvası da aynı dokuyu kullanır.
 
 Yeniden üretmek (bilgisayarda, Blender 4.x):
@@ -136,7 +137,7 @@ python3 -I ../araclar/arka_plan_katmanla.py RENDER gorseller/
 | 3B kenar yumuşatma (MSAA) | yok | 2x | 4x |
 | Pul kabartması (normal harita) + AO dokusu | kapalı | açık | açık |
 | Kabarcık sayısı | 8 | 14 | 18 |
-| Su yüzeyi dalgalanması | kapalı | açık | açık |
+| Su yüzeyi dalgalanması + kumda kostikler | kapalı | açık | açık |
 
 - Işık kapalıyken FPS profile göre 15 / 20 / 24 (dokunmaya hızlı tepki, akıcı uyku); uygulama arka plandayken 5 FPS ve 3B çizim tamamen durur.
 - Profil `user://ayarlar.cfg` içinde saklanır. Şimdilik değiştirme arayüzü yok (dairesel menü gelince bağlanacak); bilgisayarda `1` / `2` / `3` tuşları.

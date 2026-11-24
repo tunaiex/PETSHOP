@@ -39,7 +39,9 @@ const CERCEVE_SU_TIK := 12     # cerceveyi bu kadar tik cevirmek = su degisimi
 @onready var gosterge: Node2D = $Gosterge
 @onready var bakim: Node = $Bakim
 @onready var arka_plan: Sprite2D = $ArkaPlan
-@onready var su_yuzeyi_malzeme: Material = $ArkaPlan.material
+@onready var su_yuzeyi_malzeme: ShaderMaterial = $ArkaPlan.material
+@onready var kaya_malzemeleri: Array = [[$Tas, $Tas.material], [$Kutuk, $Kutuk.material]]
+var kostik_gucu := 0.35          # ekrandaki guc; hedefe yumusakca yaklasir
 
 # Tokluk: 100 = tok, 0 = ac. Onceki projenin 'aclik' kaydi da okunur.
 var aclik := 85.0
@@ -127,6 +129,7 @@ func _process(delta: float) -> void:
 
 	if not odakta:
 		return
+	_kostigi_guncelle(delta)
 
 	cerceve_zaman = maxf(0.0, cerceve_zaman - delta)
 	if cerceve_zaman <= 0.0 and not basili:
@@ -153,8 +156,26 @@ func _process(delta: float) -> void:
 	gosterge.queue_redraw()
 
 
+func _kostigi_guncelle(delta: float) -> void:
+	# Isik kapaliyken gunes yok: kostik soner. Kirli su isigi dagitir: zayiflar.
+	var hedef := 0.0
+	if isik_acik:
+		hedef = 0.35 * lerpf(0.25, 1.0, bakim.su / 100.0)
+	var yeni := move_toward(kostik_gucu, hedef, delta * 0.5)
+	if absf(yeni - kostik_gucu) < 0.0001 and absf(yeni - hedef) < 0.0001 and hazir:
+		return
+	kostik_gucu = yeni
+	su_yuzeyi_malzeme.set_shader_parameter("kostik_guc", kostik_gucu)
+	for km in kaya_malzemeleri:
+		km[1].set_shader_parameter("kostik_guc", kostik_gucu)
+
+
 func _fps_ayarla() -> void:
-	arka_plan.material = su_yuzeyi_malzeme if bool(Ayarlar.deger("su_dalgasi")) else null
+	# Su yuzeyi dalgasi ve kostikler ayni ayara bagli (Dusuk profilde kapali).
+	var efekt := bool(Ayarlar.deger("su_dalgasi"))
+	arka_plan.material = su_yuzeyi_malzeme if efekt else null
+	for km in kaya_malzemeleri:
+		km[0].material = km[1] if efekt else null
 	Engine.max_fps = int(Ayarlar.deger("fps" if isik_acik else "gece_fps"))
 
 

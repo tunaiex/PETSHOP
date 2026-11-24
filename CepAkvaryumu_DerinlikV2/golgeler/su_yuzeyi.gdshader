@@ -1,7 +1,7 @@
 shader_type canvas_item;
-// Arka plandaki su yuzeyini hafifce dalgalandirir. Yalnizca ust bantta
-// (UV.y < bant_sonu) etkili; altinda resim oldugu gibi kalir.
-// Piksel basina tek doku okumasi + birkac sin: saat icin ucuz.
+// Arka plan: ustte su yuzeyi hafifce dalgalanir (UV.y < bant_sonu);
+// altta kuma su yuzeyinden suzulen hareketli isik desenleri (kostik) duser.
+#include "res://golgeler/kostik.gdshaderinc"
 
 uniform float bant_sonu = 0.27;   // resmin ust %27'si (su yuzeyi)
 uniform float guc = 0.0045;       // kirilma miktari (UV)
@@ -26,5 +26,6 @@ void fragment() {
 		float s = sin(uv.x * 38.0 + TIME * 1.3) * sin(uv.y * 90.0 - TIME * 1.05 + sin(uv.x * 12.0 + TIME * 0.7) * 2.0);
 		c.rgb += vec3(0.75, 0.95, 1.0) * pow(max(s, 0.0), 3.0) * isilti * w;
 	}
+	c.rgb += kostik(SCREEN_UV, c.rgb) * c.a;
 	COLOR = c;
 }
