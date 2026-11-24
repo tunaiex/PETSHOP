@@ -45,17 +45,17 @@ script = ExtResource("10_food")
 
 [node name="Tas" type="Sprite2D" parent="."]
 z_index = 2
-position = Vector2(168, 370.5)
+position = Vector2(109.5, 331)
 texture = ExtResource("4_rock")
 
 [node name="Kutuk" type="Sprite2D" parent="."]
 z_index = 4
-position = Vector2(370, 380.5)
+position = Vector2(381, 352.5)
 texture = ExtResource("5_wood")
 
 [node name="Yapraklar" type="Sprite2D" parent="."]
 z_index = 5
-position = Vector2(240, 240)
+position = Vector2(247.5, 460.5)
 texture = ExtResource("6_plants")
 
 [node name="Bakim" type="Node" parent="."]

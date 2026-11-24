@@ -98,6 +98,23 @@ Hepsi gerçek zamanla ilerler, uygulama kapalıyken de hesaplanır.
 - Her 15 saniyede, yem yendiğinde, ışık değiştiğinde, ekran kapandığında / uygulama arka plana geçtiğinde ve geri tuşunda kaydeder.
 - Yeniden açılınca geçen gerçek süre tokluğa yansıtılır (1 saat kapalı kaldıysa ~33 puan düşer).
 
+## Gerçekçi arka plan (Blender render)
+
+Arka plan artık yapay zekâ çizimi değil, gerçek taranmış (Poly Haven, CC0) kayalar ve kodla üretilmiş su bitkileriyle **Blender / Cycles** içinde render edilmiş bir akvaryum:
+
+- Kayalar: `boulder_01` (sol, saklanma noktası), `namaqualand_boulder_02` (sağ, saklanma noktası), arkada `coast_land_rocks_02`, `rock_moss_set_02`; kumda `lambis_shell`.
+- Vallisneria (uzun şerit yapraklar, arkadan ışık geçiren malzeme) ve ön tarafta saç otu prosedürel olarak üretilir.
+- Su: derinlikte turkuaza kaybolan hacimsel sis + ışık huzmeleri; yukarıda aşağıdan bakınca tam iç yansıma yapan dalgalı su yüzeyi; güneş ışığı su yüzeyi deseninden geçerek kumda **kostik** oluşturur; arkada koyu akvaryum fonu; hafif alan derinliği.
+- Saat yalnızca hazır resimleri çizer: ek 3B maliyeti **yok**.
+
+Yeniden üretmek (bilgisayarda, Blender 4.x):
+```sh
+# Poly Haven ZIP'lerini VARLIKLAR/<ad>/ altina ac (ör. VARLIKLAR/boulder_01_4k/boulder_01_4k.blend)
+blender -b --disable-autoexec --python ../araclar/blender/akvaryum_sahne.py -- VARLIKLAR RENDER 160 hepsi 960
+python3 -I ../araclar/arka_plan_katmanla.py RENDER gorseller/
+```
+`arka_plan_katmanla.py` render'ı katmanlara böler (arka plan, sol kaya, sağ kaya, ön otlar), hafif renk ayarı yapar ve `konumlar.json` ile her katmanın sahnedeki merkezini verir (`akvaryum.tscn` → `Tas` / `Kutuk` / `Yapraklar` position). Kamera veya kaya yeri değişirse saklanma hedefleri (`akvaryum.gd` → `_rastgele_hedef_sec`) de güncellenmeli.
+
 ## Galaxy Watch 8 uyarlaması
 
 ### Ekran

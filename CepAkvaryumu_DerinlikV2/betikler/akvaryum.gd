@@ -185,7 +185,7 @@ func _input(olay: InputEvent) -> void:
 	# Bilgisayarda derinlik deneyini gostermek icin:
 	if olay is InputEventKey and olay.pressed and not olay.echo:
 		if olay.keycode == KEY_Z:
-			balik_hedefi = Vector3(-104.0, 55.0, 0.90) # tasin arkasi
+			balik_hedefi = Vector3(-104.0, 66.0, 0.90) # tasin arkasi
 			bekleme_suresi = 0.0
 		elif olay.keycode == KEY_X:
 			balik_hedefi = Vector3(25.0, 0.0, 0.10) # kameraya yakin
@@ -386,9 +386,9 @@ func _rastgele_hedef_sec() -> void:
 	hedef_sayaci += 1
 	# Her birkac hedefte kaya / kutuk arkasindan gecmesini garanti eder.
 	if hedef_sayaci % 5 == 1:
-		balik_hedefi = Vector3(-102.0, 56.0, 0.88)
+		balik_hedefi = Vector3(-102.0, 66.0, 0.88)
 	elif hedef_sayaci % 5 == 3:
-		balik_hedefi = Vector3(103.0, 56.0, 0.82)
+		balik_hedefi = Vector3(100.0, 84.0, 0.84)
 	elif hedef_sayaci % 5 == 4:
 		balik_hedefi = Vector3(32.0, -42.0, 0.10)
 	elif bakim.yuva > 0.2 and hedef_sayaci % 5 == 2:
@@ -484,7 +484,7 @@ func _sensoru_kontrol_et(delta: float) -> void:
 			# guclu sarsinti gerekir; sonra 10 sn bekleme.
 			sarsinti_sayaci = sarsinti_sayaci + 1 if sarsinti > 5.8 else 0
 			if sarsinti_sayaci >= 3 and irkilme_beklemesi <= 0.0 and not yem_var:
-				balik_hedefi = Vector3(-108.0, 54.0, 0.91)
+				balik_hedefi = Vector3(-108.0, 66.0, 0.91)
 				bekleme_suresi = 0.0
 				irkilme_beklemesi = 10.0
 				sarsinti_sayaci = 0

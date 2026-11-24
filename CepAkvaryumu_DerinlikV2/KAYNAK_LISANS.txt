@@ -7,3 +7,12 @@ Rig'li 3B betta modeli (modeller/betta_splendens.glb):
   Kaynak: https://sketchfab.com/3d-models/betta-splendens-f4eeb7f50ad24873842bd954ad27d23b
   Lisans: CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
   CC-BY geregi oyunun icinde (or. hakkinda ekrani / magaza sayfasi) yazar adi belirtilmelidir.
+
+Gercekci arka plan (gorseller/arka_plan.webp, tas_on.png, kutuk_on.png, yaprak_on.png):
+  Blender 4.0 / Cycles ile render edildi (betik: ../araclar/blender/akvaryum_sahne.py).
+  Kullanilan modeller Poly Haven'dan (https://polyhaven.com), lisans CC0 1.0:
+    boulder_01, namaqualand_boulder_02, coast_land_rocks_02, rock_moss_set_02,
+    lambis_shell, crystalline_iceplant, calathea_orbifolia_01
+  Vallisneria ve sac otu yapraklari, kum zemin, su hacmi, su yuzeyi ve kostikler
+  betik icinde prosedurel olarak uretildi.
+  Ham dosyalar: GitHub "Malzemele" surumu (Releases).
