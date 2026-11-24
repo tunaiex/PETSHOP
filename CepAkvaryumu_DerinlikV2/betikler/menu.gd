@@ -40,7 +40,7 @@ func _ogeler() -> Array:
 			var l := [["super_yem", "Süper yem", "1 inci · tam tok, mutlu"]]
 			l.append(["filtre", "Filtre", "Alındı ✓" if bakim.filtre else "5 inci · su 2 kat geç kirlenir"])
 			for i in [1, 2]:
-				var ad: String = bakim.RENK_ADLARI[i] + " ışığı"
+				var ad: String = bakim.RENK_ADLARI[i]
 				if bakim.renkler[i]:
 					l.append(["renk_%d" % i, ad, "Seçili" if bakim.isik_rengi == i else "Dokun: seç"])
 				else:

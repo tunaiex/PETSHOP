@@ -82,9 +82,14 @@ var kenarda_kaldi := false
 var yol := PackedVector2Array()  # parmagin izi (cam silme icin)
 var silme_aktif := false
 var kabarma_beklemesi := 0.0
+var bakis_hedefi := -PI / 2.0   # kameraya_bak sirasinda donulecek yon
 var paralaks := Vector2.ZERO     # -1..1, bilek egimi (yumusatilmis)
 var paralaks_hedef := Vector2.ZERO
 var egim_taban := Vector3.ZERO
+var egim_paralaks := Vector2.ZERO    # yercekiminden (yavas, egim)
+var jiro_paralaks := Vector2.ZERO    # jiroskoptan (aninda, sonra soner)
+var calkanti := 0.0                  # 0..1 saat sallaninca su calkalanir
+var _yuzey_calkanti := -1.0
 var paralaks_tabanlari := {}     # dugum -> asil konum
 var kameraya_bak := 0.0          # cam parlayinca balik kameraya (cama) bakar
 var cama_geliyor := false
@@ -172,6 +177,12 @@ func _process(delta: float) -> void:
 
 
 func _kostigi_guncelle(delta: float) -> void:
+	# Calkanti yavasca sakinlesir; yuzey dalgasi ve bitki sallanmasi buyur.
+	calkanti = move_toward(calkanti, 0.0, delta * 0.35)
+	if absf(calkanti - _yuzey_calkanti) > 0.01:
+		_yuzey_calkanti = calkanti
+		su_yuzeyi_malzeme.set_shader_parameter("guc", 0.0045 * (1.0 + 2.5 * calkanti))
+		su_yuzeyi_malzeme.set_shader_parameter("sallanma", 0.016 * (1.0 + 1.5 * calkanti))
 	# Bilek donusunden gelen akinti bitkileri o yone eger.
 	if absf(su_akintisi - bitki_akintisi) > 0.01:
 		bitki_akintisi = su_akintisi
@@ -325,6 +336,8 @@ func _baliga_mi(konum: Vector2) -> bool:
 func _kabar(sure: float) -> void:
 	kabarma_beklemesi = sure + 2.0
 	balik_3d.kabar(sure)
+	# Gercek betta kabarirken yan doner: yuzgecler gorunsun diye 3/4 yan aci
+	bakis_hedefi = -PI / 2.0 + (1.15 if cos(sapma) >= 0.0 else -1.15)
 	kameraya_bak = sure
 	bekleme_suresi = sure
 	Ses.cal("kabarma")
@@ -402,6 +415,7 @@ func _yem_birak(ekran_konumu: Vector2) -> void:
 	balik_hedefi = yem_hedefi
 	bekleme_suresi = 0.0
 	kameraya_bak = 0.0
+	bakis_hedefi = -PI / 2.0
 	Ses.cal("yem")
 	_yemi_gorsellestir()
 
@@ -419,7 +433,7 @@ func _baligi_hareket_ettir(delta: float, uyku := false) -> void:
 			# Cama donup bakar (yuzu kameraya: sapma = -PI/2).
 			kameraya_bak -= delta
 			var donus := DONUS_HIZI * delta
-			sapma = wrapf(sapma + clampf(wrapf(-PI / 2.0 - sapma, -PI, PI), -donus, donus), -PI, PI)
+			sapma = wrapf(sapma + clampf(wrapf(bakis_hedefi - sapma, -PI, PI), -donus, donus), -PI, PI)
 			egim = move_toward(egim, 0.0, donus)
 			yon = Vector3(cos(egim) * cos(sapma), sin(egim), cos(egim) * sin(sapma))
 		return
@@ -586,7 +600,20 @@ func _sensoru_kontrol_et(delta: float) -> void:
 			egim_taban = yercekimi
 		egim_taban = egim_taban.lerp(yercekimi, minf(1.0, aralik * 0.25))
 		var fark := (yercekimi - egim_taban) / 2.5
-		paralaks_hedef = Vector2(-fark.x, fark.y).limit_length(1.0)
+		egim_paralaks = Vector2(-fark.x, fark.y).limit_length(1.0)
+
+	# --- Jiroskop: bilegi cevirdigin anda katmanlar o yone kayar, sonra soner.
+	# Kucuk titremeler (0,15 rad/sn alti) yok sayilir.
+	var j := Input.get_gyroscope()
+	var jv := Vector2(j.y, j.x)
+	if jv.length() > 0.15:
+		jiro_paralaks += jv * aralik * 0.9
+	jiro_paralaks = jiro_paralaks.lerp(Vector2.ZERO, minf(1.0, aralik * 1.6)).limit_length(1.0)
+	paralaks_hedef = (egim_paralaks + jiro_paralaks).limit_length(1.0)
+
+	# --- Calkanti: saat sallaninca su yuzeyi ve bitkiler daha cok dalgalanir
+	if absf(hareket_siddeti) > 0.05:
+		calkanti = maxf(calkanti, clampf(hareket_siddeti * 1.4, 0.0, 1.0))
 
 	# --- Jiroskop: bilek donusu suyu hafifce iter ---
 	var jiro := Input.get_gyroscope()

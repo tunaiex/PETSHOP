@@ -121,7 +121,7 @@ Balığa dokununca (ya da kirli cam tamamen temizlenince yansımasını görüp)
 
 ## Parallax (derinlik)
 
-Bilek eğimi (yerçekimi sensörü) katmanları farklı miktarda kaydırır: arka plan 0,35, kabarcıklar 0,4, kayalar 0,65, kum üstü (yem, inci) 0,8, ön otlar 0,95, cam yosunu 1,15; balık derinliğine göre 0,95–0,4 (en fazla 7 px). Taban yavaşça uyum sağlar: sabit tutuşta görüntü ortada durur, yalnızca eğme hareketi derinlik hissi verir. Arka plan, kayalar ve ön otlar kameraya **görünmez** (ama gölge düşürür) şekilde ayrıca render edildi; kaydırınca çift kenar oluşmaz. Gerçek saatte eksen yönü ters çıkarsa `_sensoru_kontrol_et` → `Vector2(-fark.x, fark.y)` işaretleri değiştirilmeli. Bilgisayarda ok tuşları eğimi taklit eder.
+Bilek hareketi katmanları farklı miktarda kaydırır. İki sensör birlikte çalışır: **yerçekimi** (bileği eğme, yavaş) ve **jiroskop** (bileği çevirdiğin anda hızlı tepki, sonra yumuşakça söner; 0,15 rad/sn altı titremeler yok sayılır). Ayrıca **saati sallamak** (ivmeölçer) suyu çalkalar: yüzey dalgaları ~3,5 kat, bitki sallanması ~2,5 kat büyür, birkaç saniyede sakinleşir. Katman çarpanları: arka plan 0,35, kabarcıklar 0,4, kayalar 0,65, kum üstü (yem, inci) 0,8, ön otlar 0,95, cam yosunu 1,15; balık derinliğine göre 0,95–0,4 (en fazla 7 px). Taban yavaşça uyum sağlar: sabit tutuşta görüntü ortada durur, yalnızca eğme hareketi derinlik hissi verir. Arka plan, kayalar ve ön otlar kameraya **görünmez** (ama gölge düşürür) şekilde ayrıca render edildi; kaydırınca çift kenar oluşmaz. Gerçek saatte eksen yönü ters çıkarsa `_sensoru_kontrol_et` → `Vector2(-fark.x, fark.y)` işaretleri değiştirilmeli. Bilgisayarda ok tuşları eğimi taklit eder.
 
 ## Sesler (`betikler/ses.gd`, autoload `Ses`)
 

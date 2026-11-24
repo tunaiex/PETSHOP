@@ -7,6 +7,7 @@ enum Katman { YUVA, ARTIK, SU, YOSUN, INCI, RENK }
 
 const MERKEZ := Vector2(240.0, 240.0)
 const KABARCIK := preload("res://gorseller/kabarcik.png")
+const YOSUN := preload("res://gorseller/yosun.png")  # 3 cesit leke, yan yana 96 px
 @onready var bakim: Node = get_parent()
 
 
@@ -99,20 +100,14 @@ func _su() -> void:
 
 
 func _yosun() -> void:
-	# Cam yuzeyindeki yosun lekeleri: duzensiz, ust uste binen yumusak daireler.
+	# Cam yuzeyindeki yosun lekeleri: her leke tek doku cizimi (saat icin ucuz).
 	for leke in bakim.lekeler:
 		var l: float = leke["l"]
 		if l < 0.03:
 			continue
-		var rng := RandomNumberGenerator.new()
-		rng.seed = leke["t"]
-		var p: Vector2 = leke["p"]
-		var r: float = leke["r"] * (0.55 + 0.45 * l)
-		var renk := Color(0.27, 0.42, 0.10, 0.30 * l)
-		draw_circle(p, r, renk)
-		for i in 7:
-			var q := p + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(0.2, 0.85) * r
-			draw_circle(q, r * rng.randf_range(0.25, 0.55), Color(0.25, 0.40, 0.09, 0.32 * l))
-		for i in 6:
-			var q := p + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(0.0, 1.0) * r
-			draw_circle(q, rng.randf_range(0.8, 2.0), Color(0.17, 0.27, 0.05, 0.55 * l))
+		var t: int = leke["t"]
+		var r: float = leke["r"] * (0.55 + 0.45 * l) * 1.25
+		var kaynak := Rect2((t % 3) * 96, 0, 96, 96)
+		draw_set_transform(leke["p"], float(t % 628) / 100.0, Vector2.ONE)
+		draw_texture_rect_region(YOSUN, Rect2(-r, -r, r * 2.0, r * 2.0), kaynak, Color(1, 1, 1, minf(1.0, l * 1.3)))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

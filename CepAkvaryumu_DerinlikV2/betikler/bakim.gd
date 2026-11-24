@@ -30,7 +30,7 @@ const INCI_EN_FAZLA := 3             # kumda ayni anda en fazla 3 inci
 const KUM_MASKESI := preload("res://gorseller/kum_maske.png")
 # Magaza: urun -> inci fiyati
 const FIYAT := {"super_yem": 1, "filtre": 5, "renk_1": 3, "renk_2": 3}
-const RENK_ADLARI := ["Normal", "Gün batımı", "Ay ışığı"]
+const RENK_ADLARI := ["Normal ışık", "Gün batımı ışığı", "Ay ışığı"]
 
 var su := 85.0                       # 100 = berrak, 0 = cok kirli
 var su_gorunen := 85.0               # su degisiminde yumusak gecis icin
@@ -123,7 +123,7 @@ func zamani_ilerlet(saniye: float, tokluk: float) -> void:
 			inci_birikim -= 1.0
 			inciler.append(_kumda_yer())
 		if inciler.size() >= INCI_EN_FAZLA:
-			inci_birikim = minf(inci_birikim, 1.0)
+			inci_birikim = 0.0  # kum doluyken birikmez; toplayinca yenisi 2 saat sonra
 	degisti.emit()
 
 
