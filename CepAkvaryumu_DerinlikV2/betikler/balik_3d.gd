@@ -38,6 +38,8 @@ const YUZME_KEMIKLERI := [
 	["Bone.047", "S", 0.0, -1], ["Bone.049", "S", 0.0, -1], ["Bone.051", "S", 0.0, -1],
 ]
 const SOLUNGAC_ACI := 0.55        # kabarmada solungac kapagi acilmasi (rad)
+# Yuzgec koku kemikleri: olcekleri yuzgec uzunlugunu belirler (yetiskin formu)
+const YUZGEC_KOKLERI := ["Bone.020", "Bone.039", "Bone.042", "Bone.044", "Bone.018", "Bone.019", "Bone.033", "Bone.034"]
 # Balik Sprite2D olcekleri bu dahili boyuta gore ayarlanmisti.
 const REFERANS_BOYUT := 192.0
 
@@ -53,6 +55,9 @@ var yalpa := 0.0
 var bukulme := 0.0
 var onceki_sapma := 0.0
 var kabarma := 0.0               # 0..1, yumusak gecis
+var yuzgec_olcek := 1.0          # yetiskin formu: kisa 0.8 .. halfmoon 1.15 (yavru 0.6)
+var kapali := 0.0                # 0..1 hasta / mutsuz balik yuzgeclerini kapatir
+var yuzgec_kokleri: Array[int] = []
 var kabarma_suresi := 0.0
 var malzemeler: Array[BaseMaterial3D] = []
 var etkin := true
@@ -114,6 +119,10 @@ func _ready() -> void:
 		if no >= 0:
 			yuzme.append([no, e[1], e[2], e[3]])
 	yuzme.sort_custom(func(a, b): return a[0] < b[0])  # ebeveyn kemik once islenir
+	for ad in YUZGEC_KOKLERI:
+		var no := iskelet.find_bone(ad + "_Armature")
+		if no >= 0:
+			yuzgec_kokleri.append(no)
 	# Dunya "yukari" ekseni iskelet uzayinda (bukulme bunun etrafinda olur)
 	bukulme_ekseni = (iskelet.global_transform.basis.inverse() * Vector3.UP).normalized()
 	yanal_eksen = (iskelet.global_transform.basis.inverse() * Vector3.RIGHT).normalized()
@@ -194,7 +203,8 @@ func guncelle(yon: Vector3, hiz: float, delta: float, uyuyor: bool) -> void:
 	kabarma_suresi = maxf(0.0, kabarma_suresi - delta)
 	kabarma = move_toward(kabarma, 1.0 if kabarma_suresi > 0.0 else 0.0, delta * 3.5)
 	var kb := kabarma * kabarma * (3.0 - 2.0 * kabarma)  # yumusak gecis
-	genlik *= 1.0 - 0.75 * kb
+	genlik *= (1.0 - 0.75 * kb) * (1.0 - 0.5 * kapali)
+	kurek *= 1.0 - 0.5 * kapali
 	pivot.scale = Vector3.ONE * (1.0 + 0.06 * kb)
 
 	# Bas, kuyruga ters yonde hafifce salinir (tum govde degil, pivot).
@@ -215,10 +225,10 @@ func guncelle(yon: Vector3, hiz: float, delta: float, uyuyor: bool) -> void:
 				yana = genlik * (0.5 + 1.0 * s_) * sin(faz - s_ * 4.0) + bukulme
 			"K":
 				yana = genlik * 1.0 * sin(faz - s_ * 4.0)
-				dikey = yelpaze * (isaret * 0.10 * sin(faz * 0.45 - s_ * 2.0) + 0.06 * sin(faz * 0.8 - s_ * 3.0)) - isaret * 0.30 * kb
+				dikey = yelpaze * (isaret * 0.10 * sin(faz * 0.45 - s_ * 2.0) + 0.06 * sin(faz * 0.8 - s_ * 3.0)) - isaret * 0.30 * kb + isaret * 0.28 * kapali
 			"Y":
 				yana = genlik * 0.9 * sin(faz - s_ * 4.0 - 0.6)
-				dikey = yelpaze * isaret * 0.13 * sin(faz * 0.6 - s_ * 5.0) - isaret * 0.45 * kb
+				dikey = yelpaze * isaret * 0.13 * sin(faz * 0.6 - s_ * 5.0) - isaret * 0.45 * kb + isaret * 0.40 * kapali
 			"P":
 				yana = kurek * sin(kurek_faz) * (1.0 - 0.5 * kb) - isaret * 0.5 * kb
 				dikey = isaret * kurek * 0.6 * sin(kurek_faz + 1.2)
@@ -229,6 +239,10 @@ func guncelle(yon: Vector3, hiz: float, delta: float, uyuyor: bool) -> void:
 				# Solungac: kabarirken disa acilir, titrer
 				yana = -isaret * SOLUNGAC_ACI * kb * (1.0 + 0.08 * sin(faz * 6.0))
 		_kemigi_dondur(e[0], yana, dikey)
+	# Yuzgec uzunlugu (form / evre): kok kemik olcegi tum zinciri buyutur
+	if absf(yuzgec_olcek - 1.0) > 0.01:
+		for no in yuzgec_kokleri:
+			iskelet.set_bone_pose_scale(no, Vector3.ONE * yuzgec_olcek)
 
 
 ## Kemigi balik govdesine gore dondurur: yana (yukari eksen) ve dikey (yan eksen).

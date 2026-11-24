@@ -100,13 +100,38 @@ Hepsi gerçek zamanla ilerler, uygulama kapalıyken de hesaplanır.
 - Her 15 saniyede, yem yendiğinde, ışık değiştiğinde, ekran kapandığında / uygulama arka plana geçtiğinde ve geri tuşunda kaydeder.
 - Yeniden açılınca geçen gerçek süre tokluğa yansıtılır (1 saat kapalı kaldıysa ~33 puan düşer).
 
+## Sanal evcil hayvan (`betikler/yasam.gd`)
+
+Tamagotchi mantığı. **Ölüm yok:** bakılmazsa balık hastalanır ve "kritik" olur (dipte halsiz yatar), ilaç ve bakımla toparlanır. Ömür ~1 ay, gerçek zamanla.
+
+| Evre | Gün | Görünüm |
+|---|---|---|
+| Yumurta | ilk 3 dk | Köpük yuvasında sarımsı yumurtalar; balık yok |
+| Yavru | 0–2 | Küçük (%45–60), soluk, kısa yüzgeç. Çıkınca **isim seçilir** (16 isim, çerçeveyle) |
+| Genç | 2–7 | Büyür (%85'e), renkler gelişir |
+| Yetişkin | 7–24 | **Formu bakıma bağlı:** yavru+genç dönemde ≤2 bakım hatası → **Halfmoon** (uzun yüzgeç, canlı renk), ≤6 → Normal, fazlası → Kısa yüzgeçli (soluk, tam boya ulaşamaz) |
+| Yaşlı | 24+ | Biraz solar. Mutlu + köpük yuvası dolu → **yumurta bırakır** → Menü > **Yeni nesil** |
+
+- **İhtiyaçlar / çağrı:** aç, su kirli, hasta, gece ışık açık (uykusu var), dipte ≥3 kaka, cam kirli, 24 saattir oynanmadı. Yeni ihtiyaç doğunca saat titrer ve balığın üstünde ikonlu balon belirir. **15 dk'dan uzun** ilgilenilmeyen ihtiyaç = **bakım hatası** (uygulama kapalıyken başlayanlar da sayılır).
+- **Kaka:** balık yedikten 20–40 dk sonra dipte belirir, suyu kirletir; dokununca temizlenir.
+- **Hastalık:** kirli su (<25) ya da uzun açlık risk biriktirir. Hasta balık: beyaz benekler (ich), kapalı yüzgeçler, solgun, yavaş. Menünün ilk öğesi **İlaç ver** olur; 6 saatte iyileştirir. Sağlık: hasta / aç / kirli suda düşer, iyi bakımda yükselir.
+- **Gece (22:00–08:00, saatin kendi saati):** ışık açıksa uykusu gelir (mutsuz + çağrı); kapalıysa mutlu.
+- **Oyun (Menü > Oyna):** 20 sn ışık kovalama; parmağını gezdir ya da dokun, balık kırmızı ışık noktasını kovalar. Yakaladıkça nokta zıplar, puan ve mutluluk; sonunda kabarır.
+- **Nesiller:** yavru ebeveynin renk tonunu (shader ile ton kayması) ve yüzgeç uzunluk eğilimini kısmen taşır. **Soy ağacı** menüde (isim, kaç gün yaşadı, formu).
+- **Yokken özeti:** uygulama 30 dk'dan uzun kapalı kaldıysa açılışta üstte özet şeridi ("5 saat yokken geçti. Mavi: aç, su kirli").
+- Eski kayıt (bu sistemden önce) iyi bakılmış yetişkin "Mavi" olarak devam eder; yeni kurulum yumurtadan başlar.
+- Görünüm: `golgeler/balik.gdshader` (doygunluk, parlaklık, ton, beyaz benek) + `balik_3d.gd` (yüzgeç kök kemik ölçeği, kapalı yüzgeç).
+- Bilgisayarda `T` tuşu 1 saat ileri sarar (yaşam saati dahil).
+
 ## Menü (`betikler/menu.gd`)
 
 Küçük yuvarlak ekran için tek öğe ortada büyük gösterilir; çerçeve / kenar kaydırma ile değişir, dokunma seçer, 8 sn dokunulmazsa kapanır.
 
+- (Gerekirse en başta) **İlaç ver** · **Yeni nesil**
 - **Su değiştir** — temiz su, dipteki yem alınır (önceki "tam tur / 12 tık" jesti yerine)
 - **Mağaza** — incilerle: Süper yem (1: tam tok, +mutluluk), Filtre (5: su 2 kat geç kirlenir), Gün batımı ışığı (3), Ay ışığı (3), Normal ışık
-- **Bilgi** — yaş (gün), boy, mutluluk, tokluk, su, cam, inci, filtre
+- **Bilgi** — isim, nesil, evre ve form, yaş, boy, sağlık, mutluluk, tokluk, su, cam, inci, bakım hatası
+- **Oyna** — ışık kovalama oyunu · **Soy ağacı** — önceki nesiller
 - **Ses** aç/kapat · **Grafik** Düşük/Dengeli/Yüksek · **FPS göstergesi** (FPS, kare süresi, çizim çağrısı, bellek — saatte performans ölçmek için) · **Kapat**
 
 ## Kabarma (flare)
@@ -116,6 +141,7 @@ Balığa dokununca (ya da kirli cam tamamen temizlenince yansımasını görüp)
 ## İlerleme (`betikler/bakim.gd`)
 
 - **Büyüme:** yeni oyun yavru balıkla başlar (boy %65); iyi bakılırsa (mutluluk >50, tokluk >30) 7 günde tam boya ulaşır. Eski kayıtlarda balık zaten yetişkindir.
+- **Büyüme** artık yaşam evrelerine bağlı (yukarıda).
 - **İnci:** mutluluk ≥70 iken her 2 saatte kumda bir inci belirir (en fazla 3, ara ara parıldar). Dokununca toplanır. Uygulama kapalıyken de birikir.
 - **Mağaza** menüden. Işık renkleri tüm sahneyi renklendirir (HUD hariç).
 

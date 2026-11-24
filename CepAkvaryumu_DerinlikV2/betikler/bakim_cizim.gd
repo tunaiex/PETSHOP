@@ -65,6 +65,15 @@ func _renk() -> void:
 
 
 func _yuva() -> void:
+	# Yumurtalar (yeni oyun / yeni nesil): kopuklerin arasinda sarimsi taneler
+	var yasam := bakim.get_node_or_null("../Yasam")
+	if yasam and (yasam.evre == yasam.Evre.YUMURTA or yasam.yumurta_var):
+		var r2 := RandomNumberGenerator.new()
+		r2.seed = 99
+		for i in 14:
+			var e := Vector2(330.0, 108.0) + Vector2(r2.randf_range(-22.0, 22.0), r2.randf_range(-3.0, 5.0))
+			draw_circle(e, 2.3, Color(0.98, 0.93, 0.75, 0.95))
+			draw_circle(e + Vector2(-0.6, -0.6), 0.8, Color(1, 1, 1, 0.9))
 	# Yuzeyde, sag ustte kopuk kabarciklarindan olusan yuva.
 	var adet := int(bakim.yuva * 46.0)
 	if adet <= 0:

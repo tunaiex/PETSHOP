@@ -113,9 +113,7 @@ func zamani_ilerlet(saniye: float, tokluk: float) -> void:
 	elif mutluluk < 50.0:
 		yuva = maxf(0.0, yuva - saniye / (YUVA_SONME_SAAT * SAAT))
 
-	# Buyume: yalnizca iyi bakilirken (mutlu ve ac degil)
-	if mutluluk > 50.0 and tokluk > 30.0:
-		boy = minf(1.0, boy + saniye / (BUYUME_GUN * 24.0 * SAAT) * (1.0 - YAVRU_BOY))
+	# Buyume artik yasam evrelerine bagli (yasam.gd -> boy)
 	# Inci: mutlu akvaryumda zamanla kumda belirir
 	if mutluluk >= 70.0:
 		inci_birikim += saniye / (INCI_SAAT * SAAT)
@@ -129,6 +127,9 @@ func zamani_ilerlet(saniye: float, tokluk: float) -> void:
 
 func mutluluk_hedefi(tokluk: float) -> float:
 	var h := 0.40 * tokluk + 0.35 * su + 0.25 * cam_temizligi() * 100.0
+	var yasam := get_node_or_null("../Yasam")
+	if yasam:
+		h += yasam.mutluluk_duzeltme()  # hastalik, uyku, kaka, oyun
 	if tokluk < 15.0:
 		h = minf(h, 30.0)  # cok acken baska hicbir sey mutlu etmez
 	return clampf(h, 0.0, 100.0)

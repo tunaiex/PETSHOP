@@ -37,7 +37,7 @@ const PARALAKS_PX := 7.0      # bilek egiminde en one katmanin en fazla kaymasi
 # Katman -> parallax carpani (uzak 0.35 ... cam 1.15). Balik derinligine gore.
 const PARALAKS_KATMANLAR := {"ArkaPlan": 0.35, "Baloncuklar": 0.4, "Bakim/Yuva": 0.35,
 	"Tas": 0.65, "Kutuk": 0.65, "Bakim/Artiklar": 0.8, "Bakim/Inciler": 0.8,
-	"Yapraklar": 0.95, "Bakim/CamYosunu": 1.15}
+	"Yapraklar": 0.95, "Bakim/CamYosunu": 1.15, "Yasam/Kakalar": 0.8}
 
 @onready var balik: Sprite2D = $Balik
 @onready var balik_3d: SubViewport = $Balik3D
@@ -45,6 +45,7 @@ const PARALAKS_KATMANLAR := {"ArkaPlan": 0.35, "Baloncuklar": 0.4, "Bakim/Yuva":
 @onready var gosterge: Node2D = $Gosterge
 @onready var bakim: Node = $Bakim
 @onready var menu: Node2D = $Menu
+@onready var yasam: Node = $Yasam
 @onready var arka_plan: Sprite2D = $ArkaPlan
 @onready var su_yuzeyi_malzeme: ShaderMaterial = $ArkaPlan.material
 var kostik_gucu := 0.35          # ekrandaki guc; hedefe yumusakca yaklasir
@@ -82,6 +83,10 @@ var kenarda_kaldi := false
 var yol := PackedVector2Array()  # parmagin izi (cam silme icin)
 var silme_aktif := false
 var kabarma_beklemesi := 0.0
+var oyun_kalan := 0.0            # parmak kovalama oyunu (sn)
+var oyun_noktasi := Vector2(240.0, 220.0)
+var oyun_skor := 0
+const OYUN_SURE := 20.0
 var bakis_hedefi := -PI / 2.0   # kameraya_bak sirasinda donulecek yon
 var paralaks := Vector2.ZERO     # -1..1, bilek egimi (yumusatilmis)
 var paralaks_hedef := Vector2.ZERO
@@ -111,6 +116,9 @@ var hazir := false
 func _ready() -> void:
 	randomize()
 	balik.texture = balik_3d.get_texture()
+	yasam.olay.connect(gosterge.bildirim)
+	yasam.cagri.connect(func(_ad): _titret(90))
+	yasam.evre_degisti.connect(_gorunumu_uygula)
 	_kaydi_yukle()
 	_zaman_farkini_uygula()
 	_fps_ayarla()
@@ -122,6 +130,7 @@ func _ready() -> void:
 		paralaks_tabanlari[d] = d.position
 	# Arka plan kayinca yuvarlak ekranin kenarinda bosluk olmasin
 	arka_plan.scale = Vector2.ONE * 1.02
+	_gorunumu_uygula()
 	_baligi_gorsellestir()
 	_yemi_gorsellestir()
 	hazir = true
@@ -156,10 +165,20 @@ func _process(delta: float) -> void:
 	kabarma_beklemesi = maxf(0.0, kabarma_beklemesi - delta)
 	_paralaksi_uygula(delta)
 
-	if isik_acik:
+	balik.visible = yasam.evre != yasam.Evre.YUMURTA
+	if yasam.isim_bekliyor and not menu.acik:
+		menu.isim_sec_ac()
+	if oyun_kalan > 0.0:
+		oyun_kalan -= delta
+		if oyun_kalan <= 0.0:
+			_oyun_bitti()
+
+	if not balik.visible:
+		bakim.kare(delta)  # yumurta: balik yok, yalnizca akvaryum
+	elif isik_acik:
 		yuzme_zamani += delta
 		_sensoru_kontrol_et(delta)
-		_baligi_hareket_ettir(delta)
+		_baligi_hareket_ettir(delta, yasam.kritik())
 		bakim.kare(delta)
 		_baligi_gorsellestir()
 		_yemi_gorsellestir()
@@ -167,7 +186,8 @@ func _process(delta: float) -> void:
 		# Isik kapali: balik yavasca bitkilerin yanina gidip orada uyur.
 		_baligi_hareket_ettir(delta, true)
 		_baligi_gorsellestir()
-	balik_3d.guncelle(yon, anlik_hiz, delta, not isik_acik)
+	if balik.visible:
+		balik_3d.guncelle(yon, anlik_hiz, delta, not isik_acik)
 
 	kayit_sayaci += delta
 	if kayit_sayaci >= 15.0:
@@ -246,6 +266,7 @@ func _input(olay: InputEvent) -> void:
 		elif olay.keycode == KEY_T and not OS.has_feature("mobile"):
 			# Test: 1 saat ileri sar
 			son_hesaplama_zamani -= 3600.0
+			yasam.zaman_kaydir += 3600.0
 			_zaman_farkini_uygula()
 
 
@@ -283,6 +304,8 @@ func _surukle(konum: Vector2) -> void:
 			var y := signi(adim - daire_bildirilen)
 			daire_bildirilen += y
 			_menu_adimi(y)
+	elif oyun_kalan > 0.0:
+		oyun_noktasi = _ekranda_sinirla(konum, 140.0)
 	elif not kenarda_kaldi and not menu.acik:
 		# Cam silme: parmak 60 px'i gecince parmagin altindaki yosun canli silinir.
 		if silme_aktif:
@@ -305,6 +328,9 @@ func _basmayi_bitir(konum: Vector2) -> void:
 		if not kaydirildi:
 			menu.sec()  # menude dokunma = sec
 		return
+	if oyun_kalan > 0.0:
+		oyun_noktasi = _ekranda_sinirla(konum, 140.0)
+		return
 	if silme_aktif or konum.distance_to(baslangic) >= KAYDIRMA_ESIGI:
 		if not silme_aktif:
 			_cam_sil(yol)  # kenarda baslayip duz giden kaydirma
@@ -316,10 +342,21 @@ func _basmayi_bitir(konum: Vector2) -> void:
 
 ## Kisa dokunma: once inci, sonra balik (kabarma), yoksa yem.
 func _dokunma(konum: Vector2) -> void:
+	if oyun_kalan > 0.0:
+		oyun_noktasi = _ekranda_sinirla(konum, 140.0)
+		return
 	if bakim.inci_topla(konum):
 		Ses.cal("inci")
 		_titret(40)
 		_kaydet()
+		return
+	if yasam.kaka_temizle(konum):
+		Ses.cal("silme")
+		_titret(25)
+		_kaydet()
+		return
+	if not balik.visible:
+		gosterge.bildirim("Yumurtalar çatlamak üzere...")
 		return
 	if isik_acik and not yem_var and kabarma_beklemesi <= 0.0 and _baliga_mi(konum):
 		_kabar(2.5)
@@ -355,6 +392,15 @@ func _menu_komutu(komut: String) -> void:
 		"su":
 			_su_degistir()
 			menu.kapat()
+		"ilac":
+			yasam.ilac_ver()
+			menu.kapat()
+		"nesil":
+			yasam.yeni_nesil()
+			menu.kapat()
+		"oyna":
+			menu.kapat()
+			_oyun_baslat()
 		"super_yem":
 			if bakim.satin_al("super_yem"):
 				aclik = 100.0
@@ -372,6 +418,41 @@ func _menu_komutu(komut: String) -> void:
 				Ses.cal("inci")
 				_titret(40)
 	_kaydet()
+
+
+func _oyun_baslat() -> void:
+	if not balik.visible or not isik_acik:
+		gosterge.bildirim("Şimdi oynayamaz")
+		return
+	if yasam.kritik():
+		gosterge.bildirim("%s oynayamayacak kadar halsiz" % yasam.isim)
+		return
+	yem_var = false
+	oyun_kalan = OYUN_SURE
+	oyun_skor = 0
+	oyun_noktasi = MERKEZ + Vector2(60.0, -30.0)
+	gosterge.bildirim("Parmağını gezdir, %s ışığı kovalasın!" % yasam.isim)
+
+
+func _oyun_bitti() -> void:
+	oyun_kalan = 0.0
+	yasam.oyun_oynandi()
+	bakim.mutluluk = minf(100.0, bakim.mutluluk + 5.0)
+	gosterge.bildirim("Harika! %d kez yakaladı" % oyun_skor)
+	_kabar(2.5)
+	_kaydet()
+
+
+## Yasam durumuna gore baligin gorunusu (form, renk, hastalik, yuzgecler).
+func _gorunumu_uygula() -> void:
+	var g: Dictionary = yasam.gorunum()
+	balik_3d.yuzgec_olcek = g["yuzgec"]
+	balik_3d.kapali = g["kapali"]
+	var m := balik.material as ShaderMaterial
+	m.set_shader_parameter("doygunluk", g["doygunluk"])
+	m.set_shader_parameter("parlaklik", g["parlaklik"])
+	m.set_shader_parameter("ton", g["ton"])
+	m.set_shader_parameter("benek", g["benek"])
 
 
 func _su_degistir() -> void:
@@ -423,6 +504,10 @@ func _yem_birak(ekran_konumu: Vector2) -> void:
 func _baligi_hareket_ettir(delta: float, uyku := false) -> void:
 	irkilme_beklemesi = maxf(0.0, irkilme_beklemesi - delta)
 	anlik_hiz = lerpf(anlik_hiz, 0.0, minf(1.0, delta * 3.0))
+	if oyun_kalan > 0.0 and not uyku:
+		balik_hedefi = _sinirla(Vector3(oyun_noktasi.x - 240.0, oyun_noktasi.y - 240.0, 0.22))
+		bekleme_suresi = 0.0
+		kameraya_bak = 0.0
 	if uyku:
 		balik_hedefi = UYKU_NOKTASI
 		cama_geliyor = false
@@ -443,6 +528,14 @@ func _baligi_hareket_ettir(delta: float, uyku := false) -> void:
 	var mesafe: float = fark.length()
 	if uyku and mesafe < 8.0:
 		return  # uyku yerine vardi; yuzgecler yavasca kipirdar
+	if mesafe < 10.0 and oyun_kalan > 0.0:
+		# Oyunda noktayi yakaladi: puan, nokta baska yere ziplar
+		oyun_skor += 1
+		bakim.mutluluk = minf(100.0, bakim.mutluluk + 1.5)
+		Ses.cal("tik")
+		_titret(20)
+		oyun_noktasi = MERKEZ + Vector2(randf_range(-120.0, 120.0), randf_range(-90.0, 70.0))
+		return
 	if mesafe < 8.0:
 		if cama_geliyor and not yem_var:
 			cama_geliyor = false
@@ -451,6 +544,7 @@ func _baligi_hareket_ettir(delta: float, uyku := false) -> void:
 		if yem_var:
 			yem_var = false
 			aclik = clampf(aclik + 22.0, 0.0, 100.0)
+			yasam.yem_yendi()
 			_titret(60)
 			_kaydet()
 		else:
@@ -470,12 +564,14 @@ func _baligi_hareket_ettir(delta: float, uyku := false) -> void:
 
 	# Hedefe bakmiyorsa yavaslar (yerinde doner), boylece hedefin etrafinda
 	# daire cizip durmaz.
-	var hiz := 66.0 if yem_var else 32.0
+	var hiz := 66.0 if (yem_var or oyun_kalan > 0.0) else 32.0
 	hiz += 7.0 * hareket_siddeti
 	if uyku:
 		hiz = 16.0
-	elif not yem_var:
+	elif not yem_var and oyun_kalan <= 0.0:
 		hiz *= bakim.hiz_carpani()  # mutsuz balik durgun yuzer
+	if yasam.hasta:
+		hiz *= 0.6
 	hiz *= clampf(yon.dot(fark / mesafe), 0.12, 1.0)
 	var yol := minf(mesafe, hiz * delta)
 	var adim := Vector3(yon.x, yon.y, yon.z / DERINLIK_PIKSEL) * yol
@@ -656,12 +752,37 @@ func _zaman_farkini_uygula() -> void:
 		var gecen_saniye := maxf(0.0, simdi - son_hesaplama_zamani)
 		aclik = clampf(aclik - gecen_saniye * 100.0 / TOKLUK_BITIS_SANIYE, 0.0, 100.0)
 		bakim.zamani_ilerlet(gecen_saniye, aclik)
+		yasam.ilerlet(gecen_saniye)
+		if gecen_saniye > 1800.0:
+			_yokken_ozeti(gecen_saniye)
+		elif hazir:
+			_gorunumu_uygula()
 	son_hesaplama_zamani = simdi
+
+
+func _yokken_ozeti(gecen: float) -> void:
+	if yasam.evre == yasam.Evre.YUMURTA:
+		return
+	var saat := int(gecen / 3600.0)
+	var sure := ("%d saat" % saat) if saat >= 1 else ("%d dk" % int(gecen / 60.0))
+	var ist: Array = yasam.ihtiyaclar()
+	var metin := "%s yokken geçti. " % sure
+	if ist.is_empty():
+		metin += "%s iyi görünüyor" % yasam.isim
+	else:
+		var l := []
+		for ad in ist.slice(0, 2):
+			l.append(yasam.IHTIYAC_METNI[ad])
+		metin += "%s: %s" % [yasam.isim, ", ".join(l)]
+	gosterge.bildirim(metin)
+	if hazir:
+		_gorunumu_uygula()
 
 
 func _kaydi_yukle() -> void:
 	son_hesaplama_zamani = Time.get_unix_time_from_system()
 	if not FileAccess.file_exists(KAYIT_YOLU):
+		yasam.yeni_oyun()  # ilk acilis: yumurtadan baslar
 		return
 	var dosya := FileAccess.open(KAYIT_YOLU, FileAccess.READ)
 	if dosya == null:
@@ -677,6 +798,12 @@ func _kaydi_yukle() -> void:
 				balik_konumu = _sinirla(Vector3(float(dizi[0]), float(dizi[1]), float(dizi[2])))
 		if kayit.get("bakim") is Dictionary:
 			bakim.yukle(kayit["bakim"])
+		if kayit.get("yasam") is Dictionary:
+			yasam.yukle(kayit["yasam"])
+		else:
+			yasam.eski_kayittan()  # yasam sistemi oncesi kayit: yetiskin balik
+	else:
+		yasam.yeni_oyun()
 
 
 func _kaydet() -> void:
@@ -691,7 +818,8 @@ func _kaydet() -> void:
 		"isik_acik": isik_acik,
 		"zaman": son_hesaplama_zamani,
 		"balik_konumu": [balik_konumu.x, balik_konumu.y, balik_konumu.z],
-		"bakim": bakim.sozluk()
+		"bakim": bakim.sozluk(),
+		"yasam": yasam.sozluk()
 	}))
 	dosya.flush()
 

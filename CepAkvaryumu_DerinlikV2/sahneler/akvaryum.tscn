@@ -1,4 +1,4 @@
-[gd_scene load_steps=20 format=3]
+[gd_scene load_steps=22 format=3]
 
 [ext_resource type="Script" path="res://betikler/akvaryum.gd" id="1_root"]
 [ext_resource type="Texture2D" path="res://gorseller/arka_plan.webp" id="2_bg"]
@@ -16,14 +16,16 @@
 [ext_resource type="Texture2D" path="res://gorseller/kum_maske.png" id="14_sandmask"]
 [ext_resource type="Texture2D" path="res://gorseller/kostik.png" id="15_caustictex"]
 [ext_resource type="Script" path="res://betikler/menu.gd" id="16_menu"]
+[ext_resource type="Shader" path="res://golgeler/balik.gdshader" id="17_fishshader"]
+[ext_resource type="Script" path="res://betikler/yasam.gd" id="18_life"]
 
 [sub_resource type="ShaderMaterial" id="su_yuzeyi"]
 shader = ExtResource("13_surface")
 shader_parameter/kostik_dokusu = ExtResource("15_caustictex")
 shader_parameter/kum_maskesi = ExtResource("14_sandmask")
 
-[sub_resource type="CanvasItemMaterial" id="premult"]
-blend_mode = 4
+[sub_resource type="ShaderMaterial" id="balik_malzeme"]
+shader = ExtResource("17_fishshader")
 
 [node name="Akvaryum" type="Node2D"]
 script = ExtResource("1_root")
@@ -46,7 +48,7 @@ render_target_update_mode = 4
 script = ExtResource("3_fish3d")
 
 [node name="Balik" type="Sprite2D" parent="."]
-material = SubResource("premult")
+material = SubResource("balik_malzeme")
 position = Vector2(240, 220)
 
 [node name="Yem" type="Node2D" parent="."]
@@ -100,6 +102,9 @@ katman = 5
 z_index = 35
 script = ExtResource("12_caredraw")
 katman = 3
+
+[node name="Yasam" type="Node" parent="."]
+script = ExtResource("18_life")
 
 [node name="YuvarlakMaske" type="Sprite2D" parent="."]
 z_index = 40
