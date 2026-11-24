@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://betikler/akvaryum.gd" id="1_root"]
 [ext_resource type="Texture2D" path="res://gorseller/arka_plan.webp" id="2_bg"]
@@ -10,6 +10,8 @@
 [ext_resource type="Script" path="res://betikler/gosterge.gd" id="8_hud"]
 [ext_resource type="Script" path="res://betikler/baloncuklar.gd" id="9_bub"]
 [ext_resource type="Script" path="res://betikler/yem.gd" id="10_food"]
+[ext_resource type="Script" path="res://betikler/bakim.gd" id="11_care"]
+[ext_resource type="Script" path="res://betikler/bakim_cizim.gd" id="12_caredraw"]
 
 [sub_resource type="CanvasItemMaterial" id="premult"]
 blend_mode = 4
@@ -55,6 +57,29 @@ texture = ExtResource("5_wood")
 z_index = 5
 position = Vector2(240, 240)
 texture = ExtResource("6_plants")
+
+[node name="Bakim" type="Node" parent="."]
+script = ExtResource("11_care")
+
+[node name="Yuva" type="Node2D" parent="Bakim"]
+z_index = -5
+script = ExtResource("12_caredraw")
+katman = 0
+
+[node name="Artiklar" type="Node2D" parent="Bakim"]
+z_index = 6
+script = ExtResource("12_caredraw")
+katman = 1
+
+[node name="SuRengi" type="Node2D" parent="Bakim"]
+z_index = 30
+script = ExtResource("12_caredraw")
+katman = 2
+
+[node name="CamYosunu" type="Node2D" parent="Bakim"]
+z_index = 35
+script = ExtResource("12_caredraw")
+katman = 3
 
 [node name="YuvarlakMaske" type="Sprite2D" parent="."]
 z_index = 40

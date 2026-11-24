@@ -49,16 +49,34 @@ Akvaryum (Node2D) - betikler/akvaryum.gd
 
 | Hareket | Sonuç |
 |---|---|
-| Kısa dokunuş (18 px'ten az kayma, 1 sn'den kısa) | Yem |
-| 1 sn basılı tutma (parmak kaymadan) | Işık aç / kapat |
-| 60 px'ten uzun kaydırma | Cam temizleme (`cam_temizlendi` sinyali; kirlenme mekaniği henüz yok) |
-| Kenar halkasında (merkezden ≥165 px) dairesel kaydırma, ≥45° | Her 30° = 1 menü adımı (`menu_adimi` sinyali; menü henüz yok) |
-| Galaxy Watch çerçevesi (döner/dokunmatik bezel) | Fare tekerleği olarak gelir → `menu_adimi` |
+| Kısa dokunuş (18 px'ten az kayma, 1 sn'den kısa) | Yem (balık çok tokken yemez, yem dibe çöker) |
+| 1 sn basılı tutma (parmak kaymadan) | Işık aç / kapat (kapalıyken balık bitkilerin yanında uyur) |
+| 60 px'ten uzun kaydırma | Camı siler: parmağın geçtiği yerdeki yosun canlı olarak silinir |
+| Kenar halkasında (merkezden ≥165 px) **tam tur** dairesel kaydırma | Su değişimi (ilerleme kenarda mavi halka olarak görünür) |
+| Galaxy Watch çerçevesini 4 sn içinde **12 tık** çevirmek | Su değişimi |
 | 18–60 px arası kayma | Bilinçli olarak hiçbir şey |
 
 - Dairesel kaydırma cam temizleme sayılmaz; basılı tutarken parmak kayarsa ışık değişmez.
 - Geri tuşu sistem davranışını korur (önce kaydeder, sonra uygulama kapanır). Home tuşuna dokunulmaz.
 - Dokunma alanı merkezden 236 px'e kadar (neredeyse tüm ekran).
+
+### Bakım: yosun, su, mutluluk (`betikler/bakim.gd`)
+
+Hepsi gerçek zamanla ilerler, uygulama kapalıyken de hesaplanır.
+
+| | Nasıl kötüleşir | Nasıl düzelir | Nerede görünür |
+|---|---|---|---|
+| **Tokluk** | 3 saatte 100 → 0 | Yem | Sol yay (turuncu) |
+| **Su kalitesi** | 48 saatte 100 → 0; dipteki her yem tanesi saatte +6 puan kirletir | Su değişimi (tam tur / 12 tık) | Sağ yay (mavi → sarı-yeşil), suyun rengi bulanıklaşır |
+| **Cam yosunu** | 12 leke, her biri 8–20 saatte dolar; kirli suda 1,7 kat hızlı | Kaydırarak silme (her geçiş −%55) | Camda yeşil lekeler (en önde) |
+| **Mutluluk** | %40 tokluk + %35 su + %25 cam; çok açken en fazla 30 | Üçüne bakmak (hedefe ~30 dk'da yaklaşır) | Balığın davranışı (gösterge yok) |
+
+- **Tok balık** (tokluk ≥95) yemi yemez; yem dibe çöker, 3 saatte çözünür ve o sürede suyu kirletir. Su değişimi dipteki yemi de alır.
+- **Mutlu balık** (≥75) yüzeyde (sağ üst) **köpük yuvası** yapar (6 saatte tamamlanır) ve arada yuvasına uğrar. Mutluluk 50'nin altına düşerse yuva 3 saatte söner.
+- **Mutsuz balık** yavaş yüzer (%60'a kadar), solgun görünür, 35'in altında dibe yakın durur.
+- **Kirli cam tamamen temizlenince** balık cama gelip 3 saniye sana bakar (kendi yansımasını görür).
+- Işık kapanınca suda kalan yem dibe çöker.
+- Bilgisayarda test: `T` tuşu zamanı 1 saat ileri sarar.
 
 ### Sensörler (yalnızca Android, yalnızca ışık açık ve uygulama ön plandayken)
 
@@ -182,7 +200,8 @@ adb install -r ~/storage/downloads/CepAkvaryumu_saat.apk
 - Watch 8'de 3B balığın pil / ısınma testi (gerekirse `Balik3D` boyutu 160'a, MSAA kapalıya düşürülebilir)
 - Su temizliği, mutluluk, cam silme, para, yeni balık, satın alma, büyüme
 - Akvaryumun sürekli açık saat kadranı/arka plan hizmeti olarak çalışması
-- Cam kirlenmesi (jest hazır), dairesel menü ve grafik profili seçme ekranı (jest / çerçeve hazır)
+- Menü ve grafik profili seçme ekranı (`menu_adimi` sinyali hazır)
+- Kabarma (flare), iskeletle kapalı yüzgeç ve yaprakta uzanma animasyonları
 - Wear OS "ambient" (her zaman açık ekran) modu: ekran kararınca oyun durur, bilinçli olarak
 - Google Play yayını için release imzası (şu an debug imzalı)
 
