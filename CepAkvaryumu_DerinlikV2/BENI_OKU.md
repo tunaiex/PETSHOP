@@ -216,7 +216,7 @@ python3 -I ../araclar/arka_plan_katmanla.py RENDER gorseller/
 
 `export_presets.cfg` → **"Galaxy Watch (Android)"**:
 
-- Gradle'sız export (Godot'un hazır şablonu), yalnızca `arm64-v8a`.
+- Gradle'sız export (Godot'un hazır şablonu), **evrensel APK: `armeabi-v7a` (32 bit ARM) + `arm64-v8a` (64 bit ARM)**. Galaxy Watch'ların Wear OS'u işlemci 64 bit olsa bile 32 bit uygulama ortamıyla gelebilir; yalnızca `arm64-v8a` içeren APK orada `INSTALL_FAILED_NO_MATCHING_ABIS` verir. Saatin desteklediği ABI'ler: `adb shell getprop ro.product.cpu.abilist`.
 - Paket: `com.tuni.cepakvaryumu`, saat menüsündeki ad: **Cep Akvaryumu**, sürüm 1.0 (kod 1).
 - Simge: `simge.png` (192) + uyarlanabilir simge `android_simge/on.png` / `arka.png` (432).
 - İzin: yalnızca `VIBRATE`. İnternet, depolama vb. istenmez. Tam ekran (immersive).
@@ -237,7 +237,7 @@ Ubuntu/Debian: `sudo apt install openjdk-17-jdk-headless apktool aapt zipalign a
 
 1. Godot'ta **Editor > Editor Settings > Export > Android**: Java SDK yolu, Android SDK yolu ve debug keystore tanımla.
 2. Terminalde: `GODOT=/yol/Godot_v4.3-stable_linux.x86_64 ./android_arac/apk_olustur.sh`
-3. Çıktı: `../build/CepAkvaryumu_saat.apk` (debug imzalı, ~27 MB).
+3. Çıktı: `../build/CepAkvaryumu_saat.apk` (debug imzalı, v2 + v3 imza, iki mimari ile ~52 MB).
 
 Wear OS eklemelerini istemezsen Godot'ta **Project > Export > Galaxy Watch (Android) > Export Project** de olur: o APK da saate yüklenir, sadece "saat uygulaması" ve "standalone" olarak işaretlenmez.
 

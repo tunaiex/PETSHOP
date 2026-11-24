@@ -91,8 +91,11 @@ def main():
             calistir("apktool", "b", "--use-aapt2", "-o", imzasiz, acik)
         hizali = os.path.join(gecici, "hizali.apk")
         calistir("zipalign", "-p", "-f", "4", imzasiz, hizali)
+        # v2 + v3 imza: Android 11+ (Wear OS 3+) ve Wear Installer gibi araclarla uyumlu
         calistir("apksigner", "sign", "--ks", a.keystore, "--ks-pass", "pass:" + a.ks_pass,
-                 "--ks-key-alias", a.alias, "--key-pass", "pass:" + a.ks_pass, "--out", a.cikti, hizali)
+                 "--ks-key-alias", a.alias, "--key-pass", "pass:" + a.ks_pass,
+                 "--v1-signing-enabled", "false", "--v2-signing-enabled", "true", "--v3-signing-enabled", "true",
+                 "--out", a.cikti, hizali)
         calistir("apksigner", "verify", "--verbose", a.cikti)
     finally:
         shutil.rmtree(gecici, ignore_errors=True)
