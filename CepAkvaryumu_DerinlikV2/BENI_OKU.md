@@ -120,6 +120,7 @@ Tamagotchi mantığı. **Ölüm yok:** bakılmazsa balık hastalanır ve "kritik
 - **Nesiller:** yavru ebeveynin renk tonunu (shader ile ton kayması) ve yüzgeç uzunluk eğilimini kısmen taşır. **Soy ağacı** menüde (isim, kaç gün yaşadı, formu).
 - **Yokken özeti:** uygulama 30 dk'dan uzun kapalı kaldıysa açılışta üstte özet şeridi ("5 saat yokken geçti. Mavi: aç, su kirli").
 - Eski kayıt (bu sistemden önce) iyi bakılmış yetişkin "Mavi" olarak devam eder; yeni kurulum yumurtadan başlar.
+- **Çerçeve payı:** 3B balık kare bir dahili görüntüde çizilir. Halfmoon yüzgeçleri, kabarma ve 3/4 dönüşte balık genişlediği için kamera %45 geri çekildi, dahili çözünürlük de aynı oranda arttı (Dengeli 232 px). Balık ekranda aynı boyda ve netlikte kalır, kenarlardan kesilmez (`balik_3d.gd` → `CERCEVE`). Kenarlarda yumuşak solma güvenlik payıdır. Test: `araclar/godot_testleri/kesik.gd`, 64 uç pozda kenara değen piksel 0 (eski ayarda 9/64).
 - Görünüm: `golgeler/balik.gdshader` (doygunluk, parlaklık, ton, beyaz benek) + `balik_3d.gd` (yüzgeç kök kemik ölçeği, kapalı yüzgeç).
 - Bilgisayarda `T` tuşu 1 saat ileri sarar (yaşam saati dahil).
 
@@ -190,7 +191,7 @@ python3 -I ../araclar/arka_plan_katmanla.py RENDER gorseller/
 |---|---|---|---|
 | FPS (ışık açık) | 24 | 30 | 30 |
 | FPS (ışık kapalı) | 15 | 20 | 24 |
-| 3B balık dahili çözünürlüğü | 128 px | 160 px | 224 px |
+| 3B balık dahili çözünürlüğü (çerçeve payı ×1,45 dahil) | 184 px | 232 px | 328 px |
 | 3B kenar yumuşatma (MSAA) | yok | 2x | 4x |
 | Pul kabartması (normal harita) + AO dokusu | kapalı | açık | açık |
 | Kabarcık sayısı | 8 | 14 | 18 |

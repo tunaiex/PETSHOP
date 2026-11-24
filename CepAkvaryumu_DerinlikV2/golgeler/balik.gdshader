@@ -39,5 +39,9 @@ void fragment() {
 			r = mix(r, vec3(1.0), smoothstep(0.24, 0.10, d) * benek);
 		}
 	}
-	COLOR = vec4(clamp(r, 0.0, 1.5) * c.a, c.a) * COLOR;
+	// Guvenlik: dahili kare goruntunun kenarlarina dogru yumusak solma;
+	// uc pozlarda bile duz / kare kesik gorunmez.
+	vec2 k = min(UV, 1.0 - UV);
+	float kenar = smoothstep(0.0, 0.06, min(k.x, k.y));
+	COLOR = vec4(clamp(r, 0.0, 1.5) * c.a, c.a) * COLOR * kenar;
 }

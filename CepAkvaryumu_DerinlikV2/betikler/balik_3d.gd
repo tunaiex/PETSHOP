@@ -42,6 +42,10 @@ const SOLUNGAC_ACI := 0.55        # kabarmada solungac kapagi acilmasi (rad)
 const YUZGEC_KOKLERI := ["Bone.020", "Bone.039", "Bone.042", "Bone.044", "Bone.018", "Bone.019", "Bone.033", "Bone.034"]
 # Balik Sprite2D olcekleri bu dahili boyuta gore ayarlanmisti.
 const REFERANS_BOYUT := 192.0
+# Cerceve payi: Halfmoon yuzgecleri, kabarma ve 3/4 donuste balik genisler;
+# kamera bu kadar geri cekilir, dahili cozunurluk da ayni oranda artar
+# (balik ekranda ayni boyda ve netlikte kalir, kenarlardan kesilmez).
+const CERCEVE := 1.45
 
 var pivot := Node3D.new()
 var iskelet: Skeleton3D
@@ -88,7 +92,7 @@ func _ready() -> void:
 
 	var kamera := Camera3D.new()
 	kamera.fov = 25.0
-	kamera.position = Vector3(0.0, 0.0, 2.9)
+	kamera.position = Vector3(0.0, 0.0, 2.9 * CERCEVE)
 	add_child(kamera)
 
 	add_child(pivot)
@@ -138,7 +142,8 @@ func _ready() -> void:
 
 func _profili_uygula() -> void:
 	var boyut: int = Ayarlar.deger("balik_boyutu")
-	size = Vector2i(boyut, boyut)
+	var b := int(round(boyut * CERCEVE / 8.0)) * 8
+	size = Vector2i(b, b)
 	msaa_3d = Ayarlar.deger("msaa")
 	var normal: bool = Ayarlar.deger("normal_harita")
 	for m in malzemeler:
@@ -151,7 +156,7 @@ func _profili_uygula() -> void:
 ## Balik Sprite2D'sinin olcegi bununla carpilir (dahili cozunurluk ne olursa
 ## olsun balik ekranda ayni boyda gorunur).
 func olcek_carpani() -> float:
-	return REFERANS_BOYUT / float(size.x)
+	return REFERANS_BOYUT * CERCEVE / float(size.x)
 
 
 ## Kabarma (flare): solungaclar ve yuzgecler sonuna kadar acilir.

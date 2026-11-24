@@ -365,7 +365,7 @@ func _dokunma(konum: Vector2) -> void:
 
 
 func _baliga_mi(konum: Vector2) -> bool:
-	var yaricap := balik_3d.size.x * balik.scale.x * 0.32
+	var yaricap: float = balik_3d.size.x * balik.scale.x * 0.32 / balik_3d.CERCEVE
 	return konum.distance_to(balik.position) < maxf(yaricap, 26.0)
 
 
