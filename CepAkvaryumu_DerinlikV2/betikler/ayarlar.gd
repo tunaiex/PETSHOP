@@ -15,10 +15,11 @@ const ADLAR := ["Dusuk", "Dengeli", "Yuksek"]
 # balik_boyutu: 3B baligin cizildigi dahili cozunurluk (piksel, kare)
 # msaa: 3B kenar yumusatma; normal_harita: balik pullarinin kabartma dokusu
 # baloncuk: ayni anda gorunen kabarcik sayisi
+# su_dalgasi: ust su yuzeyinin dalgalanmasi (Dusuk'te kapali: resim duragan)
 const DEGERLER := {
-	Profil.DUSUK: {"fps": 24, "gece_fps": 15, "balik_boyutu": 128, "msaa": Viewport.MSAA_DISABLED, "normal_harita": false, "baloncuk": 6},
-	Profil.DENGELI: {"fps": 30, "gece_fps": 20, "balik_boyutu": 160, "msaa": Viewport.MSAA_2X, "normal_harita": true, "baloncuk": 9},
-	Profil.YUKSEK: {"fps": 30, "gece_fps": 24, "balik_boyutu": 224, "msaa": Viewport.MSAA_4X, "normal_harita": true, "baloncuk": 11},
+	Profil.DUSUK: {"fps": 24, "gece_fps": 15, "balik_boyutu": 128, "msaa": Viewport.MSAA_DISABLED, "normal_harita": false, "baloncuk": 8, "su_dalgasi": false},
+	Profil.DENGELI: {"fps": 30, "gece_fps": 20, "balik_boyutu": 160, "msaa": Viewport.MSAA_2X, "normal_harita": true, "baloncuk": 14, "su_dalgasi": true},
+	Profil.YUKSEK: {"fps": 30, "gece_fps": 24, "balik_boyutu": 224, "msaa": Viewport.MSAA_4X, "normal_harita": true, "baloncuk": 18, "su_dalgasi": true},
 }
 
 var profil: int = Profil.DENGELI

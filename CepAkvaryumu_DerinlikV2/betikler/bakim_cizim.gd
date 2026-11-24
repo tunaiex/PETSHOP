@@ -6,6 +6,7 @@ enum Katman { YUVA, ARTIK, SU, YOSUN }
 @export var katman: Katman = Katman.YOSUN
 
 const MERKEZ := Vector2(240.0, 240.0)
+const KABARCIK := preload("res://gorseller/kabarcik.png")
 @onready var bakim: Node = get_parent()
 
 
@@ -30,10 +31,8 @@ func _yuva() -> void:
 	rng.seed = 4242
 	for i in adet:
 		var p := Vector2(330.0, 104.0) + Vector2(rng.randf_range(-38.0, 38.0) * (0.4 + 0.6 * bakim.yuva), rng.randf_range(-5.0, 6.0))
-		var r := rng.randf_range(1.8, 4.2)
-		draw_circle(p, r, Color(0.85, 0.97, 1.0, 0.16))
-		draw_arc(p, r, 0.0, TAU, 10, Color(0.9, 1.0, 1.0, 0.55), 0.9, true)
-		draw_circle(p + Vector2(-r * 0.3, -r * 0.35), 0.7, Color(1, 1, 1, 0.7))
+		var r := rng.randf_range(1.6, 3.8)
+		draw_texture_rect(KABARCIK, Rect2(p - Vector2(r, r), Vector2(r, r) * 2.0), false, Color(1, 1, 1, 0.9))
 
 
 func _artiklar() -> void:

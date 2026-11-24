@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource type="Script" path="res://betikler/akvaryum.gd" id="1_root"]
 [ext_resource type="Texture2D" path="res://gorseller/arka_plan.webp" id="2_bg"]
@@ -12,6 +12,10 @@
 [ext_resource type="Script" path="res://betikler/yem.gd" id="10_food"]
 [ext_resource type="Script" path="res://betikler/bakim.gd" id="11_care"]
 [ext_resource type="Script" path="res://betikler/bakim_cizim.gd" id="12_caredraw"]
+[ext_resource type="Shader" path="res://golgeler/su_yuzeyi.gdshader" id="13_surface"]
+
+[sub_resource type="ShaderMaterial" id="su_yuzeyi"]
+shader = ExtResource("13_surface")
 
 [sub_resource type="CanvasItemMaterial" id="premult"]
 blend_mode = 4
@@ -21,6 +25,7 @@ script = ExtResource("1_root")
 
 [node name="ArkaPlan" type="Sprite2D" parent="."]
 z_index = -10
+material = SubResource("su_yuzeyi")
 position = Vector2(240, 240)
 texture = ExtResource("2_bg")
 

@@ -38,6 +38,8 @@ const CERCEVE_SU_TIK := 12     # cerceveyi bu kadar tik cevirmek = su degisimi
 @onready var yem_gorseli: Node2D = $Yem
 @onready var gosterge: Node2D = $Gosterge
 @onready var bakim: Node = $Bakim
+@onready var arka_plan: Sprite2D = $ArkaPlan
+@onready var su_yuzeyi_malzeme: Material = $ArkaPlan.material
 
 # Tokluk: 100 = tok, 0 = ac. Onceki projenin 'aclik' kaydi da okunur.
 var aclik := 85.0
@@ -152,6 +154,7 @@ func _process(delta: float) -> void:
 
 
 func _fps_ayarla() -> void:
+	arka_plan.material = su_yuzeyi_malzeme if bool(Ayarlar.deger("su_dalgasi")) else null
 	Engine.max_fps = int(Ayarlar.deger("fps" if isik_acik else "gece_fps"))
 
 
