@@ -26,9 +26,9 @@ func _initialize():
 	b.inci_sayisi = 20
 	await cerceve(2); await tikla(Vector2(240, 240))
 	await cerceve(2)
-	kontrol("Magazada lepistes ogesi", menu._ogeler()[menu.secim][0] == "lepistes")
-	for i in 5: await tikla(Vector2(240, 240))
-	kontrol("4 lepistes alinir, 5.'si alinmaz (sayi=%d, inci=%d)" % [L.suru.size(), b.inci_sayisi], L.suru.size() == 4 and b.inci_sayisi == 8 and b.lepistes_sayisi == 4)
+	kontrol("Magazada disi ogesi", menu._ogeler()[menu.secim][0] == "disi")
+	for i in 3: await tikla(Vector2(240, 240))
+	kontrol("Tek disi alinir, ikincisi alinmaz (sayi=%d, inci=%d)" % [L.suru.size(), b.inci_sayisi], L.suru.size() == 1 and b.inci_sayisi == 15 and b.lepistes_sayisi == 1)
 	menu.kapat()
 	var k0: Vector3 = L.suru[0]["konum"]
 	await bekle(90)
@@ -36,12 +36,15 @@ func _initialize():
 	kontrol("Lepistesler yuzer (%.0f px)" % Vector2(k1.x - k0.x, k1.y - k0.y).length(), Vector2(k1.x - k0.x, k1.y - k0.y).length() > 10.0)
 	var tonlar := []
 	for l in L.suru: tonlar.append(snappedf(l["ton"], 0.01))
-	kontrol("Her biri farkli renkte %s" % [tonlar], tonlar.size() == 4)
+	await bekle(200)
+	var dk: Vector3 = L.suru[0]["konum"]
+	var uz := Vector2(dk.x - s.balik_konumu.x, dk.y - s.balik_konumu.y).length()
+	kontrol("Disi esinin yakininda dolasir (%.0f px)" % uz, uz < 140.0)
 	root.get_texture().get_image().save_png("res://arac/lepistes_ekran.png")
 	# Biyolojik yuk: 4 lepistes ile su 24 saatte daha cok kirlenir
 	b.su = 100.0
 	s.son_hesaplama_zamani -= 24 * 3600.0; s._zaman_farkini_uygula()
-	kontrol("4 lepistesle su 24 saatte ~74 puan kirlenir (%.1f)" % (100.0 - b.su), absf((100.0 - b.su) - 74.0) < 6.0)
+	kontrol("Disi ile su 24 saatte ~56 puan kirlenir (%.1f)" % (100.0 - b.su), absf((100.0 - b.su) - 56.0) < 4.0)
 	b.su = 100.0; s.aclik = 100.0; y.hasta = false; y.hastalik_riski = 0.0
 	# Yem: suru yeme toplanir
 	s.kabarma_beklemesi = 99.0
@@ -51,19 +54,19 @@ func _initialize():
 	for l in L.suru:
 		var k: Vector3 = l["konum"]
 		if Vector2(k.x - s.yem_hedefi.x, k.y - s.yem_hedefi.y).length() < 90.0: yakin += 1
-	kontrol("Yem dusunce lepistesler toplanir (%d/4 yakin)" % yakin, yakin >= 2)
+	kontrol("Yem dusunce disi de yeme gelir", yakin >= 1)
 	# Betta yakinina gelen lepistese kabarir
 	await bekle(120)
 	s.yem_var = false
 	L.kabarma_beklemesi = 0.0; s.kabarma_beklemesi = 0.0
 	L.suru[0]["konum"] = s.balik_konumu + Vector3(15, 0, 0)
 	await bekle(3)
-	kontrol("Betta yakindaki lepistese kabarir", s.get_node("Balik3D").kabarma_suresi > 0.0)
+	kontrol("Betta yakindaki disiye kabarir (kur)", s.get_node("Balik3D").kabarma_suresi > 0.0)
 	# Kayit
 	s._kaydet()
 	s.hazir = false; s.queue_free(); await bekle(2)
 	var s2 = load("res://sahneler/akvaryum.tscn").instantiate(); root.add_child(s2); await bekle(3)
 	var L2 = s2.get_node("Lepistesler")
-	kontrol("Lepistesler kayittan gelir (%d, ayni renkler)" % L2.suru.size(), L2.suru.size() == 4 and absf(L2.suru[0]["ton"] - tonlar[0]) < 0.01)
+	kontrol("Disi kayittan gelir (%d, ayni renk)" % L2.suru.size(), L2.suru.size() == 1 and absf(L2.suru[0]["ton"] - tonlar[0]) < 0.01)
 	for r in sonuc: print(r)
 	quit()

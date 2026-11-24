@@ -20,7 +20,7 @@ Gercekci arka plan (gorseller/arka_plan.webp, tas_on.png, kutuk_on.png, yaprak_o
 Sesler (sesler/*.wav): ../araclar/ses_uret.py ile kodla uretildi (sentez); kayit veya disaridan dosya yok.
 Inci, kabarcik ve kostik dokulari (gorseller/kabarcik.png, kostik.png): kodla uretildi.
 
-Lepistes modeli (modeller/lepistes.glb):
+Disi balik modeli (modeller/lepistes.glb, lepistes / guppy):
   Kaynak: kullanicinin yukledigi guppy-fish.zip (Guppy.blend, 2018). Pakette lisans
   dosyasi YOK; yazar / lisans kullanici tarafindan dogrulanmali (or. Sketchfab sayfasi).
   CC-BY ise yazar adi buraya ve oyun icine eklenmeli; NC ise ticari yayinda kullanilmamali.

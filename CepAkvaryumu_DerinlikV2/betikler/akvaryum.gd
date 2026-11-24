@@ -84,6 +84,9 @@ var kenarda_kaldi := false
 var yol := PackedVector2Array()  # parmagin izi (cam silme icin)
 var silme_aktif := false
 var kabarma_beklemesi := 0.0
+var ureme_kalan := 0.0           # kur yapma + sarilma sahnesi (sn)
+const UREME_SURE := 26.0
+const YUVA_ALTI := Vector3(88.0, -88.0, 0.35)   # kopuk yuvasinin hemen alti
 var oyun_kalan := 0.0            # parmak kovalama oyunu (sn)
 var oyun_noktasi := Vector2(240.0, 220.0)
 var oyun_skor := 0
@@ -120,6 +123,7 @@ func _ready() -> void:
 	yasam.olay.connect(gosterge.bildirim)
 	yasam.cagri.connect(func(_ad): _titret(90))
 	yasam.evre_degisti.connect(_gorunumu_uygula)
+	yasam.ureme_hazir.connect(_ureme_baslat)
 	_kaydi_yukle()
 	_zaman_farkini_uygula()
 	_fps_ayarla()
@@ -173,6 +177,8 @@ func _process(delta: float) -> void:
 		oyun_kalan -= delta
 		if oyun_kalan <= 0.0:
 			_oyun_bitti()
+	if ureme_kalan > 0.0:
+		_ureme_kare(delta)
 
 	if not balik.visible:
 		bakim.kare(delta)  # yumurta: balik yok, yalnizca akvaryum
@@ -398,7 +404,10 @@ func _menu_komutu(komut: String) -> void:
 			yasam.ilac_ver()
 			menu.kapat()
 		"nesil":
-			yasam.yeni_nesil()
+			var anne := INF
+			if not lepistesler.suru.is_empty():
+				anne = lepistesler.suru[0]["ton"]
+			yasam.yeni_nesil(anne)
 			menu.kapat()
 		"oyna":
 			menu.kapat()
@@ -408,12 +417,12 @@ func _menu_komutu(komut: String) -> void:
 				aclik = 100.0
 				Ses.cal("inci")
 				_titret(40)
-		"lepistes":
-			if bakim.satin_al("lepistes"):
+		"disi":
+			if bakim.satin_al("disi"):
 				lepistesler.ekle()
 				Ses.cal("inci")
 				_titret(40)
-				gosterge.bildirim("Yeni bir lepistes akvaryuma katıldı!")
+				gosterge.bildirim("%s artık yalnız değil: bir dişi geldi!" % yasam.isim)
 		"filtre":
 			if bakim.satin_al("filtre"):
 				Ses.cal("inci")
@@ -426,6 +435,58 @@ func _menu_komutu(komut: String) -> void:
 				Ses.cal("inci")
 				_titret(40)
 	_kaydet()
+
+
+## Ureme: kur yapma (erkek disiye kabarir, onu yuvaya yonlendirir) ->
+## sarilma (yuvanin altinda erkek govdesini disinin etrafinda C seklinde
+## kivirir) -> yuvada yumurtalar.
+func _ureme_baslat() -> void:
+	if ureme_kalan > 0.0 or not odakta or not isik_acik or not balik.visible or menu.acik or oyun_kalan > 0.0:
+		return
+	ureme_kalan = UREME_SURE
+	yem_var = false
+	gosterge.bildirim("%s dişiye kur yapıyor!" % yasam.isim)
+
+
+func _ureme_hedefi() -> Vector3:
+	var gecen := UREME_SURE - ureme_kalan
+	if gecen < 12.0 and not lepistesler.suru.is_empty():
+		var d: Vector3 = lepistesler.suru[0]["konum"]
+		return _sinirla(d + Vector3(-35.0, 0.0, 0.0))   # disinin yaninda gosteris
+	return YUVA_ALTI
+
+
+func _ureme_kare(delta: float) -> void:
+	ureme_kalan -= delta
+	var gecen := UREME_SURE - ureme_kalan
+	if lepistesler.suru.is_empty() or not isik_acik:
+		_ureme_bitir(false)
+		return
+	# Kur: birkac kez kabarir; disi yavasca yuvaya dogru
+	if gecen < 12.0:
+		lepistesler.ureme_hedefi = YUVA_ALTI + Vector3(10.0, 25.0, 0.02) if gecen > 5.0 else Vector3.INF
+		if balik_3d.kabarma_suresi <= 0.0 and fmod(gecen, 3.5) < delta * 1.5:
+			balik_3d.kabar(1.6)
+		return
+	# Yuvanin alti: ikisi bulusunca sarilma
+	lepistesler.ureme_hedefi = YUVA_ALTI + Vector3(6.0, 6.0, 0.02)
+	var d: Vector3 = lepistesler.suru[0]["konum"]
+	var yakin := Vector2(d.x - balik_konumu.x, d.y - balik_konumu.y).length() < 30.0
+	balik_3d.sarilma = move_toward(balik_3d.sarilma, 1.0 if yakin else 0.0, delta * 1.5)
+	if ureme_kalan <= 0.0:
+		_ureme_bitir(true)
+
+
+func _ureme_bitir(basarili: bool) -> void:
+	ureme_kalan = 0.0
+	balik_3d.sarilma = 0.0
+	lepistesler.ureme_hedefi = Vector3.INF
+	if basarili:
+		yasam.yumurta_birak()
+		bakim.yuva = 1.0
+		Ses.cal("inci")
+		_titret(120)
+		_kaydet()
 
 
 func _oyun_baslat() -> void:
@@ -516,6 +577,10 @@ func _baligi_hareket_ettir(delta: float, uyku := false) -> void:
 		balik_hedefi = _sinirla(Vector3(oyun_noktasi.x - 240.0, oyun_noktasi.y - 240.0, 0.22))
 		bekleme_suresi = 0.0
 		kameraya_bak = 0.0
+	if ureme_kalan > 0.0 and not uyku:
+		balik_hedefi = _ureme_hedefi()
+		if kameraya_bak <= 0.0:
+			bekleme_suresi = 0.0
 	if uyku:
 		balik_hedefi = UYKU_NOKTASI
 		cama_geliyor = false

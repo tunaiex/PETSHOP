@@ -110,7 +110,7 @@ Tamagotchi mantığı. **Ölüm yok:** bakılmazsa balık hastalanır ve "kritik
 | Yavru | 0–2 | Küçük (%45–60), soluk, kısa yüzgeç. Çıkınca **isim seçilir** (16 isim, çerçeveyle) |
 | Genç | 2–7 | Büyür (%85'e), renkler gelişir |
 | Yetişkin | 7–24 | **Formu bakıma bağlı:** yavru+genç dönemde ≤2 bakım hatası → **Halfmoon** (uzun yüzgeç, canlı renk), ≤6 → Normal, fazlası → Kısa yüzgeçli (soluk, tam boya ulaşamaz) |
-| Yaşlı | 24+ | Biraz solar. Mutlu + köpük yuvası dolu → **yumurta bırakır** → Menü > **Yeni nesil** |
+| Yaşlı | 24+ | Biraz solar. Üreme yetişkinlikten itibaren dişiyle mümkün (aşağıda) |
 
 - **İhtiyaçlar / çağrı:** aç, su kirli, hasta, gece ışık açık (uykusu var), dipte ≥3 kaka, cam kirli, 24 saattir oynanmadı. Yeni ihtiyaç doğunca saat titrer ve balığın üstünde ikonlu balon belirir. **15 dk'dan uzun** ilgilenilmeyen ihtiyaç = **bakım hatası** (uygulama kapalıyken başlayanlar da sayılır).
 - **Kaka:** balık yedikten 20–40 dk sonra dipte belirir, suyu kirletir; dokununca temizlenir.
@@ -124,13 +124,14 @@ Tamagotchi mantığı. **Ölüm yok:** bakılmazsa balık hastalanır ve "kritik
 - Görünüm: `golgeler/balik.gdshader` (doygunluk, parlaklık, ton, beyaz benek) + `balik_3d.gd` (yüzgeç kök kemik ölçeği, kapalı yüzgeç).
 - Bilgisayarda `T` tuşu 1 saat ileri sarar (yaşam saati dahil).
 
-## Lepistesler (guppy) — akvaryum arkadaşları
+## Dişi balık ve üreme
 
-- Mağazadan **3 inci** ile alınır, en fazla **4**. Her biri rastgele renk tonu (shader ton kayması) ve boyda.
-- Model: rig'li lepistes (`modeller/lepistes.glb`, ~1.500 üçgen, 43 kemik, kendi yüzme animasyonu). Kaynak: kullanıcının yüklediği `guppy-fish.zip` (Guppy.blend, Blender 2.7) → `../araclar/blender/lepistes_donustur.py` ile malzemesi yenilenip GLB'ye aktarıldı, dokusu 512 px'e indirildi.
-- Her lepistes betta gibi kendi küçük 3B görüntüsünde çizilir (Dengeli 116 px, çerçeve payı dahil); derinlik katmanları, parallax ve renk tonu bettayla aynı sistem.
-- Davranış: gevşek sürü halinde gezinir, birbirine çok yaklaşmaz, bettadan kaçar; yem düşünce yeme toplanır (yemi betta yer); gece bitkilerin dibinde dinlenir. Betta yakınına gelen lepistese ara ara **kabarır** (45–90 sn'de bir).
-- **Biyolojik yük:** her lepistes suyu %12 daha hızlı kirletir (4 lepistes: 24 saatte ~74 puan; filtre bunu yarıya indirir).
+- **Dişi:** Mağaza > Dişi balık (**5 inci**, tek). Model: kullanıcının yüklediği rig'li balık (`modeller/lepistes.glb`, ~1.500 üçgen, 43 kemik, kendi yüzme animasyonu; `../araclar/blender/lepistes_donustur.py` ile GLB'ye çevrildi). Biyolojik olarak lepistes modeli; oyunda bettanın eşi. Rastgele renk tonuyla gelir.
+- Eşinin yakınında (40–80 px) dolaşır, yem düşünce yeme gelir, gece bitkilerin dibinde dinlenir. Betta yakınındaki dişiye ara ara **kabarır** (kur).
+- **Üreme koşulları:** erkek yetişkin ya da yaşlı, dişi var, köpük yuvası dolu (≥%80), mutluluk ≥70, hasta / kritik değil, ışık açık, son üremeden **3 gün** geçmiş. Dişi olmadan yumurta olmaz.
+- **Uygulama açıkken canlı sahne (26 sn):** kur — erkek dişinin yanında birkaç kez kabarır, dişi yuvaya doğru yüzer → yuvanın altında **sarılma** — erkek gövdesini dişinin etrafında C şeklinde kıvırır (`balik_3d.gd` → `sarilma`) → yuvada yumurtalar. Uygulama kapalıyken koşullar sağlanırsa açılışta "Yokken yumurta bıraktılar!".
+- **Yeni nesil** (Menü): yavru, anne ile babanın renk tonlarının ortasını (+küçük sapma) taşır; yüzgeç eğilimi babadan.
+- Dişi suyu %12 daha hızlı kirletir (biyolojik yük).
 
 ## Menü (`betikler/menu.gd`)
 
@@ -138,7 +139,7 @@ Küçük yuvarlak ekran için tek öğe ortada büyük gösterilir; çerçeve / 
 
 - (Gerekirse en başta) **İlaç ver** · **Yeni nesil**
 - **Su değiştir** — temiz su, dipteki yem alınır (önceki "tam tur / 12 tık" jesti yerine)
-- **Mağaza** — incilerle: Süper yem (1: tam tok, +mutluluk), Filtre (5: su 2 kat geç kirlenir), Lepistes (3, en fazla 4), Gün batımı ışığı (3), Ay ışığı (3), Normal ışık
+- **Mağaza** — incilerle: Süper yem (1: tam tok, +mutluluk), Filtre (5: su 2 kat geç kirlenir), Dişi balık (5, tek), Gün batımı ışığı (3), Ay ışığı (3), Normal ışık
 - **Bilgi** — isim, nesil, evre ve form, yaş, boy, sağlık, mutluluk, tokluk, su, cam, inci, bakım hatası
 - **Oyna** — ışık kovalama oyunu · **Soy ağacı** — önceki nesiller
 - **Ses** aç/kapat · **Grafik** Düşük/Dengeli/Yüksek · **FPS göstergesi** (FPS, kare süresi, çizim çağrısı, bellek — saatte performans ölçmek için) · **Kapat**

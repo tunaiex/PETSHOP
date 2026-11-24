@@ -29,7 +29,7 @@ const INCI_SAAT := 2.0               # mutluyken her 2 saatte bir inci
 const INCI_EN_FAZLA := 3             # kumda ayni anda en fazla 3 inci
 const KUM_MASKESI := preload("res://gorseller/kum_maske.png")
 # Magaza: urun -> inci fiyati
-const FIYAT := {"super_yem": 1, "filtre": 5, "renk_1": 3, "renk_2": 3, "lepistes": 3}
+const FIYAT := {"super_yem": 1, "filtre": 5, "renk_1": 3, "renk_2": 3, "disi": 5}
 const RENK_ADLARI := ["Normal ışık", "Gün batımı ışığı", "Ay ışığı"]
 
 var su := 85.0                       # 100 = berrak, 0 = cok kirli
@@ -48,7 +48,7 @@ var inci_sayisi := 0
 var inci_birikim := 0.0              # 0..1 bir sonraki inciye ilerleme
 var inciler: Array[Vector2] = []     # kumda duran inciler (ekran konumu)
 var filtre := false
-var lepistes_sayisi := 0             # her lepistes suyu %12 daha hizli kirletir
+var lepistes_sayisi := 0             # disi balik (0/1): suyu %12 daha hizli kirletir
 var isik_rengi := 0                  # 0 normal, 1 gun batimi, 2 ay isigi
 var renkler := [true, false, false]  # alinmis isik renkleri
 var _kum_resmi: Image
@@ -206,7 +206,7 @@ func satin_al(urun: String) -> bool:
 		return false
 	if urun == "filtre" and filtre:
 		return false
-	if urun == "lepistes" and lepistes_sayisi >= 4:
+	if urun == "disi" and lepistes_sayisi >= 1:
 		return false
 	inci_sayisi -= FIYAT[urun]
 	match urun:

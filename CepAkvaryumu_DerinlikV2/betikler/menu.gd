@@ -33,7 +33,7 @@ func _ogeler() -> Array:
 			if yasam.hasta:
 				l.append(["ilac", "İlaç ver", "%s hasta" % yasam.isim if yasam.ilac_kalan <= 0.0 else "İlaç etkili, iyileşiyor"])
 			if yasam.yumurta_var:
-				l.append(["nesil", "Yeni nesil", "Yumurtaları çatlat"])
+				l.append(["nesil", "Yeni nesil", "Yumurtalar çatlasın (yavru, sen bakarsın)"])
 			l.append_array([
 				["su", "Su değiştir", "Temiz su, dipteki yem alınır"],
 				["magaza", "Mağaza", "%d inci" % bakim.inci_sayisi],
@@ -54,7 +54,7 @@ func _ogeler() -> Array:
 		"magaza":
 			var l := [["super_yem", "Süper yem", "1 inci · tam tok, mutlu"]]
 			l.append(["filtre", "Filtre", "Alındı ✓" if bakim.filtre else "5 inci · su 2 kat geç kirlenir"])
-			l.append(["lepistes", "Lepistes", ("%d/4 · 3 inci" % bakim.lepistes_sayisi) if bakim.lepistes_sayisi < 4 else "Akvaryum dolu (4/4)"])
+			l.append(["disi", "Dişi balık", "5 inci · üreme için eş" if bakim.lepistes_sayisi < 1 else "Akvaryumda ✓"])
 			for i in [1, 2]:
 				var ad: String = bakim.RENK_ADLARI[i]
 				if bakim.renkler[i]:

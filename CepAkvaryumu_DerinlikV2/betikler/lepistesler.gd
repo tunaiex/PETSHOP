@@ -1,11 +1,11 @@
 extends Node2D
-## Lepistes (guppy) surusu: bettanin akvaryum arkadaslari. Magazadan incilerle
-## alinir (en fazla 4). Her biri kendi renk tonunda ve boyunda; gevsek bir suru
-## halinde gezinir, yem dusunce toplanir, gece bitkilerin dibinde dinlenir.
-## Betta yakinlarina gelen lepistese ara ara kabarir (gercek betta davranisi).
-## Her lepistes suyu biraz daha hizli kirletir (biyolojik yuk).
+## Disi balik: bettanin esi (model: kullanicinin lepistes modeli). Magazadan
+## incilerle alinir (tek). Bettanin yakininda dolasir, yem dusunce yeme gider,
+## gece bitkilerin dibinde dinlenir. Betta ona ara ara kabarir (kur yapma).
+## Ureme sirasinda akvaryum.gd ureme_hedefi verir: kopuk yuvasinin altina gider.
+## Suyu biraz daha hizli kirletir (biyolojik yuk).
 
-const EN_FAZLA := 4
+const EN_FAZLA := 1
 const LEP3D := preload("res://betikler/lepistes_3d.gd")
 const BALIK_SHADER := preload("res://golgeler/balik.gdshader")
 const DERINLIK_PIKSEL := 260.0
@@ -21,6 +21,7 @@ var suru: Array[Dictionary] = []
 var suru_merkezi := Vector3(40.0, -20.0, 0.5)
 var merkez_hedefi := Vector3(40.0, -20.0, 0.5)
 var kabarma_beklemesi := 30.0
+var ureme_hedefi := Vector3.INF    # ciftlesme sahnesinde gidilecek yer
 
 
 func _ready() -> void:
@@ -70,16 +71,21 @@ func kare(delta: float, isik_acik: bool, uyku_noktasi: Vector3) -> void:
 		return
 	kabarma_beklemesi = maxf(0.0, kabarma_beklemesi - delta)
 	# Suru merkezi yavasca gezinir; yem varsa yeme, gece bitkilere
-	if not isik_acik:
+	if ureme_hedefi != Vector3.INF:
+		merkez_hedefi = ureme_hedefi
+	elif not isik_acik:
 		merkez_hedefi = uyku_noktasi + Vector3(30.0, 5.0, 0.1)
 	elif akvaryum.yem_var:
 		merkez_hedefi = akvaryum.yem_hedefi
-	elif suru_merkezi.distance_to(merkez_hedefi) < 15.0 or randf() < delta * 0.05:
-		merkez_hedefi = akvaryum._sinirla(Vector3(randf_range(-110, 110), randf_range(-70, 60), randf_range(0.2, 0.85)))
+	elif suru_merkezi.distance_to(merkez_hedefi) < 15.0 or randf() < delta * 0.08:
+		# Eşinin yakininda dolasir (40-80 px), arada kendi basina gezinir
+		var b: Vector3 = akvaryum.balik_konumu
+		var a := randf() * TAU
+		merkez_hedefi = akvaryum._sinirla(b + Vector3(cos(a) * randf_range(40, 80), sin(a) * randf_range(25, 50), randf_range(-0.2, 0.2)))
 	var fark := merkez_hedefi - suru_merkezi
 	fark.z *= DERINLIK_PIKSEL
 	if fark.length() > 1.0:
-		var adim := fark.normalized() * minf(fark.length(), 18.0 * delta)
+		var adim := fark.normalized() * minf(fark.length(), (45.0 if ureme_hedefi != Vector3.INF else 18.0) * delta)
 		suru_merkezi += Vector3(adim.x, adim.y, adim.z / DERINLIK_PIKSEL)
 
 	var betta: Vector3 = akvaryum.balik_konumu
@@ -97,6 +103,8 @@ func _hareket(l: Dictionary, i: int, delta: float, isik_acik: bool, betta: Vecto
 	var hk: Vector3 = l["hedef"]
 	if (l["bekle"] <= 0.0 and Vector2(k.x - hk.x, k.y - hk.y).length() < 12.0) or randf() < delta * 0.15:
 		var yay := 45.0 if isik_acik else 20.0
+		if ureme_hedefi != Vector3.INF:
+			yay = 4.0
 		l["hedef"] = akvaryum._sinirla(suru_merkezi + Vector3(randf_range(-yay, yay), randf_range(-yay * 0.6, yay * 0.6), randf_range(-0.15, 0.15)))
 		l["bekle"] = randf_range(0.2, 1.2)
 	var hedef: Vector3 = l["hedef"]
@@ -108,10 +116,11 @@ func _hareket(l: Dictionary, i: int, delta: float, isik_acik: bool, betta: Vecto
 		var dd := Vector2(k.x - o.x, k.y - o.y)
 		if dd.length() < 22.0 and absf(k.z - o.z) < 0.15:
 			hedef += Vector3(dd.x, dd.y, 0.0).normalized() * 25.0
-	# Bettadan kac (yakindaysa); bazen betta kabarir
+	# Esine cok yakin cakismasin; betta yakinindayken ara ara ona kabarir (kur)
 	var bd := Vector2(k.x - betta.x, k.y - betta.y)
-	if bd.length() < 45.0 and absf(k.z - betta.z) < 0.25:
-		hedef += Vector3(bd.x, bd.y, 0.0).normalized() * 60.0
+	if bd.length() < 30.0 and absf(k.z - betta.z) < 0.25 and ureme_hedefi == Vector3.INF:
+		hedef += Vector3(bd.x, bd.y, 0.0).normalized() * 20.0
+	if bd.length() < 60.0 and absf(k.z - betta.z) < 0.3 and ureme_hedefi == Vector3.INF:
 		if kabarma_beklemesi <= 0.0 and isik_acik and akvaryum.balik.visible and not akvaryum.yem_var:
 			kabarma_beklemesi = randf_range(45.0, 90.0)
 			akvaryum._kabar(2.0)
@@ -131,7 +140,7 @@ func _hareket(l: Dictionary, i: int, delta: float, isik_acik: bool, betta: Vecto
 	var yon := Vector3(cos(l["egim"]) * cos(l["sapma"]), sin(l["egim"]), cos(l["egim"]) * sin(l["sapma"]))
 	l["yon"] = yon
 	var hiz := 40.0 if isik_acik else 10.0
-	if akvaryum.yem_var:
+	if akvaryum.yem_var or ureme_hedefi != Vector3.INF:
 		hiz = 60.0
 	hiz *= clampf(yon.dot(f / mesafe), 0.15, 1.0)
 	var yol := minf(mesafe, hiz * delta)

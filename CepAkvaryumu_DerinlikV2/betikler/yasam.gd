@@ -4,13 +4,15 @@ extends Node
 ##
 ## Olum yok (yumusak sistem): bakilmazsa balik hastalanir ve "kritik" olur;
 ## ilac ve iyi bakimla toparlanir. Omur ~1 ay: 7. gun yetiskin, 24. gunden
-## sonra yasli. Yasli ve mutlu balik kopuk yuvasina yumurta birakir; yeni
-## nesil ebeveynin rengini ve yuzgecini kismen tasir.
+## sonra yasli. Ureme icin disi gerekir: erkek yetiskin, disi akvaryumda, kopuk
+## yuvasi dolu, mutlu ve saglikli -> kur yapma + sarilma -> yuvada yumurtalar.
+## Yeni nesil anne ile babanin renklerinin karisimini tasir.
 ## Tum hesaplar gercek zamanla ilerler (uygulama kapaliyken de).
 
 signal olay(metin: String)     # ekranda kisa bildirim seridi
 signal cagri(ihtiyac: String)  # balik yeni bir sey istiyor (titresim)
 signal evre_degisti
+signal ureme_hazir             # canli kur yapma sahnesi baslayabilir
 
 enum Evre { YUMURTA, YAVRU, GENC, YETISKIN, YASLI }
 const EVRE_ADLARI := ["Yumurta", "Yavru", "Genç", "Yetişkin", "Yaşlı"]
@@ -53,7 +55,9 @@ var kaka_zamanlari: Array[float] = []   # yem yendikten sonra kaka zamanlari (un
 var son_oyun := 0.0
 var ihtiyac_bas := {}           # ihtiyac -> basladigi zaman
 var ihtiyac_sayildi := {}       # ihtiyac -> bu seferlik hata sayildi mi
-var yumurta_var := false        # yasli balik yuvaya yumurta birakti
+var yumurta_var := false        # disi yuvaya yumurta birakti
+var son_ureme := 0.0            # son yumurtlama (unix); 3 gun bekleme
+const UREME_ARASI := 3.0 * 86400.0
 var renk_ton := 0.0             # nesilden nesile kayan renk tonu (-0.5..0.5)
 var yuzgec_gen := 1.0           # nesilden gelen yuzgec uzunlugu egilimi
 var gecmis: Array = []          # onceki nesiller
@@ -143,10 +147,13 @@ func ilerlet(saniye: float) -> void:
 	if kritik() and not once_kritik:
 		olay.emit("%s çok halsiz! Bakıma ihtiyacı var" % isim)
 
-	# Yasli ve mutlu: yuvaya yumurta birakir
-	if evre == Evre.YASLI and not yumurta_var and bakim.yuva >= 0.8 and bakim.mutluluk >= 70.0:
-		yumurta_var = true
-		olay.emit("%s yuvaya yumurta bıraktı! Menü > Yeni nesil" % isim)
+	# Ureme: kosullar saglaninca uygulama aciksa canli kur yapma sahnesi,
+	# kapaliyken dogrudan yumurta
+	if ureme_mumkun():
+		if saniye > 60.0:
+			yumurta_birak(true)
+		else:
+			ureme_hazir.emit()
 
 	_ihtiyaclari_denetle(saniye, t)
 	kaka_cizici.queue_redraw()
@@ -218,6 +225,26 @@ func _ihtiyaclari_denetle(saniye: float, t: float) -> void:
 		if not ad in aktif:
 			ihtiyac_bas.erase(ad)
 			ihtiyac_sayildi.erase(ad)
+
+
+func disi_var() -> bool:
+	var l := akvaryum.get_node_or_null("Lepistesler")
+	return l != null and l.suru.size() > 0
+
+
+func ureme_mumkun() -> bool:
+	return (evre == Evre.YETISKIN or evre == Evre.YASLI) and disi_var() and not hasta and not kritik() \
+		and not yumurta_var and bakim.yuva >= 0.8 and bakim.mutluluk >= 70.0 and akvaryum.isik_acik \
+		and simdi() - son_ureme > UREME_ARASI
+
+
+func yumurta_birak(yokken := false) -> void:
+	yumurta_var = true
+	son_ureme = simdi()
+	if yokken:
+		olay.emit("Yokken yumurta bıraktılar! Menü > Yeni nesil")
+	else:
+		olay.emit("Yuvada yumurtalar var! Menü > Yeni nesil")
 
 
 ## Mutluluk hedefine yasam etkileri (bakim.gd cagirir)
@@ -314,7 +341,7 @@ func isim_koy(ad: String) -> void:
 
 ## Yeni nesil: yasli balik "emekli olur", yumurtalardan yavru cikar.
 ## Yavru ebeveynin renk tonunu ve yuzgec egilimini kismen tasir.
-func yeni_nesil() -> void:
+func yeni_nesil(anne_ton := INF) -> void:
 	gecmis.append({"isim": isim, "nesil": nesil, "gun": int(yas_gun()),
 		"form": form, "hata": toplam_hata})
 	if gecmis.size() > 12:
@@ -323,7 +350,11 @@ func yeni_nesil() -> void:
 	nesil += 1
 	evre = Evre.YUMURTA
 	yumurta_bitis = simdi() + YUMURTA_SURE
-	renk_ton = wrapf(renk_ton + randf_range(-0.08, 0.08), -0.5, 0.5)
+	# Kalitim: anne ile babanin renk tonlarinin ortasi + kucuk sapma
+	var t := renk_ton
+	if anne_ton != INF:
+		t = renk_ton + wrapf(anne_ton - renk_ton, -0.5, 0.5) * 0.5
+	renk_ton = wrapf(t + randf_range(-0.06, 0.06), -0.5, 0.5)
 	yuzgec_gen = clampf(lerpf(yuzgec_gen, [0.92, 1.0, 1.08][ebeveyn_form], 0.5) + randf_range(-0.04, 0.04), 0.85, 1.15)
 	form = -1
 	bakim_hatasi = 0
@@ -389,7 +420,7 @@ func sozluk() -> Dictionary:
 		"isim_bekliyor": isim_bekliyor, "nesil": nesil, "form": form, "bakim_hatasi": bakim_hatasi,
 		"toplam_hata": toplam_hata, "saglik": saglik, "hasta": hasta, "hastalik_riski": hastalik_riski,
 		"ilac_kalan": ilac_kalan, "kakalar": k, "kaka_zamanlari": kaka_zamanlari, "son_oyun": son_oyun,
-		"yumurta_var": yumurta_var, "renk_ton": renk_ton, "yuzgec_gen": yuzgec_gen, "gecmis": gecmis}
+		"yumurta_var": yumurta_var, "son_ureme": son_ureme, "renk_ton": renk_ton, "yuzgec_gen": yuzgec_gen, "gecmis": gecmis}
 
 
 func yukle(d: Dictionary) -> void:
@@ -414,6 +445,7 @@ func yukle(d: Dictionary) -> void:
 		kaka_zamanlari.append(float(z))
 	son_oyun = float(d.get("son_oyun", 0.0))
 	yumurta_var = bool(d.get("yumurta_var", false))
+	son_ureme = float(d.get("son_ureme", 0.0))
 	renk_ton = float(d.get("renk_ton", 0.0))
 	yuzgec_gen = float(d.get("yuzgec_gen", 1.0))
 	gecmis = d.get("gecmis", [])

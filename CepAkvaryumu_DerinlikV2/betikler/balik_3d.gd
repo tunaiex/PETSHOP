@@ -63,6 +63,7 @@ var yuzgec_olcek := 1.0          # yetiskin formu: kisa 0.8 .. halfmoon 1.15 (ya
 var kapali := 0.0                # 0..1 hasta / mutsuz balik yuzgeclerini kapatir
 var yuzgec_kokleri: Array[int] = []
 var kabarma_suresi := 0.0
+var sarilma := 0.0               # 0..1 ciftlesmede govde disinin etrafinda C seklinde kivrilir
 var malzemeler: Array[BaseMaterial3D] = []
 var etkin := true
 
@@ -189,6 +190,8 @@ func guncelle(yon: Vector3, hiz: float, delta: float, uyuyor: bool) -> void:
 	yalpa = lerpf(yalpa, clampf(-donus * 0.10, -0.30, 0.30), yumusat)
 	# 4 omurga kemigi x bukulme = toplam govde kivrimi (en fazla ~1,4 rad)
 	bukulme = lerpf(bukulme, clampf(-donus * 0.14, -0.35, 0.35), yumusat)
+	if sarilma > 0.01:
+		bukulme = lerpf(bukulme, 0.42 * sarilma, minf(1.0, delta * 3.0))
 	pivot.rotation = Vector3(egim, sapma, yalpa)
 
 	# Animasyon hizi: uyurken cok yavas, yeme giderken hizli

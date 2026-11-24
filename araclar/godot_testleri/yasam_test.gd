@@ -126,12 +126,16 @@ func _initialize():
 	gun_atla(17.5)
 	b.yuva = 1.0; b.mutluluk = 90.0
 	ileri_sar(0.05)
-	kontrol("Yasli + mutlu + yuva: yumurta birakir (evre=%d)" % y.evre, y.evre == 4 and y.yumurta_var)
+	kontrol("Disi yokken yumurta olmaz", not y.yumurta_var)
+	s.get_node("Lepistesler").ekle(0.3)
+	b.yuva = 1.0; b.mutluluk = 90.0; s.isik_acik = true
+	ileri_sar(0.05)
+	kontrol("Disi + mutlu + yuva: (yokken) yumurta birakir (evre=%d)" % y.evre, y.evre == 4 and y.yumurta_var)
 	await cerceve(1)
 	kontrol("Menude Yeni nesil ogesi", menu._ogeler()[0][0] == "nesil")
 	await tikla(Vector2(240, 240))
 	kontrol("Yeni nesil: yumurta, nesil 2, gecmise yazildi", y.evre == 0 and y.nesil == 2 and y.gecmis.size() == 1 and y.gecmis[0]["form"] == 2)
-	kontrol("Renk tonu kalitimla biraz kayar (%.3f -> %.3f)" % [ton0, y.renk_ton], absf(y.renk_ton - ton0) <= 0.081)
+	kontrol("Yavru rengi anne-baba karisimi (baba %.2f, anne 0.30 -> %.2f)" % [ton0, y.renk_ton], absf(y.renk_ton - (ton0 + 0.3) / 2.0) <= 0.07)
 
 	# 10 Kayit
 	s._kaydet()
