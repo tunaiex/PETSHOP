@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tamagotchi Karakterleri</title>
+<style>
+:root{--bg:#f6f1ee;--panel:#fffaf7;--ink:#2b2220;--muted:#7a6c68;--accent:#c62f3a;--line:#e6dcd7}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1b1716;--panel:#252020;--ink:#f3ebe8;--muted:#a99c98;--accent:#ff6470;--line:#3a3230}}
+:root[data-theme="dark"]{--bg:#1b1716;--panel:#252020;--ink:#f3ebe8;--muted:#a99c98;--accent:#ff6470;--line:#3a3230}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{padding:16px 16px 4px;max-width:1100px;margin:auto}
+h1{font-size:20px;margin:0 0 2px}
+header p{margin:0;color:var(--muted);font-size:13px}
+main{max-width:1100px;margin:auto;padding:8px 16px 24px;display:grid;grid-template-columns:1fr 260px;gap:14px}
+#stage{position:relative;background:radial-gradient(circle at 50% 35%,#ffffff22,transparent 70%),var(--panel);border:1px solid var(--line);border-radius:14px;height:min(72vh,640px);overflow:hidden}
+canvas{display:block;width:100%;height:100%}
+#status{position:absolute;left:12px;bottom:10px;font-size:12px;color:var(--muted)}
+aside{display:flex;flex-direction:column;gap:12px}
+.grp{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px}
+.grp h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 8px}
+.btns{display:flex;flex-wrap:wrap;gap:6px}
+button{font:inherit;font-size:13px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:6px 10px;border-radius:999px;cursor:pointer}
+button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+label{font-size:13px;display:flex;gap:6px;align-items:center;margin-top:4px}
+@media (max-width:760px){main{grid-template-columns:1fr}#stage{height:62vh}}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+</head>
+<body>
+<header><h1>Tamagotchi Karakterleri — 3D Rig</h1><p>Sürükle: döndür · Tekerlek: yakınlaş · Önden / arkadan / yandan bak, animasyonları dene.</p></header>
+<main>
+<div id="stage"><canvas id="c"></canvas><div id="status">Yükleniyor…</div></div>
+<aside>
+  <div class="grp"><h2>Karakter</h2><div class="btns" id="chars"></div></div>
+  <div class="grp"><h2>Görünüm</h2><div class="btns" id="views"></div>
+    <label><input type="checkbox" id="spin"> Otomatik dön</label>
+    <label><input type="checkbox" id="bones"> Kemikleri göster</label></div>
+  <div class="grp"><h2>Animasyon</h2><div class="btns" id="anims"></div></div>
+</aside>
+</main>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+
+const CHARS=[['Bebek','Bebek'],['Genc','Genç'],['Yasli','Yaşlı']];
+const VIEWS=[['Ön',0],['Sağ',-90],['Arka',180],['Sol',90],['3/4',35]];
+const TR={Idle:'Bekleme',Happy:'Mutlu',Wave:'El sallama',Sad:'Üzgün',Eat:'Yemek',Sleep:'Uyku',Walk:'Yürüme',Dance:'Dans'};
+const c=document.getElementById('c'),stage=document.getElementById('stage'),status=document.getElementById('status');
+const renderer=new THREE.WebGLRenderer({canvas:c,antialias:true,alpha:true,preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+const scene=new THREE.Scene();
+const cam=new THREE.PerspectiveCamera(30,1,0.01,100);
+scene.add(new THREE.HemisphereLight(0xffffff,0xb8a8a0,2.2));
+const dl=new THREE.DirectionalLight(0xffffff,1.4);dl.position.set(1,2,3);scene.add(dl);
+const dl2=new THREE.DirectionalLight(0xffffff,0.8);dl2.position.set(-1,1.5,-3);scene.add(dl2);
+const ground=new THREE.Mesh(new THREE.CircleGeometry(0.6,48),new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:0.12}));
+ground.rotation.x=-Math.PI/2;scene.add(ground);
+const controls=new OrbitControls(cam,c);controls.enableDamping=true;
+let cur=null,mixer=null,clips=[],helper=null,height=1,activeAnim=null,curName=null;
+const loader=new GLTFLoader();const cache={};
+function fit(){const w=stage.clientWidth,h=stage.clientHeight;renderer.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix();}
+addEventListener('resize',fit);
+function setView(deg){const d=height*1.9;const r=deg*Math.PI/180;controls.target.set(0,height*0.5,0);cam.position.set(Math.sin(r)*d,height*0.55,Math.cos(r)*d);controls.update();}
+function btn(parent,label,fn){const b=document.createElement('button');b.textContent=label;b.onclick=()=>fn(b);parent.appendChild(b);return b;}
+function mark(parent,b){[...parent.children].forEach(x=>x.classList.toggle('on',x===b));}
+const charEl=document.getElementById('chars'),viewEl=document.getElementById('views'),animEl=document.getElementById('anims');
+async function loadChar(name){
+  status.textContent='Yükleniyor…';
+  const g=cache[name]||(cache[name]=await loader.loadAsync(`${name}/${name}.glb`));
+  if(cur)scene.remove(cur);if(helper){scene.remove(helper);helper=null;}
+  cur=g.scene;scene.add(cur);curName=name;
+  height={Bebek:0.80,Genc:1.62,Yasli:1.55}[name]||1;
+  ground.scale.setScalar(height);
+  mixer=new THREE.AnimationMixer(cur);clips=g.animations;
+  animEl.innerHTML='';
+  btn(animEl,'T-Pose',b=>{mark(animEl,b);mixer.stopAllAction();activeAnim=null;});
+  const order=['Idle','Happy','Wave','Eat','Sad','Sleep','Walk','Dance'];
+  clips.sort((a,b)=>order.indexOf(a.name)-order.indexOf(b.name)).forEach(cl=>btn(animEl,TR[cl.name]||cl.name,b=>{mark(animEl,b);play(cl.name);}));
+  updateBones();setView(currentView);
+  const first=[...animEl.children].find(b=>b.textContent==='Bekleme');if(first){first.click();}
+  let n=0;cur.traverse(o=>{if(o.isBone)n++;});
+  status.textContent=`${name} · ${n} kemik · ${clips.length} animasyon`;
+}
+function play(n){const cl=clips.find(c=>c.name===n);if(!cl)return;mixer.stopAllAction();const a=mixer.clipAction(cl);a.reset().play();activeAnim=n;}
+function updateBones(){if(helper){scene.remove(helper);helper=null;}if(document.getElementById('bones').checked&&cur){helper=new THREE.SkeletonHelper(cur);scene.add(helper);}}
+document.getElementById('bones').onchange=updateBones;
+let currentView=0;
+VIEWS.forEach(([l,d],i)=>{const b=btn(viewEl,l,b=>{mark(viewEl,b);currentView=d;setView(d);});if(i===0)b.classList.add('on');});
+CHARS.forEach(([f,l],i)=>{const b=btn(charEl,l,b=>{mark(charEl,b);loadChar(f);});if(i===0)b.classList.add('on');});
+const clock=new THREE.Clock();
+function tick(){requestAnimationFrame(tick);const dt=clock.getDelta();if(mixer)mixer.update(dt);
+  if(document.getElementById('spin').checked&&cur)cur.rotation.y+=dt*0.6;else if(cur)cur.rotation.y=0;
+  controls.update();renderer.render(scene,cam);}
+fit();tick();
+window.__api={loadChar,setView,play,mixerSet:(t)=>{if(mixer){mixer.setTime(t);}}};
+const q=new URLSearchParams(location.search);
+loadChar(q.get('c')||'Bebek').then(()=>{if(q.get('v'))setView(+q.get('v'));if(q.get('a')){if(q.get('a')==='T')mixer.stopAllAction();else play(q.get('a'));}window.__ready=true;});
+</script>
+</body>
+</html>
