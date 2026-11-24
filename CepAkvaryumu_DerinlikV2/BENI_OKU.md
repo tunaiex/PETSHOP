@@ -54,11 +54,13 @@ Akvaryum (Node2D) - betikler/akvaryum.gd
 
 | Hareket | Sonuç |
 |---|---|
-| Kısa dokunuş (18 px'ten az kayma, 1 sn'den kısa) | Yem (balık çok tokken yemez, yem dibe çöker) |
-| 1 sn basılı tutma (parmak kaymadan) | Işık aç / kapat (kapalıyken balık bitkilerin yanında uyur) |
+| Kısa dokunuş **incinin üstüne** | İnciyi toplar |
+| Kısa dokunuş **balığın üstüne** | Balık sana döner ve **kabarır** (flare) |
+| Kısa dokunuş (başka yere) | Yem (balık çok tokken yemez, yem dibe çöker) |
+| 1 sn basılı tutma (parmak kaymadan) | Işık aç / kapat (kapalıyken balık bitkilerin yanında uyur); menü açıksa menüyü kapatır |
 | 60 px'ten uzun kaydırma | Camı siler: parmağın geçtiği yerdeki yosun canlı olarak silinir |
-| Kenar halkasında (merkezden ≥165 px) **tam tur** dairesel kaydırma | Su değişimi (ilerleme kenarda mavi halka olarak görünür) |
-| Galaxy Watch çerçevesini 4 sn içinde **12 tık** çevirmek | Su değişimi |
+| **Çerçeveyi çevirmek** veya kenar halkasında (merkezden ≥165 px) dairesel kaydırma | **Menü** açılır / menüde gezinir (her 30° = 1 adım) |
+| Menüde dokunma | Seç |
 | 18–60 px arası kayma | Bilinçli olarak hiçbir şey |
 
 - Dairesel kaydırma cam temizleme sayılmaz; basılı tutarken parmak kayarsa ışık değişmez.
@@ -97,6 +99,33 @@ Hepsi gerçek zamanla ilerler, uygulama kapalıyken de hesaplanır.
 - `user://akvaryum_kaydi.json` dosyasında tokluk, zaman, ışık ve balığın X/Y/Z konumu tutulur.
 - Her 15 saniyede, yem yendiğinde, ışık değiştiğinde, ekran kapandığında / uygulama arka plana geçtiğinde ve geri tuşunda kaydeder.
 - Yeniden açılınca geçen gerçek süre tokluğa yansıtılır (1 saat kapalı kaldıysa ~33 puan düşer).
+
+## Menü (`betikler/menu.gd`)
+
+Küçük yuvarlak ekran için tek öğe ortada büyük gösterilir; çerçeve / kenar kaydırma ile değişir, dokunma seçer, 8 sn dokunulmazsa kapanır.
+
+- **Su değiştir** — temiz su, dipteki yem alınır (önceki "tam tur / 12 tık" jesti yerine)
+- **Mağaza** — incilerle: Süper yem (1: tam tok, +mutluluk), Filtre (5: su 2 kat geç kirlenir), Gün batımı ışığı (3), Ay ışığı (3), Normal ışık
+- **Bilgi** — yaş (gün), boy, mutluluk, tokluk, su, cam, inci, filtre
+- **Ses** aç/kapat · **Grafik** Düşük/Dengeli/Yüksek · **FPS göstergesi** (FPS, kare süresi, çizim çağrısı, bellek — saatte performans ölçmek için) · **Kapat**
+
+## Kabarma (flare)
+
+Balığa dokununca (ya da kirli cam tamamen temizlenince yansımasını görüp) balık sana döner; solungaç kapakları (`Bone.046`–`051`) dışa açılır, sırt / karın / kuyruk yüzgeçleri yelpaze gibi gerilir, gövde dalgası durur, hafifçe şişer (`balik_3d.gd` → `kabar()`). 4,5 sn bekleme süresi var.
+
+## İlerleme (`betikler/bakim.gd`)
+
+- **Büyüme:** yeni oyun yavru balıkla başlar (boy %65); iyi bakılırsa (mutluluk >50, tokluk >30) 7 günde tam boya ulaşır. Eski kayıtlarda balık zaten yetişkindir.
+- **İnci:** mutluluk ≥70 iken her 2 saatte kumda bir inci belirir (en fazla 3, ara ara parıldar). Dokununca toplanır. Uygulama kapalıyken de birikir.
+- **Mağaza** menüden. Işık renkleri tüm sahneyi renklendirir (HUD hariç).
+
+## Parallax (derinlik)
+
+Bilek eğimi (yerçekimi sensörü) katmanları farklı miktarda kaydırır: arka plan 0,35, kabarcıklar 0,4, kayalar 0,65, kum üstü (yem, inci) 0,8, ön otlar 0,95, cam yosunu 1,15; balık derinliğine göre 0,95–0,4 (en fazla 7 px). Taban yavaşça uyum sağlar: sabit tutuşta görüntü ortada durur, yalnızca eğme hareketi derinlik hissi verir. Arka plan, kayalar ve ön otlar kameraya **görünmez** (ama gölge düşürür) şekilde ayrıca render edildi; kaydırınca çift kenar oluşmaz. Gerçek saatte eksen yönü ters çıkarsa `_sensoru_kontrol_et` → `Vector2(-fark.x, fark.y)` işaretleri değiştirilmeli. Bilgisayarda ok tuşları eğimi taklit eder.
+
+## Sesler (`betikler/ses.gd`, autoload `Ses`)
+
+Tüm sesler kodla üretildi (`../araclar/ses_uret.py`, kayıt / indirme yok): kısık su ortamı (8 sn döngü), yem düşmesi, cam gıcırtısı, su değişimi, inci zili, kabarma, menü tıkı. Menüden kapatılabilir; uygulama arka plandayken ortam sesi durur.
 
 ## Gerçekçi arka plan (Blender render)
 
@@ -229,7 +258,6 @@ adb install -r ~/storage/downloads/CepAkvaryumu_saat.apk
 - Watch 8'de 3B balığın pil / ısınma testi (gerekirse `Balik3D` boyutu 160'a, MSAA kapalıya düşürülebilir)
 - Su temizliği, mutluluk, cam silme, para, yeni balık, satın alma, büyüme
 - Akvaryumun sürekli açık saat kadranı/arka plan hizmeti olarak çalışması
-- Menü ve grafik profili seçme ekranı (`menu_adimi` sinyali hazır)
 - Kabarma (flare), iskeletle kapalı yüzgeç ve yaprakta uzanma animasyonları
 - Wear OS "ambient" (her zaman açık ekran) modu: ekran kararınca oyun durur, bilinçli olarak
 - Google Play yayını için release imzası (şu an debug imzalı)

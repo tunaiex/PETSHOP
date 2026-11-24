@@ -16,3 +16,6 @@ Gercekci arka plan (gorseller/arka_plan.webp, tas_on.png, kutuk_on.png, yaprak_o
   Vallisneria ve sac otu yapraklari, kum zemin, su hacmi, su yuzeyi ve kostikler
   betik icinde prosedurel olarak uretildi.
   Ham dosyalar: GitHub "Malzemele" surumu (Releases).
+
+Sesler (sesler/*.wav): ../araclar/ses_uret.py ile kodla uretildi (sentez); kayit veya disaridan dosya yok.
+Inci, kabarcik ve kostik dokulari (gorseller/kabarcik.png, kostik.png): kodla uretildi.

@@ -2,7 +2,7 @@
 
 Kullanim:
   blender -b --disable-autoexec --python akvaryum_sahne.py -- VARLIK_DIZINI CIKTI_DIZINI [ornek] [mod]
-mod: "guzel" (tam render) | "maske" (katman maskeleri) | "hepsi"
+mod: "guzel" (tam render) | "arka" (on katmanlar gorunmez) | "maske" (katman maskeleri) | "hepsi"
 Ciktilar: guzel.png (tum sahne), maske_tas.png, maske_kutuk.png, maske_on.png, maske_kum.png
 """
 import bpy, sys, os, math, mathutils
@@ -339,6 +339,18 @@ def render(ad):
 if MOD in ("guzel", "hepsi"):
     render("guzel.png")
 
+if MOD in ("arka", "hepsi"):
+    # Parallax icin: kayalar ve on otlar kameraya GORUNMEZ ama golge dusurmeye
+    # ve isigi etkilemeye devam eder. Boylece arkalarindaki kum / su da
+    # render edilir; katmanlar kaydiginda cift kenar olusmaz.
+    for kol in (K_TAS, K_KUTUK, K_ON):
+        for o in kol.all_objects:
+            o.visible_camera = False
+    render("guzel_arka.png")
+    for kol in (K_TAS, K_KUTUK, K_ON):
+        for o in kol.all_objects:
+            o.visible_camera = True
+
 if MOD in ("maske", "hepsi"):
     # Katman maskeleri: katmandaki nesneler beyaz, diger her sey siyah (ortucu).
     beyaz = bpy.data.materials.new("beyaz"); beyaz.use_nodes = True
@@ -370,4 +382,12 @@ if MOD in ("maske", "hepsi"):
             if not o.material_slots:
                 o.data.materials.append(mat)
         render("maske_%s.png" % ad)
+    # Kum maskesi, on katmanlar kameraya gorunmezken (arka plan ile ayni)
+    for kol in (K_TAS, K_KUTUK, K_ON):
+        for o in kol.all_objects:
+            o.visible_camera = False
+    for o in tum:
+        for i in range(len(o.material_slots)):
+            o.material_slots[i].material = beyaz if o.name == "zemin" else siyahm
+    render("maske_kum_arka.png")
 print("BITTI")

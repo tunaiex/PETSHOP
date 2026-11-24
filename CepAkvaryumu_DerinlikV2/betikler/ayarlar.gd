@@ -1,9 +1,10 @@
 extends Node
-## Grafik kalite profilleri (autoload: "Ayarlar").
-## Varsayilan: DENGELI. Secim user://ayarlar.cfg dosyasinda saklanir.
+## Kullanici ayarlari (autoload: "Ayarlar"): grafik profili, ses, FPS gostergesi.
+## Varsayilan: DENGELI, ses acik, FPS kapali. user://ayarlar.cfg dosyasinda saklanir.
 ## Bilgisayarda test icin 1 / 2 / 3 tuslari profili degistirir.
 
 signal profil_degisti
+signal ayar_degisti
 
 enum Profil { DUSUK, DENGELI, YUKSEK }
 
@@ -23,12 +24,41 @@ const DEGERLER := {
 }
 
 var profil: int = Profil.DENGELI
+var ses_acik := true
+var fps_goster := false
 
 
 func _ready() -> void:
 	var cfg := ConfigFile.new()
 	if cfg.load(DOSYA) == OK:
 		profil = clampi(int(cfg.get_value("grafik", "profil", Profil.DENGELI)), Profil.DUSUK, Profil.YUKSEK)
+		ses_acik = bool(cfg.get_value("genel", "ses", true))
+		fps_goster = bool(cfg.get_value("genel", "fps", false))
+
+
+func _kaydet() -> void:
+	var cfg := ConfigFile.new()
+	cfg.set_value("grafik", "profil", profil)
+	cfg.set_value("genel", "ses", ses_acik)
+	cfg.set_value("genel", "fps", fps_goster)
+	cfg.save(DOSYA)
+
+
+func ses_ayarla(acik: bool) -> void:
+	ses_acik = acik
+	_kaydet()
+	ayar_degisti.emit()
+
+
+func fps_ayarla(acik: bool) -> void:
+	fps_goster = acik
+	_kaydet()
+	ayar_degisti.emit()
+
+
+## Menu icin: profili sirayla degistirir (Dusuk -> Dengeli -> Yuksek -> Dusuk)
+func sonraki_profil() -> void:
+	profil_ayarla((profil + 1) % 3)
 
 
 func deger(anahtar: String) -> Variant:
@@ -40,9 +70,7 @@ func profil_ayarla(yeni: int) -> void:
 	if yeni == profil:
 		return
 	profil = yeni
-	var cfg := ConfigFile.new()
-	cfg.set_value("grafik", "profil", profil)
-	cfg.save(DOSYA)
+	_kaydet()
 	print("Grafik profili: ", ADLAR[profil])
 	profil_degisti.emit()
 

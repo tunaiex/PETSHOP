@@ -5,8 +5,10 @@ extends Node2D
 ## sirasi ile saglanir; tam 3B sahneye gore saatte daha az pil tuketir.
 ##
 ## Galaxy Watch 8 (Wear OS): 480x480 tasarim, 438x438 icin orantili olcek.
-## Dokunma: kisa = yem, 1 sn = isik, >60 px kaydirma = cam silme,
-## kenarda tam tur dairesel kaydirma / cerceveyi 12 tik cevirme = su degisimi.
+## Dokunma: kisa = yem (incinin ustune = inci topla, baligin ustune = kabarma),
+## 1 sn = isik, >60 px kaydirma = cam silme, cerceveyi cevirme / kenarda
+## dairesel kaydirma = menu (su degisimi, magaza, bilgi, ses, grafik, FPS).
+## Bilek egimi = parallax (katmanlar farkli miktarda kayar).
 ## Bakim (yosun, su, mutluluk, kopuk yuvasi): betikler/bakim.gd
 
 signal cam_temizlendi(baslangic: Vector2, bitis: Vector2)
@@ -31,13 +33,18 @@ const DONUS_HIZI_YEM := 3.6    # rad/sn, yeme giderken
 const MAKS_EGIM := 0.55        # yukari / asagi en fazla egim (rad)
 const TOK_ESIGI := 95.0        # bundan tokken balik yemi yemez, yem dibe coker
 const UYKU_NOKTASI := Vector3(-95.0, 60.0, 0.5)  # isik kapaninca bitkilerin yanina gider
-const CERCEVE_SU_TIK := 12     # cerceveyi bu kadar tik cevirmek = su degisimi
+const PARALAKS_PX := 7.0      # bilek egiminde en one katmanin en fazla kaymasi
+# Katman -> parallax carpani (uzak 0.35 ... cam 1.15). Balik derinligine gore.
+const PARALAKS_KATMANLAR := {"ArkaPlan": 0.35, "Baloncuklar": 0.4, "Bakim/Yuva": 0.35,
+	"Tas": 0.65, "Kutuk": 0.65, "Bakim/Artiklar": 0.8, "Bakim/Inciler": 0.8,
+	"Yapraklar": 0.95, "Bakim/CamYosunu": 1.15}
 
 @onready var balik: Sprite2D = $Balik
 @onready var balik_3d: SubViewport = $Balik3D
 @onready var yem_gorseli: Node2D = $Yem
 @onready var gosterge: Node2D = $Gosterge
 @onready var bakim: Node = $Bakim
+@onready var menu: Node2D = $Menu
 @onready var arka_plan: Sprite2D = $ArkaPlan
 @onready var su_yuzeyi_malzeme: ShaderMaterial = $ArkaPlan.material
 var kostik_gucu := 0.35          # ekrandaki guc; hedefe yumusakca yaklasir
@@ -74,10 +81,11 @@ var daire_bildirilen := 0      # menuye bildirilen adim sayisi
 var kenarda_kaldi := false
 var yol := PackedVector2Array()  # parmagin izi (cam silme icin)
 var silme_aktif := false
-var su_degisti_bu_hareket := false
-var cerceve_tik := 0
-var cerceve_zaman := 0.0
-var su_degisim_ilerleme := 0.0   # 0..1, gostergede halka olarak cizilir
+var kabarma_beklemesi := 0.0
+var paralaks := Vector2.ZERO     # -1..1, bilek egimi (yumusatilmis)
+var paralaks_hedef := Vector2.ZERO
+var egim_taban := Vector3.ZERO
+var paralaks_tabanlari := {}     # dugum -> asil konum
 var kameraya_bak := 0.0          # cam parlayinca balik kameraya (cama) bakar
 var cama_geliyor := false
 
@@ -103,6 +111,12 @@ func _ready() -> void:
 	_fps_ayarla()
 	Ayarlar.profil_degisti.connect(_fps_ayarla)
 	bakim.cam_parladi.connect(_cama_gel)
+	menu.secildi.connect(_menu_komutu)
+	for yol_ in PARALAKS_KATMANLAR:
+		var d: Node2D = get_node(yol_)
+		paralaks_tabanlari[d] = d.position
+	# Arka plan kayinca yuvarlak ekranin kenarinda bosluk olmasin
+	arka_plan.scale = Vector2.ONE * 1.02
 	_baligi_gorsellestir()
 	_yemi_gorsellestir()
 	hazir = true
@@ -118,6 +132,9 @@ func _process(delta: float) -> void:
 		basma_suresi += delta
 		if basma_suresi >= UZUN_BASMA_SANIYE:
 			uzun_basma_yapildi = true
+			if menu.acik:
+				menu.kapat()  # menude uzun basma: menuyu kapatir
+				return
 			isik_acik = not isik_acik
 			if not isik_acik and yem_var:
 				# Isik kapanirken suda kalan yem dibe coker.
@@ -131,10 +148,8 @@ func _process(delta: float) -> void:
 		return
 	_kostigi_guncelle(delta)
 
-	cerceve_zaman = maxf(0.0, cerceve_zaman - delta)
-	if cerceve_zaman <= 0.0 and not basili:
-		cerceve_tik = 0
-		su_degisim_ilerleme = 0.0
+	kabarma_beklemesi = maxf(0.0, kabarma_beklemesi - delta)
+	_paralaksi_uygula(delta)
 
 	if isik_acik:
 		yuzme_zamani += delta
@@ -196,7 +211,6 @@ func _input(olay: InputEvent) -> void:
 		# Galaxy Watch cercevesi (bezel / doner cerceve) Android'de fare
 		# tekerlegi olarak gelir: ileride menu secimi icin.
 		_menu_adimi(1 if olay.button_index == MOUSE_BUTTON_WHEEL_DOWN else -1)
-		_cerceve_tik()
 	elif not OS.has_feature("mobile"):
 		if olay is InputEventMouseButton and olay.button_index == MOUSE_BUTTON_LEFT:
 			if olay.pressed:
@@ -214,6 +228,10 @@ func _input(olay: InputEvent) -> void:
 		elif olay.keycode == KEY_X:
 			balik_hedefi = Vector3(25.0, 0.0, 0.10) # kameraya yakin
 			bekleme_suresi = 0.0
+		elif olay.keycode in [KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN] and not OS.has_feature("mobile"):
+			# Test: ok tuslari bilek egimini taklit eder (parallax)
+			var e := {KEY_LEFT: Vector2.LEFT, KEY_RIGHT: Vector2.RIGHT, KEY_UP: Vector2.UP, KEY_DOWN: Vector2.DOWN}
+			paralaks_hedef = (paralaks_hedef + e[olay.keycode] * 0.5).limit_length(1.0)
 		elif olay.keycode == KEY_T and not OS.has_feature("mobile"):
 			# Test: 1 saat ileri sar
 			son_hesaplama_zamani -= 3600.0
@@ -234,7 +252,6 @@ func _basmayi_baslat(konum: Vector2) -> void:
 	kenarda_kaldi = konum.distance_to(MERKEZ) >= KENAR_YARICAPI
 	yol = PackedVector2Array([konum])
 	silme_aktif = false
-	su_degisti_bu_hareket = false
 
 
 func _surukle(konum: Vector2) -> void:
@@ -255,13 +272,7 @@ func _surukle(konum: Vector2) -> void:
 			var y := signi(adim - daire_bildirilen)
 			daire_bildirilen += y
 			_menu_adimi(y)
-		# Kenarda tam tur = su degisimi (pompa). Ilerleme halkada gorunur.
-		su_degisim_ilerleme = clampf(absf(daire_acisi) / TAU, 0.0, 1.0)
-		if su_degisim_ilerleme >= 1.0 and not su_degisti_bu_hareket:
-			su_degisti_bu_hareket = true
-			_su_degistir()
-	elif not kenarda_kaldi:
-		su_degisim_ilerleme = 0.0
+	elif not kenarda_kaldi and not menu.acik:
 		# Cam silme: parmak 60 px'i gecince parmagin altindaki yosun canli silinir.
 		if silme_aktif:
 			_cam_sil(yol.slice(yol.size() - 2))
@@ -278,34 +289,81 @@ func _basmayi_bitir(konum: Vector2) -> void:
 	if uzun_basma_yapildi:
 		return  # isik zaten degisti; birakinca yem atilmaz
 	if kenarda_kaldi and absf(daire_acisi) >= DAIRE_ESIGI:
-		return  # dairesel kaydirma: su degisimi / menu (cam silme ile karismaz)
+		return  # dairesel kaydirma: menu (cam silme ile karismaz)
+	if menu.acik:
+		if not kaydirildi:
+			menu.sec()  # menude dokunma = sec
+		return
 	if silme_aktif or konum.distance_to(baslangic) >= KAYDIRMA_ESIGI:
 		if not silme_aktif:
 			_cam_sil(yol)  # kenarda baslayip duz giden kaydirma
 		cam_temizlendi.emit(baslangic, konum)
 	elif not kaydirildi and basma_suresi < UZUN_BASMA_SANIYE:
-		_yem_birak(konum)
+		_dokunma(konum)
 	# Aradaki durum (18-60 px kayma): bilincli olarak hicbir sey yapmaz.
+
+
+## Kisa dokunma: once inci, sonra balik (kabarma), yoksa yem.
+func _dokunma(konum: Vector2) -> void:
+	if bakim.inci_topla(konum):
+		Ses.cal("inci")
+		_titret(40)
+		_kaydet()
+		return
+	if isik_acik and not yem_var and kabarma_beklemesi <= 0.0 and _baliga_mi(konum):
+		_kabar(2.5)
+		return
+	_yem_birak(konum)
+
+
+func _baliga_mi(konum: Vector2) -> bool:
+	var yaricap := balik_3d.size.x * balik.scale.x * 0.32
+	return konum.distance_to(balik.position) < maxf(yaricap, 26.0)
+
+
+## Kabarma (flare): balik sana doner, solungac ve yuzgeclerini acar.
+func _kabar(sure: float) -> void:
+	kabarma_beklemesi = sure + 2.0
+	balik_3d.kabar(sure)
+	kameraya_bak = sure
+	bekleme_suresi = sure
+	Ses.cal("kabarma")
+	_titret(40)
 
 
 func _cam_sil(noktalar: PackedVector2Array) -> void:
 	if bakim.cami_sil(noktalar) > 0:
 		_titret(20)  # her tamamen silinen lekede minik titresim
+		Ses.cal("silme")
 
 
-func _cerceve_tik() -> void:
-	# Cerceveyi 4 sn icinde 12 tik cevirmek su degisimi yapar.
-	cerceve_tik += 1
-	cerceve_zaman = 4.0
-	su_degisim_ilerleme = clampf(float(cerceve_tik) / CERCEVE_SU_TIK, 0.0, 1.0)
-	if cerceve_tik >= CERCEVE_SU_TIK:
-		cerceve_tik = 0
-		_su_degistir()
+func _menu_komutu(komut: String) -> void:
+	match komut:
+		"su":
+			_su_degistir()
+			menu.kapat()
+		"super_yem":
+			if bakim.satin_al("super_yem"):
+				aclik = 100.0
+				Ses.cal("inci")
+				_titret(40)
+		"filtre":
+			if bakim.satin_al("filtre"):
+				Ses.cal("inci")
+				_titret(40)
+		"renk_0", "renk_1", "renk_2":
+			var i := int(komut.substr(5))
+			if bakim.renkler[i]:
+				bakim.renk_sec(i)
+			elif bakim.satin_al(komut):
+				Ses.cal("inci")
+				_titret(40)
+	_kaydet()
 
 
 func _su_degistir() -> void:
 	bakim.su_degistir()
-	su_degisim_ilerleme = 0.0
+	Ses.cal("su")
 	_titret(120)
 	su_degistirildi.emit()
 	_kaydet()
@@ -321,8 +379,12 @@ func _cama_gel() -> void:
 
 
 func _menu_adimi(yon_: int) -> void:
-	# Dairesel kaydirma ve cerceve icin ayrildi; menu henuz yok.
+	# Cerceve / kenarda dairesel kaydirma: menu kapaliysa acar, aciksa gezinir.
 	menu_adimi.emit(yon_)
+	if menu.acik:
+		menu.adim(yon_)
+	else:
+		menu.ac()
 
 
 func _yem_birak(ekran_konumu: Vector2) -> void:
@@ -339,6 +401,8 @@ func _yem_birak(ekran_konumu: Vector2) -> void:
 	yem_var = true
 	balik_hedefi = yem_hedefi
 	bekleme_suresi = 0.0
+	kameraya_bak = 0.0
+	Ses.cal("yem")
 	_yemi_gorsellestir()
 
 
@@ -368,8 +432,7 @@ func _baligi_hareket_ettir(delta: float, uyku := false) -> void:
 	if mesafe < 8.0:
 		if cama_geliyor and not yem_var:
 			cama_geliyor = false
-			kameraya_bak = 3.0
-			bekleme_suresi = 3.0
+			_kabar(3.0)  # yansimasini gorup kabarir
 			return
 		if yem_var:
 			yem_var = false
@@ -457,8 +520,8 @@ func _baligi_gorsellestir() -> void:
 	balik.position = MERKEZ + Vector2(
 		balik_konumu.x,
 		balik_konumu.y - derinlik * 14.0 + sin(yuzme_zamani * 2.0) * 1.7
-	)
-	boyut *= balik_3d.olcek_carpani()
+	) + paralaks * PARALAKS_PX * lerpf(0.95, 0.4, derinlik)
+	boyut *= balik_3d.olcek_carpani() * bakim.boy  # yavru balik kucuk
 	balik.scale = Vector2(boyut, boyut)
 	# Yon ve egim artik 3B modelin kendisinde (betikler/balik_3d.gd).
 
@@ -478,7 +541,7 @@ func _yemi_gorsellestir() -> void:
 	if yem_var:
 		# Yemin de derinlikte tasin/kutugun arkasinda kalmasini saglariz.
 		yem_gorseli.z_index = 0 if yem_hedefi.z > 0.64 else (3 if yem_hedefi.z > 0.33 else 8)
-		yem_gorseli.position = MERKEZ + Vector2(yem_hedefi.x, yem_hedefi.y - yem_hedefi.z * 14.0)
+		yem_gorseli.position = MERKEZ + Vector2(yem_hedefi.x, yem_hedefi.y - yem_hedefi.z * 14.0) + paralaks * PARALAKS_PX * lerpf(0.95, 0.4, yem_hedefi.z)
 		yem_gorseli.scale = Vector2.ONE * lerpf(1.0, 0.65, yem_hedefi.z)
 
 
@@ -513,6 +576,18 @@ func _sensoru_kontrol_et(delta: float) -> void:
 				irkilme_beklemesi = 10.0
 				sarsinti_sayaci = 0
 
+	# --- Parallax: yercekimi yonu (bilek egimi). Taban yavasca uyum saglar;
+	# boylece sabit tutus her zaman ortada, yalnizca egme hareketi derinlik verir.
+	var yercekimi := Input.get_gravity()
+	if yercekimi.length_squared() < 0.01:
+		yercekimi = yer_cekimi_ortalama
+	if yercekimi.length_squared() > 0.01:
+		if egim_taban == Vector3.ZERO:
+			egim_taban = yercekimi
+		egim_taban = egim_taban.lerp(yercekimi, minf(1.0, aralik * 0.25))
+		var fark := (yercekimi - egim_taban) / 2.5
+		paralaks_hedef = Vector2(-fark.x, fark.y).limit_length(1.0)
+
 	# --- Jiroskop: bilek donusu suyu hafifce iter ---
 	var jiro := Input.get_gyroscope()
 	jiroskop_suzgec = jiroskop_suzgec.lerp(jiro, 0.35)
@@ -527,6 +602,20 @@ func _sensoru_kontrol_et(delta: float) -> void:
 	if absf(su_akintisi) > 0.01 and not yem_var:
 		# Balik akintiyla birkac piksel suruklenir; hedef / mekanik degismez.
 		balik_konumu = _sinirla(balik_konumu + Vector3(su_akintisi * 6.0 * aralik, 0.0, 0.0))
+
+
+## Bilek egimi -> katmanlar farkli miktarda kayar (uzak az, yakin cok).
+func _paralaksi_uygula(delta: float) -> void:
+	var yeni := paralaks.lerp(paralaks_hedef, minf(1.0, delta * 6.0))
+	if yeni.distance_to(paralaks) < 0.002 and hazir:
+		return
+	paralaks = yeni
+	for d in paralaks_tabanlari:
+		d.position = paralaks_tabanlari[d] + paralaks * PARALAKS_PX * PARALAKS_KATMANLAR[_katman_yolu(d)]
+
+
+func _katman_yolu(d: Node) -> String:
+	return str(get_path_to(d))
 
 
 func _titret(sure_ms: int) -> void:

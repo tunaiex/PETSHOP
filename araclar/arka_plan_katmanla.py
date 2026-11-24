@@ -11,13 +11,23 @@ import sys
 from PIL import Image, ImageEnhance, ImageFilter
 
 kaynak, cikti = sys.argv[1].rstrip("/") + "/", sys.argv[2].rstrip("/") + "/"
-g = Image.open(kaynak + "guzel.png").convert("RGB")
-g = g.filter(ImageFilter.MedianFilter(3))            # Cycles gurultusunu yumusat
-g = g.resize((480, 480), Image.LANCZOS)
-# Renk ayari: su altı fotograflari gibi biraz daha doygun ve kontrastli
-g = ImageEnhance.Color(g).enhance(1.18)
-g = ImageEnhance.Contrast(g).enhance(1.08)
-g.save(cikti + "arka_plan.webp", quality=92, method=6)
+import os
+
+
+def hazirla(yol):
+    r = Image.open(yol).convert("RGB")
+    r = r.filter(ImageFilter.MedianFilter(3))        # Cycles gurultusunu yumusat
+    r = r.resize((480, 480), Image.LANCZOS)
+    # Renk ayari: su alti fotograflari gibi biraz daha doygun ve kontrastli
+    r = ImageEnhance.Color(r).enhance(1.18)
+    return ImageEnhance.Contrast(r).enhance(1.08)
+
+
+g = hazirla(kaynak + "guzel.png")                    # on katmanlar bundan kesilir
+# Arka plan: on katmanlar (kayalar, on otlar) kameraya gorunmez render varsa onu
+# kullan; parallax'ta katmanlar kaydiginda arkada cift kenar kalmaz.
+arka = hazirla(kaynak + "guzel_arka.png") if os.path.exists(kaynak + "guzel_arka.png") else g
+arka.save(cikti + "arka_plan.webp", quality=92, method=6)
 
 konumlar = {}
 for ad, dosya in [("tas", "tas_on.png"), ("kutuk", "kutuk_on.png"), ("on", "yaprak_on.png")]:
@@ -30,7 +40,8 @@ for ad, dosya in [("tas", "tas_on.png"), ("kutuk", "kutuk_on.png"), ("on", "yapr
     konumlar[ad] = {"boyut": [bb[2] - bb[0], bb[3] - bb[1]], "merkez": [(bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2]}
 # Kum maskesi: kostik isiklari yalnizca kum zemine duser (tam ekran, gri tonlu)
 try:
-    km = Image.open(kaynak + "maske_kum.png").convert("L").resize((480, 480), Image.LANCZOS)
+    kum_yolu = kaynak + ("maske_kum_arka.png" if os.path.exists(kaynak + "maske_kum_arka.png") else "maske_kum.png")
+    km = Image.open(kum_yolu).convert("L").resize((480, 480), Image.LANCZOS)
     km.filter(ImageFilter.GaussianBlur(0.8)).save(cikti + "kum_maske.png", optimize=True)
 except FileNotFoundError:
     pass

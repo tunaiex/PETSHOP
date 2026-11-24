@@ -1,4 +1,4 @@
-[gd_scene load_steps=19 format=3]
+[gd_scene load_steps=20 format=3]
 
 [ext_resource type="Script" path="res://betikler/akvaryum.gd" id="1_root"]
 [ext_resource type="Texture2D" path="res://gorseller/arka_plan.webp" id="2_bg"]
@@ -15,6 +15,7 @@
 [ext_resource type="Shader" path="res://golgeler/su_yuzeyi.gdshader" id="13_surface"]
 [ext_resource type="Texture2D" path="res://gorseller/kum_maske.png" id="14_sandmask"]
 [ext_resource type="Texture2D" path="res://gorseller/kostik.png" id="15_caustictex"]
+[ext_resource type="Script" path="res://betikler/menu.gd" id="16_menu"]
 
 [sub_resource type="ShaderMaterial" id="su_yuzeyi"]
 shader = ExtResource("13_surface")
@@ -85,6 +86,16 @@ z_index = 30
 script = ExtResource("12_caredraw")
 katman = 2
 
+[node name="Inciler" type="Node2D" parent="Bakim"]
+z_index = 6
+script = ExtResource("12_caredraw")
+katman = 4
+
+[node name="IsikRengi" type="Node2D" parent="Bakim"]
+z_index = 32
+script = ExtResource("12_caredraw")
+katman = 5
+
 [node name="CamYosunu" type="Node2D" parent="Bakim"]
 z_index = 35
 script = ExtResource("12_caredraw")
@@ -98,3 +109,7 @@ texture = ExtResource("7_mask")
 [node name="Gosterge" type="Node2D" parent="."]
 z_index = 50
 script = ExtResource("8_hud")
+
+[node name="Menu" type="Node2D" parent="."]
+z_index = 60
+script = ExtResource("16_menu")

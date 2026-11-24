@@ -2,7 +2,7 @@ extends Node2D
 ## Bakim katmanlarindan birini cizer. Veriyi ust dugumdeki Bakim'dan okur ve
 ## yalnizca bir sey degistiginde yeniden cizer (her karede degil: pil).
 
-enum Katman { YUVA, ARTIK, SU, YOSUN }
+enum Katman { YUVA, ARTIK, SU, YOSUN, INCI, RENK }
 @export var katman: Katman = Katman.YOSUN
 
 const MERKEZ := Vector2(240.0, 240.0)
@@ -10,8 +10,23 @@ const KABARCIK := preload("res://gorseller/kabarcik.png")
 @onready var bakim: Node = get_parent()
 
 
+const RENKLER := [Color(1, 1, 1), Color(1.0, 0.80, 0.62), Color(0.62, 0.74, 1.0)]
+
+
 func _ready() -> void:
 	bakim.degisti.connect(queue_redraw)
+	set_process(katman == Katman.INCI)
+	if katman == Katman.RENK:
+		# Isik rengi: tum sahneyi carparak renklendirir (HUD haric, o daha ustte)
+		var m := CanvasItemMaterial.new()
+		m.blend_mode = CanvasItemMaterial.BLEND_MODE_MUL
+		material = m
+
+
+func _process(_delta: float) -> void:
+	# Incilerin parlamasi icin (yalnizca kumda inci varken)
+	if not bakim.inciler.is_empty():
+		queue_redraw()
 
 
 func _draw() -> void:
@@ -20,6 +35,32 @@ func _draw() -> void:
 		Katman.ARTIK: _artiklar()
 		Katman.SU: _su()
 		Katman.YOSUN: _yosun()
+		Katman.INCI: _inciler()
+		Katman.RENK: _renk()
+
+
+func _inciler() -> void:
+	var zaman := Time.get_ticks_msec() / 1000.0
+	for i in bakim.inciler.size():
+		var p: Vector2 = bakim.inciler[i]
+		draw_circle(p + Vector2(1.5, 2.0), 5.0, Color(0, 0, 0, 0.30))         # golge
+		draw_circle(p, 4.6, Color(0.86, 0.84, 0.88))                           # inci
+		draw_circle(p + Vector2(0.9, 1.0), 3.4, Color(0.74, 0.70, 0.78))       # alt golgelenme
+		draw_circle(p + Vector2(-0.6, -0.7), 3.0, Color(0.97, 0.94, 0.97))
+		draw_circle(p + Vector2(0.5, -0.2), 2.2, Color(1.0, 0.86, 0.92, 0.35)) # sedef pembesi
+		draw_circle(p + Vector2(-1.6, -1.8), 1.1, Color(1, 1, 1, 0.95))        # parlama
+		# Ara ara yildiz gibi parildar
+		var parilti := pow(maxf(0.0, sin(zaman * 1.7 + i * 2.1)), 12.0)
+		if parilti > 0.02:
+			var k := 7.0 * parilti
+			var r := Color(1, 1, 1, parilti)
+			draw_line(p + Vector2(-1.6 - k, -1.8), p + Vector2(-1.6 + k, -1.8), r, 1.0, true)
+			draw_line(p + Vector2(-1.6, -1.8 - k), p + Vector2(-1.6, -1.8 + k), r, 1.0, true)
+
+
+func _renk() -> void:
+	if bakim.isik_rengi != 0:
+		draw_circle(MERKEZ, 241.0, RENKLER[bakim.isik_rengi])
 
 
 func _yuva() -> void:

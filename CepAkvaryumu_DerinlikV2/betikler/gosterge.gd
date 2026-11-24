@@ -22,10 +22,17 @@ func _draw() -> void:
 	var su_renk := Color(0.75, 0.78, 0.2).lerp(Color(0.25, 0.85, 1.0), clampf((su - 0.3) / 0.5, 0.0, 1.0))
 	if su > 0.005:
 		draw_arc(MERKEZ, 214.0, sag_bas, lerpf(sag_bas, sag_bit, su), 32, su_renk, 9.0, true)
-	# Su degisimi ilerlemesi: kenarda donen ince halka
-	var ilerleme: float = akvaryum.get("su_degisim_ilerleme")
-	if ilerleme > 0.01:
-		draw_arc(MERKEZ, 229.0, -PI / 2.0, -PI / 2.0 + TAU * ilerleme, 64, Color(0.45, 0.9, 1.0, 0.9), 5.0, true)
+	# Performans gostergesi (menu > FPS): saatte akicilik / yuk olcumu icin
+	if Ayarlar.fps_goster:
+		var yazi := ThemeDB.fallback_font
+		var ms := Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
+		var cizim := int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
+		var bellek := Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0
+		var satir1 := "%d FPS  ·  %.1f ms" % [Engine.get_frames_per_second(), ms]
+		var satir2 := "%d çizim  ·  %.0f MB" % [cizim, bellek]
+		draw_rect(Rect2(160, 392, 160, 40), Color(0, 0, 0, 0.55))
+		draw_string(yazi, Vector2(160, 409), satir1, HORIZONTAL_ALIGNMENT_CENTER, 160, 14, Color(0.6, 1.0, 0.6))
+		draw_string(yazi, Vector2(160, 426), satir2, HORIZONTAL_ALIGNMENT_CENTER, 160, 12, Color(0.8, 0.9, 1.0))
 	# Sag alt ya da kenarlarda yazi kullanmiyoruz; merkez oyuncak gibi kalmiyor.
 	# Minik isik sembolu: basma alani degil, uzun basmaya gorsel ipucu.
 	draw_circle(Vector2(240.0, 56.0), 18.0, Color(0.0, 0.08, 0.12, 0.50))

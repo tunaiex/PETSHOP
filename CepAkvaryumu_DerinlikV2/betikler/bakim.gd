@@ -1,11 +1,12 @@
 extends Node
-## Akvaryum bakimi: cam yosunu, su kalitesi, artan yem, mutluluk, kopuk yuvasi.
+## Akvaryum bakimi: cam yosunu, su kalitesi, artan yem, mutluluk, kopuk yuvasi,
+## ilerleme (buyume, inci, magaza: super yem, filtre, isik renkleri).
 ## Tum degerler gercek zamanla ilerler (uygulama kapaliyken de); ana betik
 ## her saniye ve acilista gecen sureyi zamani_ilerlet() ile verir.
 ##
 ## Cizim, z_index'leri farkli dort kucuk Node2D ile yapilir (bakim_cizim.gd):
 ##   Yuva (yuzeyde kopuk yuvasi), Artiklar (dipteki yem), SuRengi (bulaniklik),
-##   CamYosunu (en onde, camin ustunde).
+##   CamYosunu (en onde, camin ustunde), Inciler (kumda), IsikRengi (renk filtresi).
 
 signal cam_parladi        # kirli cam tamamen temizlendi
 signal degisti            # cizimlerin yenilenmesi gerekiyor
@@ -22,6 +23,14 @@ const YOSUN_LEKE := 12
 const YUVA_BUYUME_SAAT := 6.0        # mutluyken yuva 6 saatte tamamlanir
 const YUVA_SONME_SAAT := 3.0         # mutsuzken 3 saatte kaybolur
 const MUTLULUK_ZAMAN_SABITI := 1800.0  # mutluluk hedefe ~30 dk'da yaklasir
+const BUYUME_GUN := 7.0              # iyi bakilan yavru 7 gunde tam boy olur
+const YAVRU_BOY := 0.65
+const INCI_SAAT := 2.0               # mutluyken her 2 saatte bir inci
+const INCI_EN_FAZLA := 3             # kumda ayni anda en fazla 3 inci
+const KUM_MASKESI := preload("res://gorseller/kum_maske.png")
+# Magaza: urun -> inci fiyati
+const FIYAT := {"super_yem": 1, "filtre": 5, "renk_1": 3, "renk_2": 3}
+const RENK_ADLARI := ["Normal", "Gün batımı", "Ay ışığı"]
 
 var su := 85.0                       # 100 = berrak, 0 = cok kirli
 var su_gorunen := 85.0               # su degisiminde yumusak gecis icin
@@ -32,11 +41,27 @@ var mutluluk := 70.0                 # 0..100
 var lekeler: Array[Dictionary] = []  # {p: Vector2, r: float, l: 0..1, h: buyume/sn, t: tohum}
 var artiklar: Array[Dictionary] = [] # {p: Vector2 (ekran), dip: float, yas: sn}
 
+# --- Ilerleme ---
+var boy := YAVRU_BOY                 # 0.65 yavru .. 1.0 yetiskin (yeni oyun)
+var dogum := 0.0                     # unix zamani: balik ne zaman geldi
+var inci_sayisi := 0
+var inci_birikim := 0.0              # 0..1 bir sonraki inciye ilerleme
+var inciler: Array[Vector2] = []     # kumda duran inciler (ekran konumu)
+var filtre := false
+var isik_rengi := 0                  # 0 normal, 1 gun batimi, 2 ay isigi
+var renkler := [true, false, false]  # alinmis isik renkleri
+var _kum_resmi: Image
+
 
 func _ready() -> void:
 	if lekeler.is_empty():
 		for i in YOSUN_LEKE:
 			lekeler.append(_yeni_leke(randf_range(0.0, 0.2)))
+	if dogum <= 0.0:
+		dogum = Time.get_unix_time_from_system()
+	_kum_resmi = KUM_MASKESI.get_image()
+	if _kum_resmi.is_compressed():
+		_kum_resmi.decompress()
 
 
 func _yeni_leke(seviye: float) -> Dictionary:
@@ -66,7 +91,8 @@ func zamani_ilerlet(saniye: float, tokluk: float) -> void:
 		artik_kiri += minf(saniye, kalan) * ARTIK_KIRLETME_SAAT / SAAT
 		a["yas"] += saniye
 	artiklar = artiklar.filter(func(a): return a["yas"] < ARTIK_OMUR_SAAT * SAAT)
-	su = clampf(su - saniye * 100.0 / (SU_BITIS_SAAT * SAAT) - artik_kiri, 0.0, 100.0)
+	var filtre_carpani := 0.5 if filtre else 1.0
+	su = clampf(su - (saniye * 100.0 / (SU_BITIS_SAAT * SAAT) + artik_kiri) * filtre_carpani, 0.0, 100.0)
 	if not gecis:
 		su_gorunen = su
 
@@ -86,6 +112,18 @@ func zamani_ilerlet(saniye: float, tokluk: float) -> void:
 		yuva = minf(1.0, yuva + saniye / (YUVA_BUYUME_SAAT * SAAT))
 	elif mutluluk < 50.0:
 		yuva = maxf(0.0, yuva - saniye / (YUVA_SONME_SAAT * SAAT))
+
+	# Buyume: yalnizca iyi bakilirken (mutlu ve ac degil)
+	if mutluluk > 50.0 and tokluk > 30.0:
+		boy = minf(1.0, boy + saniye / (BUYUME_GUN * 24.0 * SAAT) * (1.0 - YAVRU_BOY))
+	# Inci: mutlu akvaryumda zamanla kumda belirir
+	if mutluluk >= 70.0:
+		inci_birikim += saniye / (INCI_SAAT * SAAT)
+		while inci_birikim >= 1.0 and inciler.size() < INCI_EN_FAZLA:
+			inci_birikim -= 1.0
+			inciler.append(_kumda_yer())
+		if inciler.size() >= INCI_EN_FAZLA:
+			inci_birikim = minf(inci_birikim, 1.0)
 	degisti.emit()
 
 
@@ -137,6 +175,56 @@ func cami_sil(noktalar: PackedVector2Array) -> int:
 	return biten
 
 
+## Kum maskesinden, on kisimda rastgele bir kum noktasi (inci icin).
+func _kumda_yer() -> Vector2:
+	for deneme in 60:
+		var p := Vector2(randf_range(120.0, 360.0), randf_range(385.0, 445.0))
+		if p.distance_to(MERKEZ) > 215.0:
+			continue
+		var px := Vector2i(clampi(int(p.x), 0, _kum_resmi.get_width() - 1), clampi(int(p.y), 0, _kum_resmi.get_height() - 1))
+		if _kum_resmi.get_pixelv(px).r > 0.9:
+			return p
+	return Vector2(240.0, 430.0)
+
+
+## Dokunulan yerde inci varsa toplar.
+func inci_topla(ekran_konumu: Vector2) -> bool:
+	for i in inciler.size():
+		if inciler[i].distance_to(ekran_konumu) < 26.0:
+			inciler.remove_at(i)
+			inci_sayisi += 1
+			degisti.emit()
+			return true
+	return false
+
+
+## Magazadan alisveris. Basariliysa true. (super_yem etkisini ana betik uygular)
+func satin_al(urun: String) -> bool:
+	if not FIYAT.has(urun) or inci_sayisi < FIYAT[urun]:
+		return false
+	if urun == "filtre" and filtre:
+		return false
+	inci_sayisi -= FIYAT[urun]
+	match urun:
+		"super_yem": mutluluk = minf(100.0, mutluluk + 10.0)
+		"filtre": filtre = true
+		"renk_1": renkler[1] = true; isik_rengi = 1
+		"renk_2": renkler[2] = true; isik_rengi = 2
+	degisti.emit()
+	return true
+
+
+func renk_sec(i: int) -> void:
+	if i >= 0 and i < renkler.size() and renkler[i]:
+		isik_rengi = i
+		degisti.emit()
+
+
+## Balik ne kadar zamandir akvaryumda (gun).
+func yas_gun() -> float:
+	return maxf(0.0, Time.get_unix_time_from_system() - dogum) / (24.0 * SAAT)
+
+
 ## Balik tokken atilan yem dibe coker.
 func artik_ekle(ekran_konumu: Vector2) -> void:
 	if artiklar.size() >= ARTIK_EN_FAZLA:
@@ -183,7 +271,12 @@ func sozluk() -> Dictionary:
 	var a := []
 	for artik in artiklar:
 		a.append([artik["p"].x, artik["dip"], artik["yas"]])
-	return {"su": su, "yuva": yuva, "mutluluk": mutluluk, "lekeler": l, "artiklar": a}
+	var inc := []
+	for p in inciler:
+		inc.append([p.x, p.y])
+	return {"su": su, "yuva": yuva, "mutluluk": mutluluk, "lekeler": l, "artiklar": a,
+		"boy": boy, "dogum": dogum, "inci": inci_sayisi, "inci_birikim": inci_birikim,
+		"inciler": inc, "filtre": filtre, "isik_rengi": isik_rengi, "renkler": renkler}
 
 
 func yukle(d: Dictionary) -> void:
@@ -196,6 +289,21 @@ func yukle(d: Dictionary) -> void:
 		lekeler.clear()
 		for e in l:
 			lekeler.append({"p": Vector2(e[0], e[1]), "r": float(e[2]), "l": float(e[3]), "h": float(e[4]), "t": int(e[5])})
+	# Eski kayit (ilerleme sistemi oncesi): balik zaten yetiskin
+	boy = clampf(float(d.get("boy", 1.0)), YAVRU_BOY, 1.0)
+	dogum = float(d.get("dogum", dogum))
+	inci_sayisi = int(d.get("inci", 0))
+	inci_birikim = float(d.get("inci_birikim", 0.0))
+	inciler.clear()
+	for e in d.get("inciler", []):
+		inciler.append(Vector2(e[0], e[1]))
+	filtre = bool(d.get("filtre", false))
+	var r = d.get("renkler", [true, false, false])
+	if r is Array and r.size() == 3:
+		renkler = [bool(r[0]), bool(r[1]), bool(r[2])]
+	isik_rengi = clampi(int(d.get("isik_rengi", 0)), 0, 2)
+	if not renkler[isik_rengi]:
+		isik_rengi = 0
 	artiklar.clear()
 	for e in d.get("artiklar", []):
 		# Kayittan gelen yem zaten dipte durur.

@@ -33,7 +33,11 @@ const YUZME_KEMIKLERI := [
 	["Bone.033", "Y", 0.45, -1], ["Bone.035", "Y", 0.55, -1], ["Bone.034", "Y", 0.60, -1], ["Bone.036", "Y", 0.70, -1],
 	["Bone.010", "P", 0.0, 1], ["Bone.011", "P", 0.0, -1],
 	["Bone.027", "V", 0.0, 0], ["Bone.028", "V", 0.0, 0],
+	# Solungac kapaklari (kabarmada disa acilir): +1 sag, -1 sol
+	["Bone.046", "S", 0.0, 1], ["Bone.048", "S", 0.0, 1], ["Bone.050", "S", 0.0, 1],
+	["Bone.047", "S", 0.0, -1], ["Bone.049", "S", 0.0, -1], ["Bone.051", "S", 0.0, -1],
 ]
+const SOLUNGAC_ACI := 0.55        # kabarmada solungac kapagi acilmasi (rad)
 # Balik Sprite2D olcekleri bu dahili boyuta gore ayarlanmisti.
 const REFERANS_BOYUT := 192.0
 
@@ -48,6 +52,8 @@ var yanal_eksen := Vector3.RIGHT   # balik govdesinin "yan"i (yuzgec acilip kapa
 var yalpa := 0.0
 var bukulme := 0.0
 var onceki_sapma := 0.0
+var kabarma := 0.0               # 0..1, yumusak gecis
+var kabarma_suresi := 0.0
 var malzemeler: Array[BaseMaterial3D] = []
 var etkin := true
 
@@ -139,6 +145,11 @@ func olcek_carpani() -> float:
 	return REFERANS_BOYUT / float(size.x)
 
 
+## Kabarma (flare): solungaclar ve yuzgecler sonuna kadar acilir.
+func kabar(sure := 2.5) -> void:
+	kabarma_suresi = maxf(kabarma_suresi, sure)
+
+
 ## Oyun arka plandayken / ekran kapaliyken 3B cizimi tamamen durdurur.
 func etkinlestir(acik: bool) -> void:
 	etkin = acik
@@ -179,6 +190,13 @@ func guncelle(yon: Vector3, hiz: float, delta: float, uyuyor: bool) -> void:
 	# Hizli yuzerken yuzgecler geriye yatar, daha az acilip kapanir.
 	var yelpaze := 0.4 if uyuyor else lerpf(1.0, 0.6, etkinlik)
 
+	# Kabarma: govde dalgasi neredeyse durur, yuzgecler gerilir, balik hafif sisar
+	kabarma_suresi = maxf(0.0, kabarma_suresi - delta)
+	kabarma = move_toward(kabarma, 1.0 if kabarma_suresi > 0.0 else 0.0, delta * 3.5)
+	var kb := kabarma * kabarma * (3.0 - 2.0 * kabarma)  # yumusak gecis
+	genlik *= 1.0 - 0.75 * kb
+	pivot.scale = Vector3.ONE * (1.0 + 0.06 * kb)
+
 	# Bas, kuyruga ters yonde hafifce salinir (tum govde degil, pivot).
 	pivot.rotate_object_local(Vector3.UP, -genlik * 0.35 * sin(faz))
 
@@ -197,16 +215,19 @@ func guncelle(yon: Vector3, hiz: float, delta: float, uyuyor: bool) -> void:
 				yana = genlik * (0.5 + 1.0 * s_) * sin(faz - s_ * 4.0) + bukulme
 			"K":
 				yana = genlik * 1.0 * sin(faz - s_ * 4.0)
-				dikey = yelpaze * (isaret * 0.10 * sin(faz * 0.45 - s_ * 2.0) + 0.06 * sin(faz * 0.8 - s_ * 3.0))
+				dikey = yelpaze * (isaret * 0.10 * sin(faz * 0.45 - s_ * 2.0) + 0.06 * sin(faz * 0.8 - s_ * 3.0)) - isaret * 0.30 * kb
 			"Y":
 				yana = genlik * 0.9 * sin(faz - s_ * 4.0 - 0.6)
-				dikey = yelpaze * isaret * 0.13 * sin(faz * 0.6 - s_ * 5.0)
+				dikey = yelpaze * isaret * 0.13 * sin(faz * 0.6 - s_ * 5.0) - isaret * 0.45 * kb
 			"P":
-				yana = kurek * sin(kurek_faz)
+				yana = kurek * sin(kurek_faz) * (1.0 - 0.5 * kb) - isaret * 0.5 * kb
 				dikey = isaret * kurek * 0.6 * sin(kurek_faz + 1.2)
 			"V":
 				yana = 0.10 * sin(faz * 0.5)
-				dikey = 0.15 * yelpaze * sin(faz * 0.5 + 1.0)
+				dikey = 0.15 * yelpaze * sin(faz * 0.5 + 1.0) + 0.35 * kb
+			"S":
+				# Solungac: kabarirken disa acilir, titrer
+				yana = -isaret * SOLUNGAC_ACI * kb * (1.0 + 0.08 * sin(faz * 6.0))
 		_kemigi_dondur(e[0], yana, dikey)
 
 
