@@ -2,7 +2,7 @@
 """Blender render'ini (guzel.png + maske_*.png) oyun katmanlarina boler.
 
 Kullanim: python3 -I araclar/arka_plan_katmanla.py RENDER_DIZINI CIKTI_DIZINI
-Ciktilar: arka_plan.webp, tas_on.png, kutuk_on.png, yaprak_on.png, konumlar.json
+Ciktilar: arka_plan.webp, tas_on.png, kutuk_on.png, yaprak_on.png, kum_maske.png, konumlar.json
 (konumlar: her katmanin 480x480 sahnedeki merkezi -> akvaryum.tscn'deki position)
 """
 import json
@@ -28,5 +28,11 @@ for ad, dosya in [("tas", "tas_on.png"), ("kutuk", "kutuk_on.png"), ("on", "yapr
     bb = m.point(lambda v: 255 if v > 0 else 0).getbbox()
     katman.crop(bb).save(cikti + dosya, optimize=True)
     konumlar[ad] = {"boyut": [bb[2] - bb[0], bb[3] - bb[1]], "merkez": [(bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2]}
+# Kum maskesi: kostik isiklari yalnizca kum zemine duser (tam ekran, gri tonlu)
+try:
+    km = Image.open(kaynak + "maske_kum.png").convert("L").resize((480, 480), Image.LANCZOS)
+    km.filter(ImageFilter.GaussianBlur(0.8)).save(cikti + "kum_maske.png", optimize=True)
+except FileNotFoundError:
+    pass
 json.dump(konumlar, open(cikti + "konumlar.json", "w"), indent=1)
 print(json.dumps(konumlar))

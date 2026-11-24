@@ -40,8 +40,8 @@ const CERCEVE_SU_TIK := 12     # cerceveyi bu kadar tik cevirmek = su degisimi
 @onready var bakim: Node = $Bakim
 @onready var arka_plan: Sprite2D = $ArkaPlan
 @onready var su_yuzeyi_malzeme: ShaderMaterial = $ArkaPlan.material
-@onready var kaya_malzemeleri: Array = [[$Tas, $Tas.material], [$Kutuk, $Kutuk.material]]
 var kostik_gucu := 0.35          # ekrandaki guc; hedefe yumusakca yaklasir
+var bitki_akintisi := 0.0
 
 # Tokluk: 100 = tok, 0 = ac. Onceki projenin 'aclik' kaydi da okunur.
 var aclik := 85.0
@@ -157,6 +157,10 @@ func _process(delta: float) -> void:
 
 
 func _kostigi_guncelle(delta: float) -> void:
+	# Bilek donusunden gelen akinti bitkileri o yone eger.
+	if absf(su_akintisi - bitki_akintisi) > 0.01:
+		bitki_akintisi = su_akintisi
+		su_yuzeyi_malzeme.set_shader_parameter("akinti", bitki_akintisi)
 	# Isik kapaliyken gunes yok: kostik soner. Kirli su isigi dagitir: zayiflar.
 	var hedef := 0.0
 	if isik_acik:
@@ -166,16 +170,12 @@ func _kostigi_guncelle(delta: float) -> void:
 		return
 	kostik_gucu = yeni
 	su_yuzeyi_malzeme.set_shader_parameter("kostik_guc", kostik_gucu)
-	for km in kaya_malzemeleri:
-		km[1].set_shader_parameter("kostik_guc", kostik_gucu)
 
 
 func _fps_ayarla() -> void:
 	# Su yuzeyi dalgasi ve kostikler ayni ayara bagli (Dusuk profilde kapali).
 	var efekt := bool(Ayarlar.deger("su_dalgasi"))
 	arka_plan.material = su_yuzeyi_malzeme if efekt else null
-	for km in kaya_malzemeleri:
-		km[0].material = km[1] if efekt else null
 	Engine.max_fps = int(Ayarlar.deger("fps" if isik_acik else "gece_fps"))
 
 

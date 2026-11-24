@@ -3,7 +3,7 @@
 Kullanim:
   blender -b --disable-autoexec --python akvaryum_sahne.py -- VARLIK_DIZINI CIKTI_DIZINI [ornek] [mod]
 mod: "guzel" (tam render) | "maske" (katman maskeleri) | "hepsi"
-Ciktilar: guzel.png (tum sahne), maske_tas.png, maske_kutuk.png, maske_on.png
+Ciktilar: guzel.png (tum sahne), maske_tas.png, maske_kutuk.png, maske_on.png, maske_kum.png
 """
 import bpy, sys, os, math, mathutils
 
@@ -353,11 +353,15 @@ if MOD in ("maske", "hepsi"):
     w.node_tree.nodes["Background"].inputs[1].default_value = 0.0  # dunya isigi kapali
     sc.view_settings.view_transform = "Standard"; sc.view_settings.look = "None"
     sc.cycles.samples = 16; sc.cycles.use_denoising = False
-    katmanlar = {"tas": K_TAS, "kutuk": K_KUTUK, "on": K_ON}
+    # "kum": yalnizca kum zemin (kostik isiklari sadece buraya duser)
+    katmanlar = {"tas": K_TAS, "kutuk": K_KUTUK, "on": K_ON, "kum": "zemin"}
     tum = [o for o in sc.objects if o.type == "MESH" and not o.users_collection[0] is K_ISIK]
     for ad, kol in katmanlar.items():
         for o in tum:
-            mat = beyaz if kol in o.users_collection else siyahm
+            if isinstance(kol, str):
+                mat = beyaz if o.name == kol else siyahm
+            else:
+                mat = beyaz if kol in o.users_collection else siyahm
             o.data.materials.clear() if False else None
             o.material_slots and None
             o["_asil"] = 1
