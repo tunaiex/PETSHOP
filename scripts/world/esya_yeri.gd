@@ -42,7 +42,9 @@ func _onizle() -> void:
 	if m == null and info.has("rack"):
 		# Akvaryum rafları: oyundaki gibi modelin kendisi (döndürülüp ortalanmış)
 		var rc: Dictionary = info.rack
-		if ResourceLoader.exists(str(rc.get("model", ""))):
+		if str(rc.get("frame", "")) == "kabin" and ResourceLoader.exists(AquariumRack.CABINET_MODEL):
+			m = (load(AquariumRack.CABINET_MODEL) as PackedScene).instantiate()
+		elif ResourceLoader.exists(str(rc.get("model", ""))):
 			var rm: Node3D = (load(rc.model) as PackedScene).instantiate()
 			var box: AABB = MeshKit.model_aabb(rm)
 			rm.position = -Vector3(box.get_center().x, box.position.y, box.get_center().z)

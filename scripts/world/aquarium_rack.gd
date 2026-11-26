@@ -116,7 +116,17 @@ func _build_shop_frame() -> void:
 
 ## Siyah kabinli akvaryum duvarı: altta kapaklı dolap, kapalı yanlar ve arka, katlar arasında kalın
 ## siyah bantlar (ışık bandı), üstte kornişli kapak. Fotoğraftaki mağaza akvaryum sistemleri gibi.
+const CABINET_MODEL := "res://assets/modeller/akvaryum/akvaryum_kabin.glb"
+
+
 func _build_cabinet_frame() -> void:
+	# Blender'da yapılmış gerçekçi model (assets/modeller/akvaryum/akvaryum_kabin.glb); yoksa kutularla çiz
+	if ResourceLoader.exists(CABINET_MODEL):
+		var m: Node3D = (load(CABINET_MODEL) as PackedScene).instantiate()
+		add_child(m)
+		for c in m.find_children("*", "MeshInstance3D", true, false):
+			(c as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+		return
 	var black := MeshKit.mat(Color(0.035, 0.035, 0.04), 0.3, 0.2)
 	var seam := MeshKit.mat(Color(0.12, 0.12, 0.13), 0.4)
 	var lv: Array = levels()
