@@ -5,7 +5,7 @@ extends Node3D
 ## Kargo kolisinde, oyuncunun elinde, müşterinin elinde ve kasa tezgâhında aynı görünüm.
 ## Kök noktası poşetin/kutunun tabanıdır.
 
-const BAG_MODEL := "res://assets/models/props/balik_posedi.glb"
+const BAG_MODEL := "res://assets/modeller/akvaryum/balik_posedi.glb"
 const BAG_HEIGHT := 0.3   ## poşetin gerçek boyu (m)
 
 var species: String = ""

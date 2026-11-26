@@ -151,7 +151,7 @@ static func get_product(id: String) -> Dictionary:
 	return PRODUCTS.get(id, {})
 
 
-const MODEL := "res://assets/models/products/%s.glb"
+const MODEL := "res://assets/modeller/urun/%s.glb"
 
 
 ## Ürünün hazır modeli varsa, yüksekliği `height` olacak, tabanı y=0'da ve

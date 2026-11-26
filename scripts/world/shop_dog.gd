@@ -3,7 +3,7 @@ extends Node3D
 ## Dükkânın maskotu: Labrador "Karamel". Mağazada dolaşır, koklar, oturur, yatar.
 ## Oyuncu severse kuyruk sallar (silkinir / oyun daveti), müşteriler onu sever (+itibar, günde bir).
 
-const MODEL := "res://assets/models/animals/labrador.glb"
+const MODEL := "res://assets/modeller/hayvan/labrador.glb"
 const SCALE := 0.5        ## model gerçeğin iki katı büyüklükte geliyor
 const WALK_SPEED := 0.98 * SCALE   ## yürüme animasyonuna uyan hız (m/sn)
 const NAME := "Karamel"

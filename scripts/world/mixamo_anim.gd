@@ -7,7 +7,7 @@ extends RefCounted
 ##
 ## Model +Z'ye bakar, Y yukarı. Mixamo dinlenme pozu T-pozdur (kollar yanlara açık).
 
-const PHONE_ANIM := "res://assets/models/characters/anim_telefon.res"
+const PHONE_ANIM := "res://assets/modeller/karakter/anim_telefon.res"
 const WALK_LEN := 1.0
 
 static var _phone: Animation = null

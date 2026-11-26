@@ -284,8 +284,8 @@ func _test_meshes() -> void:
 			var size: Vector3 = (t.xf * t.mesh.get_aabb()).size
 			ok = abs(size.z - float(FishDB.get_species(id).length)) < 0.02 or id == "denizati"
 		check(ok, "%s gerçek modeli yüklendi ve boyu doğru" % id)
-	for prop in ["props/akvaryum_dolabi", "props/kasa_tezgahi", "props/duvar_rafi", "props/agave", "decor/resif_kayasi", "decor/amfora"]:
-		check(ResourceLoader.exists("res://assets/models/%s.glb" % prop), "%s modeli var" % prop)
+	for prop in ["akvaryum/akvaryum_dolabi", "mobilya/kasa_tezgahi", "mobilya/duvar_rafi", "bitki/agave", "dekor/resif_kayasi", "dekor/amfora"]:
+		check(ResourceLoader.exists("res://assets/modeller/%s.glb" % prop), "%s modeli var" % prop)
 	check(MeshKit.grass_clump(1, 6, 0.3).get_surface_count() == 1, "Bitki modeli üretildi")
 
 

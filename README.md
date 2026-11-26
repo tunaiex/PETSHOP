@@ -116,8 +116,8 @@ Yeni model eklemek için `.glb` dosyalarını aşağıdaki yerlere koyman yeterl
 
 | Dosya | Yerine geçtiği |
 |---|---|
-| `assets/models/fish/<tür>.glb` (ör. `neon.glb`, `japon.glb`) | O türün balığı |
-| `assets/models/characters/*.glb` | Müşteri karakterleri (`customer.gd` içindeki `CHARACTERS` listesine ekle). `walk` / `idle` animasyonları oynatılır. |
+| `assets/modeller/balik/<tür>.glb` (ör. `neon.glb`, `japon.glb`) | O türün balığı |
+| `assets/modeller/karakter/*.glb` | Müşteri karakterleri (`customer.gd` içindeki `CHARACTERS` listesine ekle). `walk` / `idle` animasyonları oynatılır. |
 
 Balık modelinin burnu **+Z** yönüne bakmalı (bu paketteki gibi). Farklıysa `fish_db.gd` içindeki `MODEL_FWD` ile ayarla.
 Boyutu tür uzunluğuna göre otomatik ölçeklenir.

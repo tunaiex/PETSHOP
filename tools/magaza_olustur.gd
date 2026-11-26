@@ -5,7 +5,7 @@ extends SceneTree
 ##   godot --headless --path . -s res://tools/magaza_olustur.gd
 
 const OUT := "res://scenes/magaza.tscn"
-const PIECE := "res://assets/models/store/bina/%s.glb"
+const PIECE := "res://assets/modeller/magaza/bina/%s.glb"
 const H_IN := 3.0
 const X0 := -7.2
 const X1 := 7.2

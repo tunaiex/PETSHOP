@@ -17,7 +17,7 @@ Mağaza `scenes/magaza.tscn` sahnesinde. Godot'da **FileSystem** panelinden bu d
 
 ## Sık yapılanlar
 
-- **Yeni parça eklemek:** `assets/models/store/bina/` ya da `assets/models/store/fixtures/` klasöründen bir `.glb` dosyasını sahneye sürükle. Duvar, vitrin ve kolon parçaları otomatik olarak geçilmez olur. Diğer büyük eşyalar kutu çarpışması alır. Zemin, tavan ve posterlere çarpışma verilmez.
+- **Yeni parça eklemek:** `assets/modeller/magaza/bina/` ya da `assets/modeller/magaza/esya/` klasöründen bir `.glb` dosyasını sahneye sürükle. Duvar, vitrin ve kolon parçaları otomatik olarak geçilmez olur. Diğer büyük eşyalar kutu çarpışması alır. Zemin, tavan ve posterlere çarpışma verilmez.
 - **Hazır bir raf eklemek:** `Esyalar` altındaki bir eşyayı seç, Ctrl+D ile çoğalt, taşı, Inspector'dan **Tip**'ini değiştir. Sadece Y ekseninde döndür.
 - **Bir rafı kaldırmak:** `Esyalar` altından sil.
 - **Dükkânı büyütmek ya da küçültmek:** duvar ve vitrin parçalarını taşı, zemin/tavan karolarını ekle ya da sil. Sonra `SatisAlani`'nın konumunu ve **Boyut**'unu yeni iç alana göre ayarla.

@@ -1,14 +1,14 @@
 class_name Customer
 extends Node3D
 ## Müşteri: içeri girer, tanklara bakar, balık/ürün seçer, sıraya girer, pazarlık eder, çıkar.
-## Görünüm: assets/models/characters/*.glb (yürüme/bekleme animasyonlu) yoksa prosedürel insan.
+## Görünüm: assets/modeller/karakter/*.glb (yürüme/bekleme animasyonlu) yoksa prosedürel insan.
 
 ## Mixamo karakterleri (yürüme/bekleme animasyonu MixamoAnim ile kodla üretilir)
 const CHARACTERS := [
-	"res://assets/models/characters/musteri_1.glb", "res://assets/models/characters/musteri_2.glb",
-	"res://assets/models/characters/musteri_3.glb", "res://assets/models/characters/musteri_4.glb",
-	"res://assets/models/characters/musteri_5.glb", "res://assets/models/characters/musteri_6.glb",
-	"res://assets/models/characters/musteri_7.glb", "res://assets/models/characters/musteri_8.glb",
+	"res://assets/modeller/karakter/musteri_1.glb", "res://assets/modeller/karakter/musteri_2.glb",
+	"res://assets/modeller/karakter/musteri_3.glb", "res://assets/modeller/karakter/musteri_4.glb",
+	"res://assets/modeller/karakter/musteri_5.glb", "res://assets/modeller/karakter/musteri_6.glb",
+	"res://assets/modeller/karakter/musteri_7.glb", "res://assets/modeller/karakter/musteri_8.glb",
 ]
 
 enum State { ENTER, BROWSE, LOOK, SHELF, QUEUE, REGISTER, LEAVE, GONE }
@@ -44,12 +44,12 @@ var _model: Node3D
 
 ## Müdavimlerin her gelişte aynı görünmesi için sabit modelleri (isim/cinsiyet uyumlu)
 const REGULAR_MODELS := {
-	"Hüseyin Amca": "res://assets/models/characters/musteri_5.glb",
-	"Ayşe Hanım": "res://assets/models/characters/musteri_2.glb",
-	"Mert": "res://assets/models/characters/musteri_1.glb",
-	"Zeynep": "res://assets/models/characters/musteri_3.glb",
-	"Kemal Usta": "res://assets/models/characters/musteri_8.glb",
-	"Elif Teyze": "res://assets/models/characters/musteri_7.glb",
+	"Hüseyin Amca": "res://assets/modeller/karakter/musteri_5.glb",
+	"Ayşe Hanım": "res://assets/modeller/karakter/musteri_2.glb",
+	"Mert": "res://assets/modeller/karakter/musteri_1.glb",
+	"Zeynep": "res://assets/modeller/karakter/musteri_3.glb",
+	"Kemal Usta": "res://assets/modeller/karakter/musteri_8.glb",
+	"Elif Teyze": "res://assets/modeller/karakter/musteri_7.glb",
 }
 var _idle_anim: String = ""
 var _bubble: Label3D

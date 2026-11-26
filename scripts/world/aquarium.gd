@@ -8,8 +8,8 @@ const TH := 0.55
 const TD := 0.5
 const STAND_H := 0.82
 const GRAVEL := 0.07
-const CABINET_MODEL := "res://assets/models/props/akvaryum_dolabi.glb"
-const RACK_TANK_MODEL := "res://assets/models/props/isikli_akvaryum.glb"
+const CABINET_MODEL := "res://assets/modeller/akvaryum/akvaryum_dolabi.glb"
+const RACK_TANK_MODEL := "res://assets/modeller/akvaryum/isikli_akvaryum.glb"
 ## Raf akvaryumu iç ölçüleri (yaklaşık 95 × 50 × 52 cm cam tank)
 const RACK_TW := 0.9
 const RACK_TH := 0.48
@@ -41,7 +41,7 @@ var _water_h: float = TH - 0.06
 var rack_level: int = -1
 ## "hamster" / "civciv": suyu olmayan hayvan kafesi. "" ise akvaryum.
 var pen: String = ""
-const PEN_MODEL_CHICK := "res://assets/models/props/civciv_kafesi.glb"
+const PEN_MODEL_CHICK := "res://assets/modeller/kafes/civciv_kafesi.glb"
 const CHICK_D := 1.05      ## civciv kafesi çapı
 const CHICK_FLOOR := 0.07  ## kafes tabanı yüksekliği
 var _rack_size: Vector2 = Vector2.ZERO
@@ -102,7 +102,7 @@ func setup_shelf(id: int, level: int, y0: float, size: Vector2, height: float) -
 
 ## Hamster / civciv kafesi kurulumu
 var _pen_colors: Array = []
-const BIRD_CAGE_MODEL := "res://assets/models/props/kus_kafesi.glb"
+const BIRD_CAGE_MODEL := "res://assets/modeller/kafes/kus_kafesi.glb"
 const BIRD_STAND := 0.75   ## kuş kafesi sehpasının üst yüzeyi
 const BIRD_W := 0.72       ## kafes tabanı genişliği
 
@@ -733,7 +733,7 @@ func _rebuild_content() -> void:
 	sync()
 
 
-const DECOR_MODEL := "res://assets/models/decor/%s.glb"
+const DECOR_MODEL := "res://assets/modeller/dekor/%s.glb"
 ## Dekor yuvaları (tank yerel x,z). Bitkiler arka sıraya dizilir.
 const SLOTS := [Vector2(-0.38, -0.08), Vector2(0.36, -0.06), Vector2(-0.02, -0.1), Vector2(0.16, 0.08), Vector2(-0.22, 0.1), Vector2(0.48, 0.12), Vector2(-0.5, 0.06), Vector2(0.04, 0.13)]
 

@@ -24,14 +24,14 @@ const ITEMS := {
 	"tank_rafi": {
 		"name": "3 katlı akvaryum rafı", "price": 450, "cat": "akvaryum",
 		"size": Vector2(1.1, 0.86), "height": 2.15,
-		"rack": {"model": "res://assets/models/props/akvaryum_rafi.glb", "rot": 90.0, "levels": [0.171, 0.835, 1.56], "bays": [0.0],
+		"rack": {"model": "res://assets/modeller/akvaryum/akvaryum_rafi.glb", "rot": 90.0, "levels": [0.171, 0.835, 1.56], "bays": [0.0],
 			"tank": Vector3(0.9, 0.48, 0.45), "slot_price": 420, "slot_cap": 8},
 		"desc": "Üst üste 3 ışıklı akvaryum alır. Her kata akvaryumu ayrıca alıp koyarsın (LED lamba dahil, 8 yer).",
 	},
 	"tank_rafi_2": {
 		"name": "İki bölmeli akvaryum rafı", "price": 780, "cat": "akvaryum",
 		"size": Vector2(2.14, 0.86), "height": 2.95,
-		"rack": {"model": "res://assets/models/props/akvaryum_rafi_ikili.glb", "rot": 90.0, "levels": [0.17, 0.835, 1.559, 2.223], "bays": [-0.525, 0.525],
+		"rack": {"model": "res://assets/modeller/akvaryum/akvaryum_rafi_ikili.glb", "rot": 90.0, "levels": [0.17, 0.835, 1.559, 2.223], "bays": [-0.525, 0.525],
 			"tank": Vector3(0.9, 0.48, 0.45), "slot_price": 420, "slot_cap": 8},
 		"desc": "Yan yana iki bölme, 4 kat: 8 ışıklı akvaryum alır. Akvaryumları ayrıca alırsın.",
 	},
@@ -63,7 +63,7 @@ const ITEMS := {
 	"turk_akvaryum_rafi": {
 		"name": "18 bölmeli akvaryum duvarı", "price": 2800, "cat": "akvaryum",
 		"size": Vector2(4.25, 0.7), "height": 2.3,
-		"rack": {"model": "res://assets/models/props/akvaryum_rafi_turk.glb", "rot": 0.0, "levels": [0.37, 1.03, 1.67], "bays": [-1.75, -1.05, -0.35, 0.35, 1.05, 1.75], "z": 0.02,
+		"rack": {"model": "res://assets/modeller/akvaryum/akvaryum_rafi_turk.glb", "rot": 0.0, "levels": [0.37, 1.03, 1.67], "bays": [-1.75, -1.05, -0.35, 0.35, 1.05, 1.75], "z": 0.02,
 			"tank": Vector3(0.58, 0.5, 0.42), "slot_price": 180, "slot_cap": 4, "prefilled": true},
 		"desc": "Balıkçı dükkânlarındaki gibi 6 sütun x 3 kat akvaryum duvarı. 18 bölmenin hepsi kumlu, ışıklı ve suyla dolu gelir: içine balık koyman yeterli.",
 	},
@@ -274,7 +274,7 @@ static func in_category(cat: String) -> Array:
 	return ITEMS.keys().filter(func(k): return ITEMS[k].cat == cat and not ITEMS[k].get("hidden", false))
 
 
-const STORE_MODEL := "res://assets/models/store/fixtures/%s.glb"
+const STORE_MODEL := "res://assets/modeller/magaza/esya/%s.glb"
 
 
 ## Mağaza paketindeki eşya modeli (çarpışma kopyaları gizli). Yoksa null.

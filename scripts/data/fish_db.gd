@@ -2,7 +2,7 @@ class_name FishDB
 extends RefCounted
 ## Balık türleri veritabanı.
 ## Yeni tür eklemek için SPECIES sözlüğüne bir kayıt eklemek yeterli.
-## assets/models/fish/<id>.glb dosyası varsa prosedürel model yerine o kullanılır.
+## assets/modeller/balik/<id>.glb dosyası varsa prosedürel model yerine o kullanılır.
 
 const SPECIES := {
 	"lepistes": {
@@ -272,9 +272,9 @@ static func get_species(id: String) -> Dictionary:
 ## Bu türün gerçek 3D modeli (yoksa "").
 ## Kara hayvanlarının modelleri ve modelin baş yönü
 const LAND_MODELS := {
-	"hamster": ["res://assets/models/animals/hamster.glb", Vector3(-1, 0, 0), "HamsterALL_Walk", "HamsterALL_Idle"],
-	"civciv": ["res://assets/models/animals/civciv.glb", Vector3(0, 0, 1), "Take 001", "Take 001"],
-	"orumcek": ["res://assets/models/animals/orumcek.glb", Vector3(0, 0, 1), "Spider_Armature|walk_ani_vor", "Spider_Armature|warte_pose"],
+	"hamster": ["res://assets/modeller/hayvan/hamster.glb", Vector3(-1, 0, 0), "HamsterALL_Walk", "HamsterALL_Idle"],
+	"civciv": ["res://assets/modeller/hayvan/civciv.glb", Vector3(0, 0, 1), "Take 001", "Take 001"],
+	"orumcek": ["res://assets/modeller/hayvan/orumcek.glb", Vector3(0, 0, 1), "Spider_Armature|walk_ani_vor", "Spider_Armature|warte_pose"],
 }
 
 
@@ -298,7 +298,7 @@ static func ids_in_habitat(h: String) -> Array:
 
 
 static func model_path(id: String) -> String:
-	var p := "res://assets/models/fish/%s.glb" % id
+	var p := "res://assets/modeller/balik/%s.glb" % id
 	return p if ResourceLoader.exists(p) else ""
 
 

@@ -51,6 +51,8 @@ func _process(_d):
 			if b.text.begins_with("Parasını"):
 				b.pressed.emit()
 		print("-- satış + kepçe")
+		if g.tanks[0].fish.is_empty():
+			g.tanks[0].fish.append(TankSim.new_fish("neon"))
 		var cs = m.spawn_customer()
 		cs.basket = [{"type": "fish", "tank": 0, "uid": int(g.tanks[0].fish[0].uid), "species": "neon"}]
 		m.queue = [cs]

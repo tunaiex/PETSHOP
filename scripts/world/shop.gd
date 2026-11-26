@@ -138,7 +138,6 @@ static func pbr(kind: String) -> Material:
 	var m := StandardMaterial3D.new()
 	m.uv1_triplanar = true
 	m.uv1_world_triplanar = true
-	var city := "res://assets/models/city/%s"
 	match kind:
 		"terrazzo":
 			m.albedo_texture = load("res://assets/textures/terrazzo_color.jpg")
@@ -149,22 +148,6 @@ static func pbr(kind: String) -> Material:
 			m.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
 			m.roughness = 0.75
 			m.uv1_scale = Vector3.ONE * 0.4
-		"marble", "concrete", "paver", "asphalt", "brick", "metal":
-			var base: String = {"marble": "T_MarbleFloor", "concrete": "T_Concrete", "paver": "T_Concrete", "asphalt": "T_Concrete_Asphalt", "brick": "T_RedBrick", "metal": "T_MetalConcrete"}[kind]
-			m.albedo_texture = load(city % (base + "_BaseColor.png"))
-			if kind != "asphalt":
-				m.normal_enabled = true
-				m.normal_texture = load(city % (base + "_Normal.png"))
-				m.roughness_texture = load(city % (base + "_ORM.png"))
-				m.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_GREEN
-				m.ao_enabled = true
-				m.ao_texture = load(city % (base + "_ORM.png"))
-				m.ao_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
-			else:
-				m.roughness = 0.9
-			m.uv1_scale = Vector3.ONE * {"marble": 0.35, "concrete": 0.3, "paver": 0.45, "asphalt": 0.15, "brick": 0.5, "metal": 0.4}[kind]
-			if kind == "metal":
-				m.albedo_color = Color(0.42, 0.44, 0.46)
 	_mat_cache[kind] = m
 	return m
 
@@ -210,7 +193,7 @@ func _collider(parent: Node3D, size: Vector3, pos: Vector3) -> void:
 
 
 const MAGAZA := "res://scenes/magaza.tscn"
-const SIGN_BAND := "res://assets/models/store/tabela_bandi.glb"
+const SIGN_BAND := "res://assets/modeller/magaza/tabela_bandi.glb"
 const H_IN := 3.0
 ## Satış alanı (x, z, genişlik, derinlik) ve otomatik kapının ortası.
 ## Mağaza sahnesindeki "SatisAlani" ve "Kapi" düğümlerinden okunur; bunlar varsayılanlar.

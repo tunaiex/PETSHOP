@@ -3,7 +3,7 @@ extends Node3D
 ## Çalışan: kasiyer kasada bekleyen müşteriye satış yapar,
 ## bakımcı tankları dolaşıp yem verir, ölü balıkları çıkarır, kirli suyu değiştirir.
 
-const CHARACTERS := ["res://assets/models/characters/musteri_2.glb", "res://assets/models/characters/musteri_6.glb"]
+const CHARACTERS := ["res://assets/modeller/karakter/musteri_2.glb", "res://assets/modeller/karakter/musteri_6.glb"]
 
 var role: String = "kasiyer"
 var main: Node

@@ -3,7 +3,7 @@ extends Node3D
 ## Ürün rafı. İçindeki ürünler Game.furniture kaydındaki "shelf" sözlüğünden çizilir.
 ## Oyuncu depodan rafa dizer, müşteri raftan alır.
 
-const WALL_MODEL := "res://assets/models/props/duvar_rafi.glb"
+const WALL_MODEL := "res://assets/modeller/mobilya/duvar_rafi.glb"
 
 var furniture_uid: int = 0
 var kind: String = "kavisli_raf"

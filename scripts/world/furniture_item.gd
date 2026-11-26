@@ -2,7 +2,8 @@ class_name FurnitureItem
 extends Node3D
 ## Kasa tezgâhı, saksı bitkileri ve paspas gibi genel eşyalar.
 
-const PROPS := "res://assets/models/props/%s.glb"
+## Model klasörleri (assets/modeller/<klasör>/<ad>.glb)
+const PROP_DIRS := ["bitki", "mobilya", "akvaryum", "kafes", "dekor"]
 
 var furniture_uid: int = 0
 var type: String = ""
@@ -48,10 +49,13 @@ func setup(uid: int, t: String, m: Node) -> void:
 
 
 func _prop(id: String) -> Node3D:
-	var path := PROPS % id
-	if not ResourceLoader.exists(path):
+	if id == "":
 		return null
-	return (load(path) as PackedScene).instantiate()
+	for d in PROP_DIRS:
+		var path := "res://assets/modeller/%s/%s.glb" % [d, id]
+		if ResourceLoader.exists(path):
+			return (load(path) as PackedScene).instantiate()
+	return null
 
 
 ## Kasa üstü cihazlar (tezgâha göre yerel konum, Y dönüşü) — mağaza paketinin yerleşiminden
